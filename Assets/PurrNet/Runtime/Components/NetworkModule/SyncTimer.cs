@@ -81,6 +81,9 @@ namespace PurrNet
         [TargetRpc]
         private void BufferPlayer([UsedImplicitly] PlayerID player, float timeRemaining, TimerState state)
         {
+            if (IsController(_ownerAuth))
+                return;
+
             _remaining = timeRemaining;
             _state = state;
         }
