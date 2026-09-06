@@ -1,3 +1,10 @@
+# [1.23.0-beta.35](https://github.com/PurrNet/PurrNet/compare/v1.23.0-beta.34...v1.23.0-beta.35) (2026-09-06)
+
+
+### Bug Fixes
+
+* UDP GC for .netstandard ([6e7668c](https://github.com/PurrNet/PurrNet/commit/6e7668cfd28711da0a6db6d8d868688c03e06e90))
+
 # [1.23.0-beta.34](https://github.com/PurrNet/PurrNet/compare/v1.23.0-beta.33...v1.23.0-beta.34) (2026-09-06)
 
 
