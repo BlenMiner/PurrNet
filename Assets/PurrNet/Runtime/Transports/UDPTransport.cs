@@ -30,6 +30,9 @@ namespace PurrNet.Transports
         [SerializeField]
         private float _timeoutInSeconds = 5f;
 
+        [Tooltip("Use native UDP sockets on supported Windows/Linux runtimes to avoid per-packet socket allocations. Other platforms use managed sockets. Applied when the transport is enabled.")]
+        [SerializeField] private bool _useNativeSockets = true;
+
         [SerializeField] private NetworkSimulation _networkSimulation = NetworkSimulation.@default;
 
         public event OnConnected onConnected;
@@ -179,6 +182,7 @@ namespace PurrNet.Transports
                 UnconnectedMessagesEnabled = true,
                 PingInterval = 900,
                 AutoRecycle = true,
+                UseNativeSockets = _useNativeSockets,
                 EnableStatistics = false,
                 DisconnectTimeout = Mathf.RoundToInt(_timeoutInSeconds * 1000)
             };
@@ -188,6 +192,7 @@ namespace PurrNet.Transports
                 UnconnectedMessagesEnabled = true,
                 PingInterval = 900,
                 AutoRecycle = true,
+                UseNativeSockets = _useNativeSockets,
                 EnableStatistics = false,
                 DisconnectTimeout = Mathf.RoundToInt(_timeoutInSeconds * 1000)
             };

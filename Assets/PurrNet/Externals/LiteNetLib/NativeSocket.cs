@@ -129,6 +129,10 @@ namespace LiteNetLib
 
         static NativeSocket()
         {
+#if UNITY_5_3_OR_NEWER && !(UNITY_EDITOR_WIN || UNITY_EDITOR_LINUX || UNITY_STANDALONE_WIN || UNITY_STANDALONE_LINUX)
+            // Other Unity targets keep managed sockets even if their runtime reports Linux.
+            return;
+#else
             if (RuntimeInformation.IsOSPlatform(OSPlatform.Linux))
             {
                 IsSupported = true;
@@ -138,6 +142,7 @@ namespace LiteNetLib
             {
                 IsSupported = true;
             }
+#endif
         }
 
         /// <summary>
@@ -218,5 +223,13 @@ namespace LiteNetLib
             UnixMode
                 ? (short)(remoteEndPoint.AddressFamily == AddressFamily.InterNetwork ? AF_INET : AF_INET6)
                 : (short)remoteEndPoint.AddressFamily;
+
+        internal static void SetNativeAddressFamily(byte[] address, IPEndPoint endPoint)
+        {
+            short family = GetNativeAddressFamily(endPoint);
+            // sockaddr's family uses host byte order. Linux IPv6 is 10; managed IPv6 is 23.
+            address[0] = (byte)(BitConverter.IsLittleEndian ? family : family >> 8);
+            address[1] = (byte)(BitConverter.IsLittleEndian ? family >> 8 : family);
+        }
     }
 }

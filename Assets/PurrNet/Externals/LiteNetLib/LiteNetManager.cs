@@ -56,9 +56,7 @@ namespace LiteNetLib
 #if DEBUG || SIMULATE_NETWORK
         private struct OutboundDelayedPacket
         {
-            public byte[] Data;
-            public int Start;
-            public int Length;
+            public NetPacket Data;
             public IPEndPoint EndPoint;
             public DateTime TimeWhenSend;
         }
@@ -90,7 +88,7 @@ namespace LiteNetLib
 
         /// <summary>
         ///     Used with <see cref="SimulateLatency"/> and <see cref="SimulatePacketLoss"/> to tag packets that
-        ///     need to be dropped. Only relevant when <c>DEBUG</c> is defined.
+        ///     should not be processed immediately. Only relevant in builds with network simulation.
         /// </summary>
         private bool _dropPacket;
 
@@ -249,8 +247,9 @@ namespace LiteNetLib
         public LiteNetPeer FirstPeer => _headPeer;
 
         /// <summary>
-        /// Experimental feature mostly for servers. Only for Windows/Linux
-        /// use direct socket calls for send/receive to drastically increase speed and reduce GC pressure
+        /// Use direct socket calls on supported Windows/Linux runtimes, including manual mode.
+        /// Known-peer traffic reuses native address storage to avoid per-datagram socket allocations.
+        /// Configure before Start. Unsupported platforms fall back to managed sockets.
         /// </summary>
         public bool UseNativeSockets = false;
 
@@ -558,9 +557,10 @@ namespace LiteNetLib
                     var incomingData = _pingSimulationList[i];
                     if (incomingData.TimeWhenGet <= time)
                     {
-                        HandleMessageReceived(incomingData.Data, incomingData.EndPoint);
                         _pingSimulationList.RemoveAt(i);
                         i--;
+                        // Ownership passes to message handling, including when a user callback throws.
+                        HandleMessageReceived(incomingData.Data, incomingData.EndPoint);
                     }
                 }
             }
@@ -573,10 +573,17 @@ namespace LiteNetLib
                     var outboundData = _outboundSimulationList[i];
                     if (outboundData.TimeWhenSend <= time)
                     {
-                        // Send the delayed packet directly to socket layer bypassing simulation
-                        SendRawCore(outboundData.Data, outboundData.Start, outboundData.Length, outboundData.EndPoint);
                         _outboundSimulationList.RemoveAt(i);
                         i--;
+                        try
+                        {
+                            // Send the delayed packet directly to socket layer bypassing simulation.
+                            SendRawCore(outboundData.Data.RawData, 0, outboundData.Data.Size, outboundData.EndPoint);
+                        }
+                        finally
+                        {
+                            PoolRecycle(outboundData.Data);
+                        }
                     }
                 }
             }
@@ -741,12 +748,16 @@ namespace LiteNetLib
             }
 
             _dropPacket = false;
-            HandleSimulateLatency(packet, remoteEndPoint);
             HandleSimulatePacketLoss();
             if (_dropPacket)
             {
+                PoolRecycle(packet);
                 return;
             }
+
+            HandleSimulateLatency(packet, remoteEndPoint);
+            if (_dropPacket)
+                return;
 
             // ProcessEvents
             HandleMessageReceived(packet, remoteEndPoint);
@@ -799,17 +810,15 @@ namespace LiteNetLib
             int outboundLatency = roundTripLatency / 2;
             if (outboundLatency > MinLatencyThreshold)
             {
-                // Create a copy of the data to avoid issues with recycled packets
-                byte[] dataCopy = new byte[length];
-                Array.Copy(data, start, dataCopy, 0, length);
+                // Keep an independent pooled copy until the simulated send is due.
+                var dataCopy = PoolGetPacket(length);
+                Buffer.BlockCopy(data, start, dataCopy.RawData, 0, length);
 
                 lock (_outboundSimulationList)
                 {
                     _outboundSimulationList.Add(new OutboundDelayedPacket
                     {
                         Data = dataCopy,
-                        Start = 0,
-                        Length = length,
                         EndPoint = remoteEndPoint,
                         TimeWhenSend = DateTime.UtcNow.AddMilliseconds(outboundLatency)
                     });
@@ -1517,7 +1526,11 @@ namespace LiteNetLib
         private void ClearPingSimulationList()
         {
             lock (_pingSimulationList)
+            {
+                for (int i = 0; i < _pingSimulationList.Count; i++)
+                    PoolRecycle(_pingSimulationList[i].Data);
                 _pingSimulationList.Clear();
+            }
         }
 
         [Conditional("DEBUG"), Conditional("SIMULATE_NETWORK")]
@@ -1525,7 +1538,11 @@ namespace LiteNetLib
         {
 #if DEBUG || SIMULATE_NETWORK
             lock (_outboundSimulationList)
+            {
+                for (int i = 0; i < _outboundSimulationList.Count; i++)
+                    PoolRecycle(_outboundSimulationList[i].Data);
                 _outboundSimulationList.Clear();
+            }
 #endif
         }
 

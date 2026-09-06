@@ -1,4 +1,5 @@
 ﻿using System;
+using System.Collections.Generic;
 using System.Net;
 using System.Threading;
 
@@ -64,6 +65,7 @@ namespace LiteNetLib
         private int _lastIndex;
         private int _freeList = -1;
         private LiteNetPeer[] _peersArray = new LiteNetPeer[32];
+        private Dictionary<NativeEndPoint, LiteNetPeer> _nativePeers;
 
         protected readonly ReaderWriterLockSlim _peersLock = new ReaderWriterLockSlim(LockRecursionPolicy.NoRecursion);
         protected volatile LiteNetPeer _headPeer;
@@ -72,6 +74,7 @@ namespace LiteNetLib
         {
             _peersLock.EnterWriteLock();
             _headPeer = null;
+            _nativePeers?.Clear();
             if (_lastIndex > 0)
             {
                 Array.Clear(_slots, 0, _lastIndex);
@@ -188,6 +191,8 @@ namespace LiteNetLib
             {
                 if (_slots[i].HashCode == hashCode && _slots[i].Value.Equals(peer))
                 {
+                    if (peer.NativeAddress != null)
+                        _nativePeers?.Remove(new NativeEndPoint(peer.NativeAddress, peer.AddressFamily));
                     if (last < 0)
                         _buckets[bucket] = _slots[i].Next + 1;
                     else
@@ -210,6 +215,20 @@ namespace LiteNetLib
                 }
             }
             return false;
+        }
+
+        private bool TryGetNativePeer(NativeEndPoint endPoint, out LiteNetPeer peer)
+        {
+            _peersLock.EnterReadLock();
+            try
+            {
+                peer = null;
+                return _nativePeers != null && _nativePeers.TryGetValue(endPoint, out peer);
+            }
+            finally
+            {
+                _peersLock.ExitReadLock();
+            }
         }
 
         private bool TryGetPeer(IPEndPoint endPoint, out LiteNetPeer actualValue)
@@ -315,6 +334,12 @@ namespace LiteNetLib
             _slots[index].Next = _buckets[bucket] - 1;
             _buckets[bucket] = index + 1;
             _count++;
+
+            if (value.NativeAddress != null)
+            {
+                _nativePeers ??= new Dictionary<NativeEndPoint, LiteNetPeer>();
+                _nativePeers[new NativeEndPoint(value.NativeAddress, value.AddressFamily)] = value;
+            }
 
             return true;
         }

@@ -272,6 +272,7 @@ namespace LiteNetLib
                 NativeAddress = new byte[_cachedSocketAddr.Size];
                 for (int i = 0; i < _cachedSocketAddr.Size; i++)
                     NativeAddress[i] = _cachedSocketAddr[i];
+                NativeSocket.SetNativeAddressFamily(NativeAddress, this);
             }
 #if NET8_0_OR_GREATER
             _cachedHashCode = NetManager.UseNativeSockets ? base.GetHashCode() : _cachedSocketAddr.GetHashCode();
@@ -313,6 +314,7 @@ namespace LiteNetLib
                 NativeAddress = new byte[_cachedSocketAddr.Size];
                 for (int i = 0; i < _cachedSocketAddr.Size; i++)
                     NativeAddress[i] = _cachedSocketAddr[i];
+                NativeSocket.SetNativeAddressFamily(NativeAddress, this);
             }
 #if NET8_0_OR_GREATER
             _cachedHashCode = NetManager.UseNativeSockets ? base.GetHashCode() : _cachedSocketAddr.GetHashCode();
