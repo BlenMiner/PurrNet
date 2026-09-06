@@ -2,7 +2,6 @@ using System;
 using System.Collections.Generic;
 using System.Text;
 using System.Threading.Tasks;
-using Newtonsoft.Json;
 using PurrNet.Transports;
 using PurrNet.Utils;
 using UnityEngine;
@@ -81,7 +80,7 @@ namespace PurrNet
                 if (!string.IsNullOrEmpty(ProjectId))
                     payload["project_id"] = ProjectId;
 
-                var json = JsonConvert.SerializeObject(payload);
+                var json = PurrJson.Serialize(payload);
                 var bodyRaw = Encoding.UTF8.GetBytes(json);
 
                 var request = new UnityWebRequest(ENDPOINT, "POST");

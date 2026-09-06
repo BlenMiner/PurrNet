@@ -18,7 +18,6 @@
     "overrideReferences": true,
     "precompiledReferences": [
         "System.Collections.Immutable.dll",
-        "Newtonsoft.Json.dll",
         "K4os.Compression.LZ4.dll",
         "Ruffles.dll",
         "System.Runtime.CompilerServices.Unsafe.dll"

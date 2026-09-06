@@ -1,5 +1,4 @@
 #if UNITY_EDITOR
-using Newtonsoft.Json.Linq;
 using UnityEditor;
 #else
 using UnityEngine.Scripting;
@@ -33,8 +32,14 @@ namespace PurrNet.Utils
             if (asset == null)
                 return null;
 
-            var json = JObject.Parse(asset.text);
-            return 'v' + (json["version"]?.ToString() ?? "?");
+            var json = JsonUtility.FromJson<PackageJson>(asset.text);
+            return 'v' + (string.IsNullOrEmpty(json?.version) ? "?" : json.version);
+        }
+
+        [System.Serializable]
+        private class PackageJson
+        {
+            public string version;
         }
 #else
         [RuntimeInitializeOnLoadMethod(RuntimeInitializeLoadType.SubsystemRegistration), Preserve]

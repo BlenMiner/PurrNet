@@ -1,5 +1,4 @@
 using System;
-using Newtonsoft.Json;
 
 namespace PurrNet.Transports
 {
@@ -11,13 +10,10 @@ namespace PurrNet.Transports
             return HashCode.Combine(connectionId, isValid);
         }
 
-        [JsonProperty]
         public int connectionId { get; private set; }
 
-        [JsonProperty]
         public bool isValid { get; private set; }
 
-        [JsonConstructor]
         public Connection(int connectionId, bool isValid)
         {
             this.connectionId = connectionId;

@@ -1,19 +1,26 @@
-﻿using Newtonsoft.Json;
+﻿using System.Collections.Generic;
 
 namespace PurrNet.Edgegap.Runtime
 {
     public class PortMappingData
     {
-        [JsonProperty("name")]
         public string name { get; private set; }
 
-        [JsonProperty("internal")]
         public int internalPort { get; private set; }
 
-        [JsonProperty("external")]
         public int externalPort { get; private set; }
 
-        [JsonProperty("protocol")]
         public string protocol { get; private set; }
+
+        internal static PortMappingData Parse(Dictionary<string, object> json)
+        {
+            return new PortMappingData
+            {
+                name = EdgegapJson.GetString(json, "name"),
+                internalPort = EdgegapJson.GetInt(json, "internal"),
+                externalPort = EdgegapJson.GetInt(json, "external"),
+                protocol = EdgegapJson.GetString(json, "protocol")
+            };
+        }
     }
 }
