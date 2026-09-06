@@ -347,7 +347,6 @@ namespace PurrNet.Modules
                 return;
 
             bool committed = false;
-            bool initialAbsoluteApplied = false;
             var decoded = ListPool<NTUnreliableEntry>.Instantiate();
 
             try
@@ -445,8 +444,7 @@ namespace PurrNet.Modules
                             if (state.frame == NetworkTransformFrame.LocalIdentity)
                                 _factory.TryGetIdentity(_scene, state.parentId, out frameParent);
 
-                            if (nt.TryApplyUnreliableState(state, gen, packetOrder, data.tick, frameParent, isAbsolute,
-                                    out bool initialAbsolute))
+                            if (nt.TryApplyUnreliableState(state, gen, packetOrder, data.tick, frameParent, isAbsolute))
                             {
                                 decoded.Add(new NTUnreliableEntry
                                 {
@@ -457,7 +455,6 @@ namespace PurrNet.Modules
                                     gen = gen
                                 });
                                 recorded = true;
-                                initialAbsoluteApplied |= initialAbsolute;
                             }
                         }
                     }
@@ -476,7 +473,6 @@ namespace PurrNet.Modules
                 slot = new NTUnreliableSlot { used = true, seq = data.seq, entries = decoded };
                 decoded = null;
                 stream.ackDirty = true;
-                stream.urgentAck |= initialAbsoluteApplied;
                 stream.packetsSinceAck++;
                 committed = true;
             }
@@ -523,7 +519,7 @@ namespace PurrNet.Modules
                 return false;
 
             stream.ackDelayTicks++;
-            return stream.urgentAck || stream.ackDelayTicks >= NTUnreliable.ACK_INTERVAL_TICKS;
+            return stream.ackDelayTicks >= NTUnreliable.ACK_INTERVAL_TICKS;
         }
 
         private void OnUnreliableAck(PlayerID player, NetworkTransformUnreliableAck data, bool asServer)
@@ -698,7 +694,6 @@ namespace PurrNet.Modules
             using var _ = _flushAckMarker.Auto();
 
             stream.ackDirty = false;
-            stream.urgentAck = false;
             stream.ackDelayTicks = 0;
             stream.packetsSinceAck = 0;
 
@@ -1138,7 +1133,6 @@ namespace PurrNet.Modules
             if (_recvStreams.TryGetValue(player, out var recv) && recv.ackInit && recv.ackDirty)
             {
                 recv.ackDirty = false;
-                recv.urgentAck = false;
                 recv.ackDelayTicks = 0;
                 recv.packetsSinceAck = 0;
                 delta.ack = new NetworkTransformUnreliableAckHeader
