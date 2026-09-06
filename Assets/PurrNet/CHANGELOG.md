@@ -1,3 +1,10 @@
+# [1.23.0-beta.33](https://github.com/PurrNet/PurrNet/compare/v1.23.0-beta.32...v1.23.0-beta.33) (2026-09-06)
+
+
+### Bug Fixes
+
+* revert NT ACK patch, it was not worth it ([32e6053](https://github.com/PurrNet/PurrNet/commit/32e6053cabbd570e8d3105326ce0ffae513a9744))
+
 # [1.23.0-beta.32](https://github.com/PurrNet/PurrNet/compare/v1.23.0-beta.31...v1.23.0-beta.32) (2026-09-06)
 
 
