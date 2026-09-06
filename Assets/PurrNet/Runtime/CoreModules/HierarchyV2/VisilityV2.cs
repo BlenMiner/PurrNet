@@ -1,12 +1,19 @@
 using System.Collections.Generic;
-using PurrNet.Collections;
 using PurrNet.Pooling;
+using Unity.Profiling;
 using UnityEngine;
 
 namespace PurrNet.Modules
 {
     internal class VisilityV2
     {
+        static readonly ProfilerMarker _refreshMarker = new ProfilerMarker("PurrNet.VisibilityV2.Refresh");
+        static readonly ProfilerMarker _evaluateMarker = new ProfilerMarker("PurrNet.VisibilityV2.Evaluate");
+        static readonly ProfilerMarker _evaluateAllMarker = new ProfilerMarker("PurrNet.VisibilityV2.EvaluateAll");
+        static readonly ProfilerMarker _clearMarker = new ProfilerMarker("PurrNet.VisibilityV2.Clear");
+        static readonly ProfilerMarker _clearPlayerMarker = new ProfilerMarker("PurrNet.VisibilityV2.ClearPlayer");
+        static readonly ProfilerMarker _notifyMarker = new ProfilerMarker("PurrNet.VisibilityV2.Notify");
+
         readonly NetworkManager _manager;
         readonly NetworkVisibilityRuleSet _defaultRuleSet;
 
@@ -20,230 +27,244 @@ namespace PurrNet.Modules
             _defaultRuleSet = manager.visibilityRules;
         }
 
-        /// <summary>
-        /// Refreshes visibility for the given GameObject for the specified player.
-        /// </summary>
-        /// <param name="player"></param>
-        /// <param name="transform"></param>
-        /// <returns>True if any visibility has changed</returns>
         public void RefreshVisibilityForGameObject(PlayerID player, Transform transform)
         {
-            if (!transform)
-                return;
-
-            RefreshVisibilityForGameObject(player, transform, _defaultRuleSet, true, false);
+            if (transform && transform.TryGetComponent(out NetworkIdentity identity))
+                RefreshVisibilityForGameObject(player, identity);
         }
 
-        public void RefreshVisibilityForGameObject(PlayerID player, Transform transform, NetworkIdentity parent)
+        public void RefreshVisibilityForGameObject(PlayerID player, NetworkIdentity identity,
+            NetworkIdentity parent = null)
         {
-            if (!transform)
+            using var marker = _refreshMarker.Auto();
+            if (!identity)
                 return;
 
             bool isParentVisible = !parent || parent.IsObserverOrPending(player);
-
-            RefreshVisibilityForGameObject(player, transform, _defaultRuleSet, isParentVisible, false);
-        }
-
-        public void ClearVisibilityForGameObject(Transform transform)
-        {
-            if (!transform)
-                return;
-
-            var affectedPlayers = HashSetPool<PlayerID>.Instantiate();
-
-            ClearVisibilityForGameObject(transform, affectedPlayers);
-
-            foreach (var player in affectedPlayers)
-                visibilityChanged?.Invoke(player, transform, false);
-
-            HashSetPool<PlayerID>.Destroy(affectedPlayers);
-        }
-
-        public void ClearVisibilityForGameObject(Transform transform, PlayerID player)
-        {
-            if (!transform)
-                return;
-
-            RefreshVisibilityForGameObject(transform, player);
-            visibilityChanged?.Invoke(player, transform, false);
-        }
-
-        private static bool RefreshVisibilityForGameObject(Transform transform, PlayerID player)
-        {
-            using var identities = DisposableList<NetworkIdentity>.Create(16);
-            transform.GetComponents(identities.list);
-
-            bool removed = false;
-
-            int ccount = identities.Count;
-            if (ccount == 0)
-                return removed;
-
-            for (var i = 0; i < ccount; i++)
+            var frame = EvaluateNode(player, identity, _defaultRuleSet, isParentVisible, false);
+            if (frame.childCount == 0)
             {
-                var identity = identities[i];
-                if (identity.TryRemoveObserver(player))
-                    removed = true;
+                if (frame.shouldTrigger)
+                    Notify(player, frame.scope, frame.isVisible);
+                return;
             }
 
-            var directChildren = identities[0].directChildren;
-            if (directChildren == null)
-                return removed;
+            using var traversalLease = DisposableList<VisibilityFrame>.Create(16);
+            var traversal = traversalLease.list;
 
-            var dcount = directChildren.Count;
-
-            for (var i = 0; i < dcount; i++)
+            while (true)
             {
-                if (i >= directChildren.Count)
+                if (TryGetNextChild(ref frame, out var child))
+                {
+                    traversal.Add(frame);
+                    frame = EvaluateNode(player, child, frame.rules, frame.isVisible, frame.wasParentDirtied);
+                    continue;
+                }
+
+                if (frame.shouldTrigger)
+                    Notify(player, frame.scope, frame.isVisible);
+
+                if (traversal.Count == 0)
                     break;
 
-                var child = directChildren[i];
-                if (!child)
-                    continue;
-
-                var childTransform = child.transform;
-                if (!childTransform)
-                    continue;
-
-                removed |= RefreshVisibilityForGameObject(childTransform, player);
+                int last = traversal.Count - 1;
+                frame = traversal[last];
+                traversal.RemoveAt(last);
             }
-
-            return removed;
         }
 
-        private static void ClearVisibilityForGameObject(Transform transform, HashSet<PlayerID> players)
+        private struct VisibilityFrame
         {
-            using var identities = DisposableList<NetworkIdentity>.Create(16);
-            transform.GetComponents(identities.list);
-
-            int ccount = identities.Count;
-            if (ccount == 0)
-                return;
-
-            for (var i = 0; i < ccount; i++)
-            {
-                var identity = identities[i];
-                var observers = identity.observers;
-                players.UnionWith(observers);
-                if (identity.hasPendingObservers)
-                    players.UnionWith(identity.pendingObservers);
-                identity.ClearObservers();
-            }
-
-            var directChildren = identities[0].directChildren;
-            if (directChildren == null)
-                return;
-
-            var dcount = directChildren.Count;
-
-            for (var i = 0; i < dcount; i++)
-            {
-                if (i >= directChildren.Count)
-                    break;
-
-                var child = directChildren[i];
-                if (!child)
-                    continue;
-
-                var childTransform = child.transform;
-                if (!childTransform)
-                    continue;
-
-                ClearVisibilityForGameObject(childTransform, players);
-            }
+            public Transform scope;
+            public IReadOnlyList<NetworkIdentity> children;
+            public int childCount;
+            public int nextChild;
+            public NetworkVisibilityRuleSet rules;
+            public bool isVisible;
+            public bool wasParentDirtied;
+            public bool shouldTrigger;
         }
 
-        private void RefreshVisibilityForGameObject(PlayerID player, Transform transform,
+        private VisibilityFrame EvaluateNode(PlayerID player, NetworkIdentity identity,
             NetworkVisibilityRuleSet rules, bool isParentVisible, bool wasParentDirtied)
         {
-            using var identities = DisposableList<NetworkIdentity>.Create(16);
+            var identities = identity.siblingIdentities;
+            var scope = identity.transform;
+            bool isVisible = Evaluate(player, identities, ref rules, isParentVisible, out bool fullyChanged);
+            bool shouldTrigger = !wasParentDirtied && fullyChanged;
+            var children = identities[0].directChildren;
+            return new VisibilityFrame
+            {
+                scope = scope,
+                children = children,
+                childCount = children?.Count ?? 0,
+                rules = rules,
+                isVisible = isVisible,
+                wasParentDirtied = wasParentDirtied || shouldTrigger,
+                shouldTrigger = shouldTrigger
+            };
+        }
 
-            transform.GetComponents(identities.list);
+        private static bool TryGetNextChild(ref VisibilityFrame frame, out NetworkIdentity child)
+        {
+            while (frame.nextChild < frame.childCount && frame.nextChild < frame.children.Count)
+            {
+                child = frame.children[frame.nextChild++];
+                if (child)
+                    return true;
+            }
 
-            if (identities.Count == 0)
+            child = null;
+            return false;
+        }
+
+        public void ClearVisibilityForGameObject(NetworkIdentity identity)
+        {
+            using var marker = _clearMarker.Auto();
+            if (!identity)
                 return;
 
-            var isVisible = Evaluate(player, identities.list, ref rules, isParentVisible, out bool fullyChanged, transform);
-            bool shouldTrigger = !wasParentDirtied && fullyChanged;
-
-            if (shouldTrigger)
-                wasParentDirtied = true;
-
-            var directChildren = identities[0].directChildren;
-            if (directChildren != null)
+            var scope = identity.transform;
+            var affectedPlayers = HashSetPool<PlayerID>.Instantiate();
+            try
             {
-                var count = directChildren.Count;
+                ClearObservers(identity, null, affectedPlayers);
+                foreach (var player in affectedPlayers)
+                    Notify(player, scope, false);
+            }
+            finally
+            {
+                HashSetPool<PlayerID>.Destroy(affectedPlayers);
+            }
+        }
 
-                for (var i = 0; i < count; i++)
+        public void ClearVisibilityForGameObject(NetworkIdentity identity, PlayerID player)
+        {
+            using var marker = _clearPlayerMarker.Auto();
+            if (!identity)
+                return;
+
+            var scope = identity.transform;
+            ClearObservers(identity, player, null);
+            Notify(player, scope, false);
+        }
+
+        private static void ClearObservers(NetworkIdentity root, PlayerID? player, HashSet<PlayerID> affectedPlayers)
+        {
+            var children = ClearNode(root, player, affectedPlayers);
+            if (children == null || children.Count == 0)
+                return;
+
+            using var traversalLease = DisposableList<NetworkIdentity>.Create(16);
+            var traversal = traversalLease.list;
+            for (var i = children.Count - 1; i >= 0; i--)
+                traversal.Add(children[i]);
+
+            while (traversal.Count > 0)
+            {
+                int last = traversal.Count - 1;
+                var current = traversal[last];
+                traversal.RemoveAt(last);
+
+                if (!current)
+                    continue;
+
+                children = ClearNode(current, player, affectedPlayers);
+
+                if (children == null)
+                    continue;
+
+                for (var i = children.Count - 1; i >= 0; i--)
+                    traversal.Add(children[i]);
+            }
+        }
+
+        private static IReadOnlyList<NetworkIdentity> ClearNode(NetworkIdentity current, PlayerID? player,
+            HashSet<PlayerID> affectedPlayers)
+        {
+            var identities = current.siblingIdentities;
+            for (var i = 0; i < identities.Length; i++)
+            {
+                var identity = identities[i];
+                if (!identity)
+                    continue;
+
+                if (player.HasValue)
                 {
-                    if (i >= directChildren.Count)
-                        break;
-
-                    var pair = directChildren[i];
-                    if (!pair)
-                        continue;
-
-                    var childTransform = pair.transform;
-                    if (!childTransform)
-                        continue;
-
-                    RefreshVisibilityForGameObject(player, childTransform, rules, isVisible, wasParentDirtied);
+                    identity.TryRemoveObserver(player.Value);
+                }
+                else
+                {
+                    affectedPlayers.UnionWith(identity.observers);
+                    if (identity.hasPendingObservers)
+                        affectedPlayers.UnionWith(identity.pendingObservers);
+                    identity.ClearObservers();
                 }
             }
 
-            if (shouldTrigger)
-                visibilityChanged?.Invoke(player, transform, isVisible);
+            return identities[0].directChildren;
+        }
+
+        private void Notify(PlayerID player, Transform scope, bool isVisible)
+        {
+            using var marker = _notifyMarker.Auto();
+            visibilityChanged?.Invoke(player, scope, isVisible);
         }
 
         public void EvaluateAll(IReadOnlyList<PlayerID> players, List<NetworkIdentity> identities)
         {
-            var hash = HashSetPool<NetworkIdentity>.Instantiate();
-
-            for (var i = 0; i < identities.Count; i++)
+            using var marker = _evaluateAllMarker.Auto();
+            var roots = HashSetPool<NetworkIdentity>.Instantiate();
+            try
             {
-                var nid = identities[i];
-                var root = nid.GetRootIdentity();
-
-                if (!root)
-                    continue;
-
-                hash.Add(root);
-            }
-
-
-            for (var i = 0; i < players.Count; i++)
-            {
-                var player = players[i];
-                foreach (var root in hash)
+                for (var i = 0; i < identities.Count; i++)
                 {
-                    RefreshVisibilityForGameObject(player, root.transform);
+                    var identity = identities[i];
+                    if (!identity)
+                        continue;
+                    var root = identity.GetRootIdentity();
+                    if (root)
+                        roots.Add(root.siblingIdentities[0]);
+                }
+
+                for (var i = 0; i < players.Count; i++)
+                {
+                    var player = players[i];
+                    foreach (var root in roots)
+                        RefreshVisibilityForGameObject(player, root);
                 }
             }
-
-            HashSetPool<NetworkIdentity>.Destroy(hash);
+            finally
+            {
+                HashSetPool<NetworkIdentity>.Destroy(roots);
+            }
         }
 
         /// <summary>
         /// Evaluate visibility of the object.
         /// Also adds/removes observers based on the visibility.
         /// </summary>
-        private bool Evaluate(PlayerID player, List<NetworkIdentity> identities,
-            ref NetworkVisibilityRuleSet rules, bool isParentVisible, out bool fullyChanged, Transform transform)
+        private bool Evaluate(PlayerID player, NetworkIdentity[] identities,
+            ref NetworkVisibilityRuleSet rules, bool isParentVisible, out bool fullyChanged)
         {
+            using var marker = _evaluateMarker.Auto();
             fullyChanged = false;
 
             if (!isParentVisible)
             {
-                for (var i = 0; i < identities.Count; i++)
-                    identities[i].TryRemoveObserver(player);
+                for (var i = 0; i < identities.Length; i++)
+                    if (identities[i])
+                        identities[i].TryRemoveObserver(player);
                 return false;
             }
 
             bool isAnyVisible = false;
 
-            for (var i = 0; i < identities.Count; i++)
+            for (var i = 0; i < identities.Length; i++)
             {
                 var identity = identities[i];
+                if (!identity)
+                    continue;
 
                 if (identity.whitelist.Contains(player))
                 {

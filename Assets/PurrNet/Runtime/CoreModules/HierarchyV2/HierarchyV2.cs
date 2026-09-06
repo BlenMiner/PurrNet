@@ -655,7 +655,7 @@ namespace PurrNet.Modules
                 for (var i = 0; i < players.Count; i++)
                 {
                     var player = players[i];
-                    _visibility.RefreshVisibilityForGameObject(player, idTrs, parent);
+                    _visibility.RefreshVisibilityForGameObject(player, first, parent);
                 }
 
                 FlushSpawnPackets();
@@ -773,11 +773,10 @@ namespace PurrNet.Modules
 
             if (_asServer && _scenePlayers.TryGetPlayersInScene(_sceneId, out var players))
             {
-                var trs = identity.transform;
                 for (var i = 0; i < players.Count; i++)
                 {
                     var player = players[i];
-                    _visibility.RefreshVisibilityForGameObject(player, trs, closestNid);
+                    _visibility.RefreshVisibilityForGameObject(player, first, closestNid);
                 }
 
                 _manager.FlushBatchedRPCs();
@@ -1097,7 +1096,7 @@ namespace PurrNet.Modules
                 if (_scenePlayers.TryGetPlayersInScene(_sceneId, out var players))
                 {
                     for (var i = 0; i < players.Count; i++)
-                        _visibility.RefreshVisibilityForGameObject(players[i], root.transform);
+                        _visibility.RefreshVisibilityForGameObject(players[i], root);
                 }
             }
             finally
@@ -1245,7 +1244,7 @@ namespace PurrNet.Modules
                 if (!root || !roots.Add(root))
                     continue;
 
-                _visibility.ClearVisibilityForGameObject(root.transform, player);
+                _visibility.ClearVisibilityForGameObject(root, player);
             }
             FlushSpawnPackets();
             HashSetPool<NetworkIdentity>.Destroy(roots);
@@ -2222,7 +2221,7 @@ namespace PurrNet.Modules
                 if (!root || !roots.Add(root))
                     continue;
 
-                _visibility.RefreshVisibilityForGameObject(player, root.transform);
+                _visibility.RefreshVisibilityForGameObject(player, root);
             }
 
             FlushSpawnPackets();
@@ -2255,7 +2254,7 @@ namespace PurrNet.Modules
                 if (!id || id.isManualSpawn) continue;
                 var root = id.GetRootIdentity();
                 if (root && roots.Add(root))
-                    _visibility.RefreshVisibilityForGameObject(player, root.transform);
+                    _visibility.RefreshVisibilityForGameObject(player, root);
             }
 
             FlushSpawnPackets();
@@ -2272,10 +2271,11 @@ namespace PurrNet.Modules
         {
             if (_asServer && _scenePlayers.TryGetPlayersInScene(_sceneId, out var players))
             {
+                var identity = root ? root.GetComponent<NetworkIdentity>() : null;
                 for (var index = 0; index < players.Count; index++)
                 {
                     var player = players[index];
-                    _visibility.RefreshVisibilityForGameObject(player, root);
+                    _visibility.RefreshVisibilityForGameObject(player, identity);
                 }
 
                 FlushSpawnPackets();
@@ -3014,7 +3014,7 @@ namespace PurrNet.Modules
                     for (var i = 0; i < players.Count; i++)
                     {
                         var player = players[i];
-                        _visibility.RefreshVisibilityForGameObject(player, gameObject.transform);
+                        _visibility.RefreshVisibilityForGameObject(player, id);
                     }
                 }
                 finally
@@ -3149,7 +3149,7 @@ namespace PurrNet.Modules
 
             if (_asServer)
             {
-                _visibility.ClearVisibilityForGameObject(gameObject.transform);
+                _visibility.ClearVisibilityForGameObject(children[0]);
 
                 for (var i = 0; i < c; i++)
                 {

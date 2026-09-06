@@ -34,6 +34,32 @@ namespace PurrNet
 
         [SerializeField, HideInInspector] private List<NetworkIdentity> _directChildren;
 
+        private NetworkIdentity[] _siblingIdentities;
+
+        internal NetworkIdentity[] siblingIdentities
+        {
+            get
+            {
+                if (_siblingIdentities != null)
+                    return _siblingIdentities;
+
+                var siblings = GetComponents<NetworkIdentity>();
+                for (var i = 0; i < siblings.Length; i++)
+                    siblings[i]._siblingIdentities = siblings;
+                return siblings;
+            }
+        }
+
+        private void InvalidateSiblingIdentities()
+        {
+            var siblings = _siblingIdentities;
+            if (siblings == null)
+                return;
+
+            for (var i = 0; i < siblings.Length; i++)
+                siblings[i]._siblingIdentities = null;
+        }
+
         public event Action<PlayerID> onObserverAdded;
 
         public event Action<PlayerID> onObserverRemoved;
@@ -105,7 +131,7 @@ namespace PurrNet
 
         public bool isSetup => _isSetup;
 
-        public bool skipSceneAutoSpawning { get; set; } = false;
+        public bool skipSceneAutoSpawning { get; set; }
 
         /// <summary>
         /// Used for internal cleanup, avoid using this.
@@ -113,6 +139,7 @@ namespace PurrNet
         public void ResetIsSetup()
         {
             _isSetup = false;
+            InvalidateSiblingIdentities();
         }
 
         public void PreparePrefabInfo(int prefabId, int componentIndex, bool shouldBePooled, bool isSceneObject)
@@ -143,6 +170,8 @@ namespace PurrNet
             RecalculateNearestPath();
 
             var firstIdentity = GetComponent<NetworkIdentity>();
+            // Preparing a newly added component must also invalidate the existing siblings.
+            firstIdentity.InvalidateSiblingIdentities();
 
             if (firstIdentity != this)
                 _directChildren = new List<NetworkIdentity>();
@@ -412,15 +441,15 @@ namespace PurrNet
             if (_pendingObservers == null)
                 return;
 
-            var pendingObservers = _pendingObservers;
+            var cached = _pendingObservers;
             _pendingObservers = null;
-            ListPool<PlayerID>.Destroy(pendingObservers);
+            ListPool<PlayerID>.Destroy(cached);
         }
 
-        [UsedByIL]
+        [UsedByIL, UsedImplicitly]
         public virtual void OnReceivedRpc(int id, RPCPacket packet, RPCInfo info, bool asServer) { }
 
-        [UsedByIL]
+        [UsedByIL, UsedImplicitly]
         public static void OnReceivedRpc(int id, StaticRPCPacket packet, RPCInfo info, bool asServer) { }
 
         [UsedImplicitly]
@@ -1248,6 +1277,7 @@ namespace PurrNet
             }
             finally
             {
+                InvalidateSiblingIdentities();
                 ReleasePendingObservers();
             }
         }
