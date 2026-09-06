@@ -861,13 +861,13 @@ namespace PurrNet.Modules
             public GameObject result;
             public bool flushData;
             public bool cancelled;
-            public bool packetDisposed;
+            bool _packetDisposed;
 
             public void DisposePacket()
             {
-                if (packetDisposed)
+                if (_packetDisposed)
                     return;
-                packetDisposed = true;
+                _packetDisposed = true;
                 packet.Dispose();
             }
         }
@@ -3029,7 +3029,7 @@ namespace PurrNet.Modules
             AutoAssignOwnership(id);
         }
 
-        private static int _supressAutoOwner = 0;
+        private static int _supressAutoOwner;
 
         public static void SupressAutoOwner()
         {
@@ -3648,7 +3648,7 @@ namespace PurrNet.Modules
 
             for (var i = 0; i < aLength; i++)
             {
-                if (a[i] != b[i])
+                if (a![i] != b![i])
                     return false;
             }
             return true;
@@ -3669,7 +3669,7 @@ namespace PurrNet.Modules
 
             for (var i = 0; i < aLength; i++)
             {
-                if (!string.Equals(a[i], b[i], StringComparison.Ordinal))
+                if (!string.Equals(a![i], b![i], StringComparison.Ordinal))
                     return false;
             }
             return true;
