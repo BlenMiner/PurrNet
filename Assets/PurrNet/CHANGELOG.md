@@ -1,3 +1,10 @@
+# [1.23.0-beta.38](https://github.com/PurrNet/PurrNet/compare/v1.23.0-beta.37...v1.23.0-beta.38) (2026-09-06)
+
+
+### Performance Improvements
+
+* cut spawn churn garbage and per-player finish packets ([2e630ad](https://github.com/PurrNet/PurrNet/commit/2e630ad88c6cae46618b700e8e6d7fe261e4700a))
+
 # [1.23.0-beta.37](https://github.com/PurrNet/PurrNet/compare/v1.23.0-beta.36...v1.23.0-beta.37) (2026-09-06)
 
 
