@@ -846,4 +846,41 @@ public class RPCBatchTests
         Assert.That(received[new BatchKey { playerId = target, channel = Channel.Unreliable }],
             Is.EqualTo(new[] { 0, 1 }));
     }
+
+    static int FramingBitsPerEntry(bool consecutiveIds, int count, out int payloadBits)
+    {
+        using var backend = new TestRPCBatchBackend();
+        using var batch = new RPCBatch(backend, (sender, header, content, asServer) => { });
+        var targets = new List<PlayerID> { new PlayerID(1, false), new PlayerID(2, false), new PlayerID(3, false) };
+        using var content = BitPackerPool.Get();
+        content.WriteBits(0x12345678UL, 32);
+        payloadBits = content.positionInBits;
+
+        for (int i = 0; i < count; i++)
+        {
+            var header = new UnionRPCHeader(new NetworkIdentityRPCHeader
+            {
+                senderId = PlayerID.Server,
+                networkId = new NetworkID((ulong)(consecutiveIds ? 200 + i : 200)),
+                sceneId = new SceneID(0),
+                rpcId = new Size(3),
+                targetId = null
+            });
+            batch.Queue(targets, header, new BitData(content), Channel.ReliableOrdered);
+        }
+
+        batch.Flush();
+        Assert.That(backend.sent.Count, Is.EqualTo(3));
+        return backend.sent[0].data.positionInBits - payloadBits * count;
+    }
+
+    [Test]
+    public void ObserverRpcBatchFramingPerEntry()
+    {
+        const int count = 100;
+        int consecutive = FramingBitsPerEntry(true, count, out _);
+        int identical = FramingBitsPerEntry(false, count, out _);
+        Assert.That(consecutive, Is.LessThanOrEqualTo(24 * count), "a batched identity RPC to the next id should cost about 3 bytes of framing");
+        Assert.That(identical, Is.LessThanOrEqualTo(4 * count));
+    }
 }

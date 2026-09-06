@@ -11,6 +11,23 @@ namespace PurrNet
     public static class PackNetworkIdentity
     {
         [UsedByIL]
+        public static bool WriteNetworkIDDelta(BitPacker packer, NetworkID oldvalue, NetworkID newvalue)
+        {
+            bool changed = DeltaPacker<PlayerID>.Write(packer, oldvalue.scope, newvalue.scope);
+            return DeltaPackInteger.WriteUInt64(packer, oldvalue.id, newvalue.id) || changed;
+        }
+
+        [UsedByIL]
+        public static void ReadNetworkIDDelta(BitPacker packer, NetworkID oldvalue, ref NetworkID value)
+        {
+            var scope = oldvalue.scope;
+            DeltaPacker<PlayerID>.Read(packer, oldvalue.scope, ref scope);
+            var id = oldvalue.id;
+            DeltaPackInteger.ReadUInt64(packer, oldvalue.id, ref id);
+            value = new NetworkID(id, scope);
+        }
+
+        [UsedByIL]
         public static void WriteIdentityConcrete(this BitPacker packer, NetworkIdentity identity)
         {
             WriteIdentity(packer, identity);

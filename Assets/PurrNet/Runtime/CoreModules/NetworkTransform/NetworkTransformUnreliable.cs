@@ -82,6 +82,37 @@ namespace PurrNet.Modules
         public NetworkTransform transform;
     }
 
+    internal sealed class NTSharedEntries : List<NTUnreliableEntry>
+    {
+        public int refs;
+
+        private static readonly Stack<NTSharedEntries> _pool = new();
+
+        public static NTSharedEntries Rent() => _pool.Count > 0 ? _pool.Pop() : new NTSharedEntries();
+
+        public static void Retain(List<NTUnreliableEntry> entries)
+        {
+            if (entries is NTSharedEntries shared)
+                shared.refs++;
+        }
+
+        public static void Release(List<NTUnreliableEntry> entries)
+        {
+            if (entries is not NTSharedEntries shared)
+            {
+                ListPool<NTUnreliableEntry>.Destroy(entries);
+                return;
+            }
+
+            if (--shared.refs > 0)
+                return;
+
+            shared.refs = 0;
+            shared.Clear();
+            _pool.Push(shared);
+        }
+    }
+
     internal struct NTBaselineSlot
     {
         public bool has;
@@ -116,6 +147,48 @@ namespace PurrNet.Modules
         public bool hasPrevPrev;
         public bool restConfirmed;
         public byte redundancy;
+        public int refs;
+
+        private static readonly Stack<NTLastAdaptiveWrite> _pool = new();
+
+        public static NTLastAdaptiveWrite Rent() => _pool.Count > 0 ? _pool.Pop() : new NTLastAdaptiveWrite();
+
+        public static void Release(NTLastAdaptiveWrite write)
+        {
+            if (write == null || --write.refs > 0)
+                return;
+
+            write.tick = 0;
+            write.prevTick = 0;
+            write.prevPrevTick = 0;
+            write.revision = 0;
+            write.state = default;
+            write.prevState = default;
+            write.prevPrevState = default;
+            write.refreshInterval = 0;
+            write.hasPrev = false;
+            write.hasPrevPrev = false;
+            write.restConfirmed = false;
+            write.redundancy = 0;
+            write.refs = 0;
+            _pool.Push(write);
+        }
+
+        public void CopyFrom(NTLastAdaptiveWrite other)
+        {
+            tick = other.tick;
+            prevTick = other.prevTick;
+            prevPrevTick = other.prevPrevTick;
+            revision = other.revision;
+            state = other.state;
+            prevState = other.prevState;
+            prevPrevState = other.prevPrevState;
+            refreshInterval = other.refreshInterval;
+            hasPrev = other.hasPrev;
+            hasPrevPrev = other.hasPrevPrev;
+            restConfirmed = other.restConfirmed;
+            redundancy = other.redundancy;
+        }
     }
 
     internal struct NTUnreliableGeneration
@@ -173,7 +246,25 @@ namespace PurrNet.Modules
         {
             int index = nt.GetNTIndex(asServer);
             if (index >= 0 && index < adaptiveByIndex.Length)
-                adaptiveByIndex[index] = value;
+                SetAdaptiveAt(index, value);
+        }
+
+        public void SetAdaptiveAt(int index, NTLastAdaptiveWrite value)
+        {
+            var current = adaptiveByIndex[index];
+            if (ReferenceEquals(current, value))
+                return;
+
+            if (value != null)
+                value.refs++;
+            adaptiveByIndex[index] = value;
+            NTLastAdaptiveWrite.Release(current);
+        }
+
+        public void ReleaseAdaptive()
+        {
+            for (int i = 0; i < adaptiveByIndex.Length; i++)
+                SetAdaptiveAt(i, null);
         }
 
         public bool IsPending(NetworkTransform nt)
@@ -329,7 +420,7 @@ namespace PurrNet.Modules
             for (int i = 0; i < ring.Length; i++)
             {
                 if (ring[i].entries != null)
-                    ListPool<NTUnreliableEntry>.Destroy(ring[i].entries);
+                    NTSharedEntries.Release(ring[i].entries);
                 ring[i] = default;
             }
         }

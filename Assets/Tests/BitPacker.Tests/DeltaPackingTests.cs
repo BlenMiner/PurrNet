@@ -163,6 +163,38 @@ public class DeltaFloatBitPerfectionTests
     }
 
     [Test]
+    public void NetworkIDDelta_RoundTripsAndStaysCompact()
+    {
+        var pairs = new (NetworkID from, NetworkID to)[]
+        {
+            (new NetworkID(200), new NetworkID(201)),
+            (new NetworkID(200), new NetworkID(200)),
+            (new NetworkID(10, new PlayerID(2, false)), new NetworkID(9, new PlayerID(2, false))),
+            (new NetworkID(5, new PlayerID(3, false)), new NetworkID(900000, new PlayerID(7, true))),
+            (default, new NetworkID(ulong.MaxValue, new PlayerID(ulong.MaxValue, false))),
+        };
+
+        foreach (var (from, to) in pairs)
+        {
+            packer.ResetPositionAndMode(false);
+            bool changed = DeltaPacker<NetworkID>.Write(packer, from, to);
+            int written = packer.positionInBits;
+            Assert.That(changed, Is.EqualTo(!from.Equals(to)), $"{from} -> {to}");
+
+            packer.ResetPositionAndMode(true);
+            NetworkID read = default;
+            DeltaPacker<NetworkID>.Read(packer, from, ref read);
+            Assert.That(read, Is.EqualTo(to), $"{from} -> {to}");
+            Assert.That(read.scope.isBot, Is.EqualTo(to.scope.isBot), $"{from} -> {to}");
+            Assert.That(packer.positionInBits, Is.EqualTo(written), $"{from} -> {to} read a different length");
+        }
+
+        packer.ResetPositionAndMode(false);
+        DeltaPacker<NetworkID>.Write(packer, new NetworkID(200), new NetworkID(201));
+        Assert.That(packer.positionInBits, Is.LessThanOrEqualTo(12), "the next id in a batch should cost about a byte");
+    }
+
+    [Test]
     public void DoubleDelta_UnchangedValue_WritesSingleBit()
     {
         foreach (ulong bits in doublePatterns)

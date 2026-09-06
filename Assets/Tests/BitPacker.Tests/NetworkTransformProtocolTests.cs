@@ -804,6 +804,93 @@ public class NetworkTransformProtocolTests
         }
     }
 
+    [Test]
+    public void SharedEntriesOutliveAcksOfOtherPeers()
+    {
+        var objects = new List<GameObject>();
+        var module = new NetworkTransformModule(null, null, null, default, null);
+        var nt = CreateNetworkTransform(10, objects);
+
+        try
+        {
+            module.Register(nt);
+            var first = module.GetSendStream(new PlayerID(1, false));
+            var second = module.GetSendStream(new PlayerID(2, false));
+            int index = nt.ntIndex;
+            nt.CaptureUnreliableState();
+
+            var shared = NTSharedEntries.Rent();
+            shared.Add(new NTUnreliableEntry
+            {
+                nid = nt.id!.Value,
+                state = nt.capturedState,
+                gen = nt.sendGen,
+                genEpoch = nt.sendGenEpoch,
+                revision = nt.capturedRevision,
+                transform = nt
+            });
+            NTSharedEntries.Retain(shared);
+            NTSharedEntries.Retain(shared);
+            first.ring[1] = new NTUnreliableSlot { used = true, anchor = true, seq = 1, order = 1, entries = shared };
+            second.ring[1] = new NTUnreliableSlot { used = true, anchor = true, seq = 1, order = 1, entries = shared };
+
+            module.ProcessAck(first, 1, 0);
+            Assert.That(first.baselines[index].has, Is.True);
+            Assert.That(first.ring[1].entries, Is.Null);
+            Assert.That(second.ring[1].entries, Is.SameAs(shared));
+            Assert.That(shared, Has.Count.EqualTo(1), "the other peer's slot still holds the shared list");
+
+            module.ProcessAck(second, 1, 0);
+            Assert.That(second.baselines[index].has, Is.True);
+            Assert.That(second.ring[1].entries, Is.Null);
+            Assert.That(shared, Is.Empty, "the last release returns the list to the pool");
+        }
+        finally
+        {
+            for (int i = 0; i < objects.Count; i++)
+                Object.DestroyImmediate(objects[i]);
+        }
+    }
+
+    [Test]
+    public void SharedAdaptiveWriteIsCopiedBeforeOnePeerMutatesIt()
+    {
+        var objects = new List<GameObject>();
+        var module = new NetworkTransformModule(null, null, null, default, null);
+        var nt = CreateNetworkTransform(10, objects);
+
+        try
+        {
+            module.Register(nt);
+            var first = module.GetSendStream(new PlayerID(1, false));
+            var second = module.GetSendStream(new PlayerID(2, false));
+            int index = nt.ntIndex;
+
+            var write = NTLastAdaptiveWrite.Rent();
+            write.tick = 7;
+            first.SetAdaptiveAt(index, write);
+            second.SetAdaptiveAt(index, write);
+            Assert.That(write.refs, Is.EqualTo(2));
+
+            var owned = NetworkTransformModule.Own(first, nt, write);
+            Assert.That(owned, Is.Not.SameAs(write));
+            Assert.That(owned.tick, Is.EqualTo(7));
+            Assert.That(first.GetAdaptive(nt), Is.SameAs(owned));
+            Assert.That(second.GetAdaptive(nt), Is.SameAs(write));
+            Assert.That(write.refs, Is.EqualTo(1));
+            Assert.That(NetworkTransformModule.Own(second, nt, write), Is.SameAs(write), "a sole holder mutates in place");
+
+            second.SetAdaptiveAt(index, null);
+            Assert.That(write.refs, Is.EqualTo(0));
+            Assert.That(write.tick, Is.EqualTo(0), "a released write is reset before reuse");
+        }
+        finally
+        {
+            for (int i = 0; i < objects.Count; i++)
+                Object.DestroyImmediate(objects[i]);
+        }
+    }
+
     private static NTUnreliableSlot SlotWith(NetworkID nid, uint genEpoch)
     {
         return new NTUnreliableSlot
