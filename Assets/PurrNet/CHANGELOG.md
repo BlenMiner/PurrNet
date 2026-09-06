@@ -1,3 +1,10 @@
+# [1.23.0-beta.32](https://github.com/PurrNet/PurrNet/compare/v1.23.0-beta.31...v1.23.0-beta.32) (2026-09-06)
+
+
+### Bug Fixes
+
+* forgot to push file ([a256909](https://github.com/PurrNet/PurrNet/commit/a2569099aefbac4a7594a29b3853edbe62cc832d))
+
 # [1.23.0-beta.31](https://github.com/PurrNet/PurrNet/compare/v1.23.0-beta.30...v1.23.0-beta.31) (2026-09-06)
 
 
