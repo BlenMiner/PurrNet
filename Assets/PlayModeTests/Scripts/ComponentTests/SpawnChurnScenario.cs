@@ -18,10 +18,10 @@ public class SpawnChurnScenario : Scenario
     [SerializeField] private float _despawnTimeoutSeconds = 30f;
     [SerializeField] private float _barrierTimeoutSeconds = 60f;
 
-    private const int BarrierSpawn = 7800;
-    private const int BarrierChurned = 7801;
-    private const int BarrierConverged = 7802;
-    private const int BarrierEnd = 7803;
+    private const int BarrierSpawn = 9700;
+    private const int BarrierChurned = 9701;
+    private const int BarrierConverged = 9702;
+    private const int BarrierEnd = 9703;
 
     private const float PositionEpsilon = 0.05f;
 
