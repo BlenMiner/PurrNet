@@ -1,3 +1,10 @@
+# [1.23.0-beta.34](https://github.com/PurrNet/PurrNet/compare/v1.23.0-beta.33...v1.23.0-beta.34) (2026-09-06)
+
+
+### Performance Improvements
+
+* improve visibility and cache sibling components ([550987b](https://github.com/PurrNet/PurrNet/commit/550987bab7d74411ef82208cb70fe47ae6976b54))
+
 # [1.23.0-beta.33](https://github.com/PurrNet/PurrNet/compare/v1.23.0-beta.32...v1.23.0-beta.33) (2026-09-06)
 
 
