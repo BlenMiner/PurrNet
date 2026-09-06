@@ -1,3 +1,15 @@
+# [1.23.0-beta.37](https://github.com/PurrNet/PurrNet/compare/v1.23.0-beta.36...v1.23.0-beta.37) (2026-09-06)
+
+
+### Bug Fixes
+
+* delta registration bug ([3db7937](https://github.com/PurrNet/PurrNet/commit/3db793787ff3397a78df5cbeef3282a73e9e13e8))
+
+
+### Performance Improvements
+
+* NetworkTransform per-client replay ([efadd94](https://github.com/PurrNet/PurrNet/commit/efadd94c90c604ca982fe550e5cab09d77047ebd))
+
 # [1.23.0-beta.36](https://github.com/PurrNet/PurrNet/compare/v1.23.0-beta.35...v1.23.0-beta.36) (2026-09-06)
 
 
