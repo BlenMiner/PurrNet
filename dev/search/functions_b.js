@@ -2,7 +2,7 @@ var searchData=
 [
   ['manualaddobserver_0',['ManualAddObserver',['../classPurrNet_1_1Modules_1_1HierarchyV2.html#a860b66bc63404519bf3eabd0d4931718',1,'PurrNet::Modules::HierarchyV2']]],
   ['manualdespawn_1',['ManualDespawn',['../classPurrNet_1_1Modules_1_1HierarchyV2.html#a12726fef8c81dc378108f7cd74e1dada',1,'PurrNet::Modules::HierarchyV2']]],
-  ['manualearlyspawn_2',['ManualEarlySpawn',['../classPurrNet_1_1Modules_1_1HierarchyV2.html#a5340886582f3249661b41dde044b3029',1,'PurrNet.Modules.HierarchyV2.ManualEarlySpawn(NetworkIdentity identity, NetworkID id)'],['../classPurrNet_1_1Modules_1_1HierarchyV2.html#a067aee8d58ff65246c3d6159caaa8c70',1,'PurrNet.Modules.HierarchyV2.ManualEarlySpawn(NetworkIdentity identity, NetworkID id, BitData customData)']]],
+  ['manualearlyspawn_2',['ManualEarlySpawn',['../classPurrNet_1_1Modules_1_1HierarchyV2.html#ad68b77aba1ef54081f2a969b0fd2f1be',1,'PurrNet::Modules::HierarchyV2']]],
   ['manualfinalizespawn_3',['ManualFinalizeSpawn',['../classPurrNet_1_1Modules_1_1HierarchyV2.html#ab814d5d8840650267d4746b3ccd1de13',1,'PurrNet::Modules::HierarchyV2']]],
   ['manualremoveobserver_4',['ManualRemoveObserver',['../classPurrNet_1_1Modules_1_1HierarchyV2.html#a1b830c7831269515ba72eb25fd9613f3',1,'PurrNet::Modules::HierarchyV2']]],
   ['matchessceneid_5',['MatchesSceneID',['../classPurrNet_1_1NetworkManager.html#acbb195c5a6938907bf6b2ed0db7e3452',1,'PurrNet::NetworkManager']]],

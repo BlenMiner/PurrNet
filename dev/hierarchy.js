@@ -170,6 +170,7 @@ var hierarchy =
       [ "PurrNet.MinimalModuleHeader", "structPurrNet_1_1MinimalModuleHeader.html", null ],
       [ "PurrNet.MinimalStaticHeader", "structPurrNet_1_1MinimalStaticHeader.html", null ],
       [ "PurrNet.Modules.DeltaValue", "structPurrNet_1_1Modules_1_1DeltaValue.html", null ],
+      [ "PurrNet.Modules.LocalTransform", "structPurrNet_1_1Modules_1_1LocalTransform.html", null ],
       [ "PurrNet.Modules.PrefabPieceID", "structPurrNet_1_1Modules_1_1PrefabPieceID.html", null ],
       [ "PurrNet.Modules.SpawnID", "structPurrNet_1_1Modules_1_1SpawnID.html", null ],
       [ "PurrNet.NetworkAssetID", "structPurrNet_1_1NetworkAssetID.html", null ],
@@ -420,7 +421,6 @@ var hierarchy =
       [ "PurrNet.SyncList< T >", "classPurrNet_1_1SyncList.html", null ],
       [ "PurrNet.SyncTimer", "classPurrNet_1_1SyncTimer.html", null ]
     ] ],
-    [ "PurrNet.Modules.LocalTransform", "structPurrNet_1_1Modules_1_1LocalTransform.html", null ],
     [ "PurrNet.Logging.LogStyle", "structPurrNet_1_1Logging_1_1LogStyle.html", null ],
     [ "PurrNet.MiscRules", "structPurrNet_1_1MiscRules.html", null ],
     [ "PurrNet.ModulesCollection", "structPurrNet_1_1ModulesCollection.html", null ],

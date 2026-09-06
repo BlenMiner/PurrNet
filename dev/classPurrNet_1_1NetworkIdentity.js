@@ -19,6 +19,7 @@ var classPurrNet_1_1NetworkIdentity =
     [ "OnObserverAdded", "classPurrNet_1_1NetworkIdentity.html#a85518391c8c60d3d0462cd0f84cb79e9", null ],
     [ "OnObserverAdded", "classPurrNet_1_1NetworkIdentity.html#a0fa8678e7216740df3574ca581f70fb5", null ],
     [ "OnObserverRemoved", "classPurrNet_1_1NetworkIdentity.html#ab2ecb22de5c175f5a774fb8e8dfa1ab7", null ],
+    [ "OnObserversAdded", "classPurrNet_1_1NetworkIdentity.html#a7742da503ba8c01a1c0a573be7b37d62", null ],
     [ "OnOwnerChanged", "classPurrNet_1_1NetworkIdentity.html#a4b6ad344119f0f67c0a69bb28a3cd9ec", null ],
     [ "OnOwnerChanged", "classPurrNet_1_1NetworkIdentity.html#a9c3488f459dd1fe939e163f153ff2da8", null ],
     [ "OnOwnerDisconnected", "classPurrNet_1_1NetworkIdentity.html#ada9d695cb5ec0673a6d0a01f215db7ff", null ],

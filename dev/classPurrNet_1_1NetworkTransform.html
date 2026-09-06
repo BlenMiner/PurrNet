@@ -260,6 +260,9 @@ void&#160;</td><td class="memItemRight" valign="bottom"><b>RemoveOwnership</b> (
 <tr class="memitem:a9c9b35a5b13b1750ecd0071bf5772c4b inherit pub_methods_classPurrNet_1_1NetworkIdentity"><td class="memItemLeft" align="right" valign="top"><a id="a9c9b35a5b13b1750ecd0071bf5772c4b" name="a9c9b35a5b13b1750ecd0071bf5772c4b"></a>
 void&#160;</td><td class="memItemRight" valign="bottom"><b>TriggerOnPreObserverAdded</b> (<a class="el" href="structPurrNet_1_1PlayerID.html">PlayerID</a> target, bool isSpawner)</td></tr>
 <tr class="separator:a9c9b35a5b13b1750ecd0071bf5772c4b inherit pub_methods_classPurrNet_1_1NetworkIdentity"><td class="memSeparator" colspan="2">&#160;</td></tr>
+<tr class="memitem:a9e2c34a37734f389972f3903c67f18ed inherit pub_methods_classPurrNet_1_1NetworkIdentity"><td class="memItemLeft" align="right" valign="top"><a id="a9e2c34a37734f389972f3903c67f18ed" name="a9e2c34a37734f389972f3903c67f18ed"></a>
+void&#160;</td><td class="memItemRight" valign="bottom"><b>TriggerOnObserversAdded</b> (IReadOnlyList&lt; <a class="el" href="structPurrNet_1_1PlayerID.html">PlayerID</a> &gt; players, bool isSpawner)</td></tr>
+<tr class="separator:a9e2c34a37734f389972f3903c67f18ed inherit pub_methods_classPurrNet_1_1NetworkIdentity"><td class="memSeparator" colspan="2">&#160;</td></tr>
 <tr class="memitem:a5dcfa9b855a83e64f3a771a104a3cfa4 inherit pub_methods_classPurrNet_1_1NetworkIdentity"><td class="memItemLeft" align="right" valign="top"><a id="a5dcfa9b855a83e64f3a771a104a3cfa4" name="a5dcfa9b855a83e64f3a771a104a3cfa4"></a>
 void&#160;</td><td class="memItemRight" valign="bottom"><b>TriggerOnObserverAdded</b> (<a class="el" href="structPurrNet_1_1PlayerID.html">PlayerID</a> target, bool isSpawner)</td></tr>
 <tr class="separator:a5dcfa9b855a83e64f3a771a104a3cfa4 inherit pub_methods_classPurrNet_1_1NetworkIdentity"><td class="memSeparator" colspan="2">&#160;</td></tr>
@@ -393,6 +396,9 @@ Protected Member Functions</h2></td></tr>
 <tr class="memitem:ab80b05c91be6ae800af6302be6ef3ab6"><td class="memItemLeft" align="right" valign="top">override void&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="classPurrNet_1_1NetworkTransform.html#ab80b05c91be6ae800af6302be6ef3ab6">OnObserverAdded</a> (<a class="el" href="structPurrNet_1_1PlayerID.html">PlayerID</a> player)</td></tr>
 <tr class="memdesc:ab80b05c91be6ae800af6302be6ef3ab6"><td class="mdescLeft">&#160;</td><td class="mdescRight">Called when an observer is added. Server only.   <a href="classPurrNet_1_1NetworkTransform.html#ab80b05c91be6ae800af6302be6ef3ab6">More...</a><br /></td></tr>
 <tr class="separator:ab80b05c91be6ae800af6302be6ef3ab6"><td class="memSeparator" colspan="2">&#160;</td></tr>
+<tr class="memitem:a9f296fba894ade39ccec9608175fbc51"><td class="memItemLeft" align="right" valign="top">override void&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="classPurrNet_1_1NetworkTransform.html#a9f296fba894ade39ccec9608175fbc51">OnObserversAdded</a> (IReadOnlyList&lt; <a class="el" href="structPurrNet_1_1PlayerID.html">PlayerID</a> &gt; players, bool isSpawner)</td></tr>
+<tr class="memdesc:a9f296fba894ade39ccec9608175fbc51"><td class="mdescLeft">&#160;</td><td class="mdescRight">Called for every observer add with all the players that were added together, one or more, before the per-player <a class="el" href="classPurrNet_1_1NetworkTransform.html#ab80b05c91be6ae800af6302be6ef3ab6" title="Called when an observer is added. Server only.">OnObserverAdded(PlayerID)</a> callbacks run for each of them. Lets a component send one message to all of them instead of one per player.   <a href="classPurrNet_1_1NetworkTransform.html#a9f296fba894ade39ccec9608175fbc51">More...</a><br /></td></tr>
+<tr class="separator:a9f296fba894ade39ccec9608175fbc51"><td class="memSeparator" colspan="2">&#160;</td></tr>
 <tr class="memitem:a743a803391991f00af2fb1a1a22f3b84"><td class="memItemLeft" align="right" valign="top">override void&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="classPurrNet_1_1NetworkTransform.html#a743a803391991f00af2fb1a1a22f3b84">OnObserverRemoved</a> (<a class="el" href="structPurrNet_1_1PlayerID.html">PlayerID</a> player)</td></tr>
 <tr class="memdesc:a743a803391991f00af2fb1a1a22f3b84"><td class="mdescLeft">&#160;</td><td class="mdescRight">Called when an observer is removed. Server only.   <a href="classPurrNet_1_1NetworkTransform.html#a743a803391991f00af2fb1a1a22f3b84">More...</a><br /></td></tr>
 <tr class="separator:a743a803391991f00af2fb1a1a22f3b84"><td class="memSeparator" colspan="2">&#160;</td></tr>
@@ -483,6 +489,9 @@ virtual void&#160;</td><td class="memItemRight" valign="bottom"><b>OnSpawnSent</
 virtual void&#160;</td><td class="memItemRight" valign="bottom"><b>OnSpawnReceived</b> ()</td></tr>
 <tr class="memdesc:ad169c9093ca6e87406dd7b7edd8690f4 inherit pro_methods_classPurrNet_1_1NetworkIdentity"><td class="mdescLeft">&#160;</td><td class="mdescRight">Called only on peers that created the object from a spawn packet, once the entire packet has been deserialized and early-spawned. Everything that spawned alongside this object exists at this point; safe to react to spawn data.  <br /></td></tr>
 <tr class="separator:ad169c9093ca6e87406dd7b7edd8690f4 inherit pro_methods_classPurrNet_1_1NetworkIdentity"><td class="memSeparator" colspan="2">&#160;</td></tr>
+<tr class="memitem:a7742da503ba8c01a1c0a573be7b37d62 inherit pro_methods_classPurrNet_1_1NetworkIdentity"><td class="memItemLeft" align="right" valign="top">virtual void&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="classPurrNet_1_1NetworkIdentity.html#a7742da503ba8c01a1c0a573be7b37d62">OnObserversAdded</a> (IReadOnlyList&lt; <a class="el" href="structPurrNet_1_1PlayerID.html">PlayerID</a> &gt; players, bool isSpawner)</td></tr>
+<tr class="memdesc:a7742da503ba8c01a1c0a573be7b37d62 inherit pro_methods_classPurrNet_1_1NetworkIdentity"><td class="mdescLeft">&#160;</td><td class="mdescRight">Called for every observer add with all the players that were added together, one or more, before the per-player <a class="el" href="classPurrNet_1_1NetworkIdentity.html#a85518391c8c60d3d0462cd0f84cb79e9" title="Called when an observer is added. Server only.">OnObserverAdded(PlayerID)</a> callbacks run for each of them. Lets a component send one message to all of them instead of one per player.   <a href="classPurrNet_1_1NetworkIdentity.html#a7742da503ba8c01a1c0a573be7b37d62">More...</a><br /></td></tr>
+<tr class="separator:a7742da503ba8c01a1c0a573be7b37d62 inherit pro_methods_classPurrNet_1_1NetworkIdentity"><td class="memSeparator" colspan="2">&#160;</td></tr>
 <tr class="memitem:afa982787d09a224c08ff7883c8d574c5 inherit pro_methods_classPurrNet_1_1NetworkIdentity"><td class="memItemLeft" align="right" valign="top">virtual void&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="classPurrNet_1_1NetworkIdentity.html#afa982787d09a224c08ff7883c8d574c5">OnLODTierChanged</a> (<a class="el" href="structPurrNet_1_1PlayerID.html">PlayerID</a> player, byte previousTier, byte newTier)</td></tr>
 <tr class="memdesc:afa982787d09a224c08ff7883c8d574c5 inherit pro_methods_classPurrNet_1_1NetworkIdentity"><td class="mdescLeft">&#160;</td><td class="mdescRight">Called when the LOD tier of this object changes for a player. Server only. Network LOD does not send automatically.   <a href="classPurrNet_1_1NetworkIdentity.html#afa982787d09a224c08ff7883c8d574c5">More...</a><br /></td></tr>
 <tr class="separator:afa982787d09a224c08ff7883c8d574c5 inherit pro_methods_classPurrNet_1_1NetworkIdentity"><td class="memSeparator" colspan="2">&#160;</td></tr>
@@ -1007,6 +1016,46 @@ LODTierChangedDelegate&#160;</td><td class="memItemRight" valign="bottom"><b>onL
 </dl>
 
 <p>Reimplemented from <a class="el" href="classPurrNet_1_1NetworkIdentity.html#ab2ecb22de5c175f5a774fb8e8dfa1ab7">PurrNet.NetworkIdentity</a>.</p>
+
+</div>
+</div>
+<a id="a9f296fba894ade39ccec9608175fbc51" name="a9f296fba894ade39ccec9608175fbc51"></a>
+<h2 class="memtitle"><span class="permalink"><a href="#a9f296fba894ade39ccec9608175fbc51">&#9670;&#160;</a></span>OnObserversAdded()</h2>
+
+<div class="memitem">
+<div class="memproto">
+<table class="mlabels">
+  <tr>
+  <td class="mlabels-left">
+      <table class="memname">
+        <tr>
+          <td class="memname">override void PurrNet.NetworkTransform.OnObserversAdded </td>
+          <td>(</td>
+          <td class="paramtype">IReadOnlyList&lt; <a class="el" href="structPurrNet_1_1PlayerID.html">PlayerID</a> &gt;&#160;</td>
+          <td class="paramname"><em>players</em>, </td>
+        </tr>
+        <tr>
+          <td class="paramkey"></td>
+          <td></td>
+          <td class="paramtype">bool&#160;</td>
+          <td class="paramname"><em>isSpawner</em>&#160;</td>
+        </tr>
+        <tr>
+          <td></td>
+          <td>)</td>
+          <td></td><td></td>
+        </tr>
+      </table>
+  </td>
+  <td class="mlabels-right">
+<span class="mlabels"><span class="mlabel">protected</span><span class="mlabel">virtual</span></span>  </td>
+  </tr>
+</table>
+</div><div class="memdoc">
+
+<p>Called for every observer add with all the players that were added together, one or more, before the per-player <a class="el" href="classPurrNet_1_1NetworkTransform.html#ab80b05c91be6ae800af6302be6ef3ab6" title="Called when an observer is added. Server only.">OnObserverAdded(PlayerID)</a> callbacks run for each of them. Lets a component send one message to all of them instead of one per player.  </p>
+
+<p>Reimplemented from <a class="el" href="classPurrNet_1_1NetworkIdentity.html#a7742da503ba8c01a1c0a573be7b37d62">PurrNet.NetworkIdentity</a>.</p>
 
 </div>
 </div>
