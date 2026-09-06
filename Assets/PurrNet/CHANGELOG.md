@@ -1,3 +1,10 @@
+# [1.23.0-beta.31](https://github.com/PurrNet/PurrNet/compare/v1.23.0-beta.30...v1.23.0-beta.31) (2026-09-06)
+
+
+### Bug Fixes
+
+* NT ACK correctness ([2b7fd72](https://github.com/PurrNet/PurrNet/commit/2b7fd72b7e08df530ea0007664d490563e214f3e))
+
 # [1.23.0-beta.30](https://github.com/PurrNet/PurrNet/compare/v1.23.0-beta.29...v1.23.0-beta.30) (2026-09-05)
 
 
