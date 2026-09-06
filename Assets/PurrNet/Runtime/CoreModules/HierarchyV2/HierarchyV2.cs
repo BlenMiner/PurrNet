@@ -5,6 +5,7 @@ using PurrNet.Logging;
 using PurrNet.Packing;
 using PurrNet.Pooling;
 using PurrNet.Utils;
+using Unity.Profiling;
 using UnityEngine;
 using UnityEngine.SceneManagement;
 
@@ -2617,6 +2618,13 @@ namespace PurrNet.Modules
 
         private readonly Dictionary<Transform, PrototypeCacheEntry> _prototypeCache = new();
 
+        static readonly ProfilerMarker _prototypeMarker = new ProfilerMarker("PurrNet.Hierarchy.Prototype");
+        static readonly ProfilerMarker _spawnPacketMarker = new ProfilerMarker("PurrNet.Hierarchy.SpawnPacket");
+        static readonly ProfilerMarker _preObserverMarker = new ProfilerMarker("PurrNet.Hierarchy.PreObserverAdded");
+        static readonly ProfilerMarker _visibilityLostMarker = new ProfilerMarker("PurrNet.Hierarchy.VisibilityLost");
+        static readonly ProfilerMarker _flushSpawnMarker = new ProfilerMarker("PurrNet.Hierarchy.FlushSpawn");
+        static readonly ProfilerMarker _lateObserversMarker = new ProfilerMarker("PurrNet.Hierarchy.LateObservers");
+
         private bool TryGetPrototypeCached(Transform scope, PlayerID player, List<NetworkIdentity> children,
             out GameObjectPrototype prototype)
         {
@@ -2672,19 +2680,25 @@ namespace PurrNet.Modules
             if (isVisible)
             {
                 var children = ListPool<NetworkIdentity>.Instantiate();
-                if (TryGetPrototypeCached(scope, player, children, out var prototype))
+                _prototypeMarker.Begin();
+                bool hasPrototype = TryGetPrototypeCached(scope, player, children, out var prototype);
+                _prototypeMarker.End();
+                if (hasPrototype)
                 {
                     if (_scenePlayers.IsPlayerLoadedInScene(player, _sceneId))
                     {
                         bool sendAsync = _asyncVisibilityDepth > 0 &&
                                          player != _manager.localPlayer &&
                                          !player.isBot && !player.isServer;
+                        _spawnPacketMarker.Begin();
                         var spawnId = SendSpawnPacket(player, prototype, children, true, sendAsync);
+                        _spawnPacketMarker.End();
 
                         if (sendAsync && _pendingAsyncObservers.ContainsKey(spawnId))
                             return;
                     }
 
+                    using var _ = _preObserverMarker.Auto();
                     for (var i = 0; i < children.Count; i++)
                     {
                         var nid = children[i];
@@ -2720,6 +2734,7 @@ namespace PurrNet.Modules
 
         private void OnVisibilityLost(PlayerID player, NetworkIdentity identity, List<NetworkIdentity> children)
         {
+            using var _ = _visibilityLostMarker.Auto();
 
             if (!HasActiveAsyncObserverState)
             {
@@ -3444,6 +3459,7 @@ namespace PurrNet.Modules
 
         private void FlushSpawnPackets()
         {
+            using var _ = _flushSpawnMarker.Auto();
             _spawnIdxByRoot.Clear();
             ClearPrototypeCache();
 
@@ -3606,6 +3622,7 @@ namespace PurrNet.Modules
 
         private void SendDelayedObserverEvents()
         {
+            using var _ = _lateObserversMarker.Auto();
             int count = _triggerLateObserverAdded.Count;
             if (count == 0)
                 return;
@@ -3659,25 +3676,65 @@ namespace PurrNet.Modules
             _observerBatchOrder.Clear();
         }
 
+        private readonly Dictionary<SpawnID, List<PlayerID>> _completeTargets = new();
+        private readonly List<SpawnID> _completeOrder = new();
+
         private void SendDelayedCompleteSpawns()
         {
+            if (_toCompleteNextFrame.Count == 0)
+                return;
+
+            if (!_asServer)
+            {
+                for (var i = 0; i < _toCompleteNextFrame.Count; i++)
+                {
+                    _playersManager.SendToServer(new FinishSpawnPacket
+                    {
+                        sceneId = _sceneId,
+                        packetIdx = _toCompleteNextFrame[i]
+                    });
+                }
+
+                _toCompleteNextFrame.Clear();
+                return;
+            }
+
             for (var i = 0; i < _toCompleteNextFrame.Count; i++)
             {
                 var toComplete = _toCompleteNextFrame[i];
-                var packet = new FinishSpawnPacket
+                var key = toComplete.WithTarget(default);
+                if (!_completeTargets.TryGetValue(key, out var targets))
                 {
-                    sceneId = _sceneId,
-                    packetIdx = toComplete
-                };
+                    targets = ListPool<PlayerID>.Instantiate();
+                    _completeTargets.Add(key, targets);
+                    _completeOrder.Add(key);
+                }
 
-                if (_asServer)
-                    _playersManager.Send(toComplete.target, packet);
-                else _playersManager.SendToServer(packet);
+                targets.Add(toComplete.target);
 
-                if (_asServer && _readyAsyncObservers.Count > 0)
+                if (_readyAsyncObservers.Count > 0)
                     _readyAsyncObservers.Remove(toComplete);
             }
 
+            for (var i = 0; i < _completeOrder.Count; i++)
+            {
+                var key = _completeOrder[i];
+                var targets = _completeTargets[key];
+                var packet = new FinishSpawnPacket
+                {
+                    sceneId = _sceneId,
+                    packetIdx = key
+                };
+
+                if (targets.Count == 1)
+                    _playersManager.Send(targets[0], packet);
+                else
+                    _playersManager.Send(targets, packet);
+                ListPool<PlayerID>.Destroy(targets);
+            }
+
+            _completeTargets.Clear();
+            _completeOrder.Clear();
             _toCompleteNextFrame.Clear();
         }
 

@@ -559,6 +559,8 @@ namespace PurrNet
 
         private int _tickRegisteredServer;
         private int _tickRegisteredClient;
+        private int _serverTickHandle = PurrAction<NetworkIdentity>.InvalidHandle;
+        private int _clientTickHandle = PurrAction<NetworkIdentity>.InvalidHandle;
 
         private void RegisterTickEvent(bool asServer)
         {
@@ -568,7 +570,7 @@ namespace PurrNet
                     return;
 
                 _serverTickManager = networkManager.GetModule<TickManager>(true);
-                _serverTickManager.onTick += ServerTick;
+                _serverTickHandle = _serverTickManager.AddIdentityTick(this);
             }
             else
             {
@@ -576,7 +578,7 @@ namespace PurrNet
                     return;
 
                 _clientTickManager = networkManager.GetModule<TickManager>(false);
-                _clientTickManager.onTick += ClientTick;
+                _clientTickHandle = _clientTickManager.AddIdentityTick(this);
             }
         }
 
@@ -611,13 +613,15 @@ namespace PurrNet
                 if (--_tickRegisteredServer <= 0)
                 {
                     if (_serverTickManager != null)
-                        _serverTickManager.onTick -= ServerTick;
+                        _serverTickManager.RemoveIdentityTick(_serverTickHandle, this);
+                    _serverTickHandle = PurrAction<NetworkIdentity>.InvalidHandle;
                 }
             }
             else if (--_tickRegisteredClient <= 0)
             {
                 if (_clientTickManager != null)
-                    _clientTickManager.onTick -= ClientTick;
+                    _clientTickManager.RemoveIdentityTick(_clientTickHandle, this);
+                _clientTickHandle = PurrAction<NetworkIdentity>.InvalidHandle;
             }
         }
 
@@ -633,7 +637,7 @@ namespace PurrNet
                 _serverSceneEvents?.OnPlayerUnloadedScene(player);
         }
 
-        private void ClientTick()
+        internal void ClientTick()
         {
             InternalTick();
 
@@ -660,7 +664,7 @@ namespace PurrNet
             }
         }
 
-        private void ServerTick()
+        internal void ServerTick()
         {
             if (_tickRegisteredClient <= 0)
             {

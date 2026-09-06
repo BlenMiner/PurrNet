@@ -75,6 +75,7 @@ namespace PurrNet.Modules
         public event Action onReliablePreTick, onReliableTick, onReliablePostTick;
 
         private readonly PurrAction<ITickListener> _tickListeners = new(static listener => listener.OnTick(), 256);
+        private readonly PurrAction<NetworkIdentity> _identityTicks;
 
         /// <summary>
         /// Lower clamp for <see cref="tickPacingScale"/>.
@@ -135,6 +136,8 @@ namespace PurrNet.Modules
         public TickManager(int tickRate, INetworkManager nm, BroadcastModule broadcaster, bool asServer)
         {
             _asServer = asServer;
+            _identityTicks = new PurrAction<NetworkIdentity>(
+                asServer ? static identity => identity.ServerTick() : static identity => identity.ClientTick(), 256);
             _lastTickTime = Time.unscaledTimeAsDouble;
             _networkManager = nm;
             tickDelta = 1f / tickRate;
@@ -215,6 +218,7 @@ namespace PurrNet.Modules
                 if (triggerNormalTicks)
                 {
                     onTick?.Invoke();
+                    _identityTicks.Invoke();
                     _tickListeners.Invoke();
                 }
                 onReliableTick?.Invoke();
@@ -227,6 +231,10 @@ namespace PurrNet.Modules
             }
         }
         
+        internal int AddIdentityTick(NetworkIdentity identity) => _identityTicks.Add(identity);
+
+        internal void RemoveIdentityTick(int handle, NetworkIdentity identity) => _identityTicks.RemoveAt(handle, identity);
+
         public void AddTickListener(ITickListener listener)
         {
             _tickListeners.Add(listener);
