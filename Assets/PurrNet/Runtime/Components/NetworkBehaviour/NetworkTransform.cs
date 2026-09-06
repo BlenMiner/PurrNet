@@ -2507,6 +2507,13 @@ namespace PurrNet
         internal bool TryApplyUnreliableState(in NetworkTransformState state, byte gen, long packetOrder,
             ushort senderTick, NetworkIdentity frameParent, bool isAbsolute)
         {
+            return TryApplyUnreliableState(state, gen, packetOrder, senderTick, frameParent, isAbsolute, out _);
+        }
+
+        internal bool TryApplyUnreliableState(in NetworkTransformState state, byte gen, long packetOrder,
+            ushort senderTick, NetworkIdentity frameParent, bool isAbsolute, out bool initialAbsolute)
+        {
+            initialAbsolute = false;
             if (_cachedIsController)
                 return true;
 
@@ -2557,6 +2564,7 @@ namespace PurrNet
             if (_hasRenderTimeline && _hasLastAppliedState)
                 _renderRel -= (short)(senderTick - _lastAppliedSenderTick);
 
+            initialAbsolute = isAbsolute && !_hasAppliedSeq;
             _lastAppliedOrder = packetOrder;
             _hasAppliedSeq = true;
             _lastReadData = state.data;
