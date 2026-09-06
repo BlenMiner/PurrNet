@@ -41,6 +41,7 @@ namespace PurrNet.Packing
             _hasWriter = true;
             DeltaPacker.RegisterWriter(typeof(T), write.Method);
             WriteFunc = write;
+            NativeDeltaPacker<T>.RegisterWriter(write);
         }
 
         public static void RegisterReader(DeltaReadFunc<T> read)
@@ -51,6 +52,7 @@ namespace PurrNet.Packing
             _hasReader = true;
             DeltaPacker.RegisterReader(typeof(T), read.Method);
             ReadFunc = read;
+            NativeDeltaPacker<T>.RegisterReader(read);
         }
 
         [UsedByIL, MethodImpl(MethodImplOptions.AggressiveInlining)]
