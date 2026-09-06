@@ -69,6 +69,7 @@ namespace PurrNet.Modules
             _broadcaster.Subscribe<NetworkTransformUnreliableDelta>(OnUnreliableDelta);
             _broadcaster.Subscribe<NetworkTransformUnreliableAck>(OnUnreliableAck);
             _broadcaster.Subscribe<NetworkTransformUnreliableNack>(OnUnreliableNack);
+            _broadcaster.Subscribe<NetworkTransformInitialState>(OnInitialState);
             _scenePlayers.onPlayerUnloadedScene += OnPlayerUnloadedScene;
         }
 
@@ -77,6 +78,7 @@ namespace PurrNet.Modules
             _broadcaster.Unsubscribe<NetworkTransformUnreliableDelta>(OnUnreliableDelta);
             _broadcaster.Unsubscribe<NetworkTransformUnreliableAck>(OnUnreliableAck);
             _broadcaster.Unsubscribe<NetworkTransformUnreliableNack>(OnUnreliableNack);
+            _broadcaster.Unsubscribe<NetworkTransformInitialState>(OnInitialState);
             _scenePlayers.onPlayerUnloadedScene -= OnPlayerUnloadedScene;
             ReleaseAllStreams();
         }
@@ -658,6 +660,27 @@ namespace PurrNet.Modules
             // clean-link memory scale with 64 packets instead of the actual in-flight window.
             ListPool<NTUnreliableEntry>.Destroy(slot.entries);
             slot.entries = null;
+        }
+
+        internal void SendInitialState(IReadOnlyList<PlayerID> players, NetworkID id, in NetworkTransformState state,
+            byte gen)
+        {
+            _broadcaster.Send(players, new NetworkTransformInitialState
+            {
+                scene = _scene,
+                id = id,
+                state = state,
+                gen = gen
+            });
+        }
+
+        private void OnInitialState(PlayerID player, NetworkTransformInitialState data, bool asServer)
+        {
+            if (asServer || data.scene != _scene)
+                return;
+
+            if (_factory.TryGetIdentity(_scene, data.id, out var identity) && identity is NetworkTransform nt)
+                nt.TryApplyTargetedState(data.state, true, data.gen);
         }
 
         private void OnUnreliableNack(PlayerID player, NetworkTransformUnreliableNack data, bool asServer)

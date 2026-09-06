@@ -1,10 +1,11 @@
-﻿using System.Text;
+﻿using System;
+using System.Text;
 using PurrNet.Packing;
 using UnityEngine;
 
 namespace PurrNet.Modules
 {
-    public readonly struct LocalTransform
+    public readonly struct LocalTransform : IEquatable<LocalTransform>
     {
         public readonly CompressedVector3 localPosition;
         public readonly PackedQuaternion localRotation;
@@ -20,6 +21,23 @@ namespace PurrNet.Modules
         public void Apply(Transform trs)
         {
             HierarchyV2.SetLocalPosAndRot(trs, localPosition, localRotation, localScale);
+        }
+
+        public bool Equals(LocalTransform other)
+        {
+            return localPosition.Equals(other.localPosition) &&
+                   localRotation.Equals(other.localRotation) &&
+                   localScale.Equals(other.localScale);
+        }
+
+        public override bool Equals(object obj)
+        {
+            return obj is LocalTransform other && Equals(other);
+        }
+
+        public override int GetHashCode()
+        {
+            return HashCode.Combine(localPosition, localRotation, localScale);
         }
     }
 

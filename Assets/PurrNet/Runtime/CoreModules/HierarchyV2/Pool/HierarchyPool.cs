@@ -628,9 +628,15 @@ namespace PurrNet.Modules
         public static bool TryGetPrototype(Transform transform, PlayerID scope, List<NetworkIdentity> allChildren,
             out GameObjectPrototype prototype)
         {
+            return TryGetPrototype(transform, scope, allChildren, out prototype, null);
+        }
+
+        internal static bool TryGetPrototype(Transform transform, PlayerID scope, List<NetworkIdentity> allChildren,
+            out GameObjectPrototype prototype, List<NetworkIdentity> componentsOut, List<NetworkIdentity> prefetched = null)
+        {
             var framework = DisposableList<GameObjectFrameworkPiece>.Create(16);
             if (!transform.TryGetComponent<NetworkIdentity>(out var rootId) || !rootId.id.HasValue ||
-                !CapturePrototype(transform, rootId, scope, false, framework, allChildren))
+                !CapturePrototype(transform, rootId, scope, false, framework, allChildren, prefetched, componentsOut))
             {
                 prototype = default;
                 framework.Dispose();
@@ -638,6 +644,25 @@ namespace PurrNet.Modules
             }
 
             prototype = FinishPrototype(transform, rootId, framework, transform.parent == rootId.defaultParent);
+            return true;
+        }
+
+        /// <summary>
+        /// True when two observers see exactly the same identities of a hierarchy, so a prototype
+        /// captured for one is valid for the other. Every other input of the capture is observer
+        /// independent.
+        /// </summary>
+        internal static bool SameObserverPattern(List<NetworkIdentity> components, PlayerID a, PlayerID b)
+        {
+            for (int i = 0; i < components.Count; i++)
+            {
+                var identity = components[i];
+                if (!identity)
+                    continue;
+                if (identity.IsObserverOrPending(a) != identity.IsObserverOrPending(b))
+                    return false;
+            }
+
             return true;
         }
 
@@ -654,11 +679,15 @@ namespace PurrNet.Modules
 
         private static bool CapturePrototype(Transform root, NetworkIdentity rootId, PlayerID? observer,
             bool includeUnspawnedChildren, DisposableList<GameObjectFrameworkPiece> framework,
-            List<NetworkIdentity> allChildren)
+            List<NetworkIdentity> allChildren, List<NetworkIdentity> prefetched = null,
+            List<NetworkIdentity> componentsOut = null)
         {
             using var componentLease = DisposableList<NetworkIdentity>.Create();
-            var components = componentLease.list;
-            root.GetComponentsInChildren(true, components);
+            var components = prefetched ?? componentLease.list;
+            if (prefetched == null)
+                root.GetComponentsInChildren(true, components);
+            if (componentsOut != null)
+                componentsOut.AddRange(components);
 
             int rootEnd = GetComponentGroupEnd(components, 0, root);
             if (observer.HasValue && !HasObserver(components, 0, rootEnd, observer.Value))

@@ -1,9 +1,11 @@
 using System;
 using System.Buffers;
+using System.Collections.Generic;
 using System.ComponentModel;
 using PurrNet.Logging;
 using PurrNet.Modules;
 using PurrNet.Packing;
+using PurrNet.Pooling;
 using PurrNet.Utils;
 using Unity.Mathematics;
 using UnityEngine;
@@ -642,17 +644,41 @@ namespace PurrNet
         protected override void OnObserverAdded(PlayerID player)
         {
             InvalidateObserverBaseline(player, true);
+        }
 
-            if (!enabled)
-            {
+        protected override void OnObserversAdded(IReadOnlyList<PlayerID> players, bool isSpawner)
+        {
+            if (!enabled || !id.HasValue)
                 return;
+
+            var targets = ListPool<PlayerID>.Instantiate();
+            for (int i = 0; i < players.Count; i++)
+            {
+                var player = players[i];
+                if (player == localPlayer || (_ownerAuth && player == owner))
+                    continue;
+                targets.Add(player);
             }
 
-            if (player == localPlayer)
-                return;
+            if (targets.Count == 1)
+            {
+                SendLatestState(targets[0], currentState, true, _sendGen);
+            }
+            else if (targets.Count > 1)
+            {
+                if (networkManager.TryGetModule<NetworkTransformFactory>(isServer, out var factory) &&
+                    factory.TryGetModule(sceneId, out var ntModule))
+                {
+                    ntModule.SendInitialState(targets, id.Value, currentState, _sendGen);
+                }
+                else
+                {
+                    for (int i = 0; i < targets.Count; i++)
+                        SendLatestState(targets[i], currentState, true, _sendGen);
+                }
+            }
 
-            if (!_ownerAuth || player != owner)
-                SendLatestState(player, currentState, true, _sendGen);
+            ListPool<PlayerID>.Destroy(targets);
         }
 
         protected override void OnObserverRemoved(PlayerID player)

@@ -1737,7 +1737,43 @@ namespace PurrNet
             }
         }
 
+        /// <summary>
+        /// Called for every observer add with all the players that were added together, one or
+        /// more, before the per-player <see cref="OnObserverAdded(PlayerID)"/> callbacks run for
+        /// each of them. Lets a component send one message to all of them instead of one per player.
+        /// </summary>
+        protected virtual void OnObserversAdded(IReadOnlyList<PlayerID> players, bool isSpawner) { }
+
+        public void TriggerOnObserversAdded(IReadOnlyList<PlayerID> players, bool isSpawner)
+        {
+            try
+            {
+                OnObserversAdded(players, isSpawner);
+            }
+            catch (Exception e)
+            {
+                Debug.LogException(e);
+            }
+
+            for (int i = 0; i < players.Count; i++)
+                TriggerOnObserverAddedCore(players[i], isSpawner);
+        }
+
         public void TriggerOnObserverAdded(PlayerID target, bool isSpawner)
+        {
+            var single = ListPool<PlayerID>.Instantiate();
+            single.Add(target);
+            try
+            {
+                TriggerOnObserversAdded(single, isSpawner);
+            }
+            finally
+            {
+                ListPool<PlayerID>.Destroy(single);
+            }
+        }
+
+        private void TriggerOnObserverAddedCore(PlayerID target, bool isSpawner)
         {
             try
             {

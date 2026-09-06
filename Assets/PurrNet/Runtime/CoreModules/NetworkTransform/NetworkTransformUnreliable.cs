@@ -59,6 +59,14 @@ namespace PurrNet.Modules
         public NetworkID id;
     }
 
+    internal struct NetworkTransformInitialState : IPackedAuto
+    {
+        public SceneID scene;
+        public NetworkID id;
+        public NetworkTransformState state;
+        public byte gen;
+    }
+
     internal struct NTUnreliableEntry
     {
         public NetworkID nid;

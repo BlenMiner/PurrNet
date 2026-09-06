@@ -6,7 +6,7 @@ namespace PurrNet.Modules
     public struct SpawnID : IEquatable<SpawnID>, IPackedAuto
     {
         readonly PackedULong packetIdx;
-        public readonly PlayerID target;
+        [DontPack] public readonly PlayerID target;
         public PlayerID scope;
 
         public SpawnID(PackedULong packetIdx, PlayerID target, PlayerID? scope)
@@ -15,6 +15,10 @@ namespace PurrNet.Modules
             this.target = target;
             this.scope = scope.GetValueOrDefault();
         }
+
+        public SpawnID WithTarget(PlayerID newTarget) => new SpawnID(packetIdx, newTarget, scope);
+
+        public bool SameWire(in SpawnID other) => packetIdx == other.packetIdx && scope.Equals(other.scope);
 
         public bool Equals(SpawnID other)
         {

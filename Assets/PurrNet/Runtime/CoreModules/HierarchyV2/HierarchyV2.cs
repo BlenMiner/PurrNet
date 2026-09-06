@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using JetBrains.Annotations;
 using PurrNet.Logging;
 using PurrNet.Packing;
 using PurrNet.Pooling;
@@ -343,6 +344,7 @@ namespace PurrNet.Modules
             UnityProxy.onAsyncInstantiateCompleted += OnAsyncInstantiateCompleted;
 #endif
             _visibility.visibilityChanged += OnVisibilityChanged;
+            _visibility.visibilityCleared += OnVisibilityCleared;
             _scenePlayers.onPrePlayerLoadedScene += OnPlayerLoadedScene;
             _scenePlayers.onPlayerUnloadedScene += OnPlayerUnloadedScene;
             _playersManager.onNetworkIDReceived += OnNetworkIDReceived;
@@ -379,6 +381,7 @@ namespace PurrNet.Modules
             UnityProxy.onAsyncInstantiateCompleted -= OnAsyncInstantiateCompleted;
 #endif
             _visibility.visibilityChanged -= OnVisibilityChanged;
+            _visibility.visibilityCleared -= OnVisibilityCleared;
             _scenePlayers.onPrePlayerLoadedScene -= OnPlayerLoadedScene;
             _scenePlayers.onPlayerUnloadedScene -= OnPlayerUnloadedScene;
             _playersManager.onLocalPlayerReceivedID -= OnPlayerReceivedID;
@@ -994,6 +997,8 @@ namespace PurrNet.Modules
         {
             if (data.sceneId != _sceneId)
                 return;
+
+            data.packetIdx = RestoreTarget(data.packetIdx, player);
 
             if (_cancelledPendingSpawns.Count > 0 && _cancelledPendingSpawns.Remove(data.packetIdx))
                 return;
@@ -2461,8 +2466,10 @@ namespace PurrNet.Modules
 
         private void OnAsyncSpawnReadyPacket(PlayerID player, AsyncSpawnReadyPacket data, bool asServer)
         {
-            if (!_asServer || data.sceneId != _sceneId || player != data.packetIdx.target)
+            if (!_asServer || data.sceneId != _sceneId)
                 return;
+
+            data.packetIdx = RestoreTarget(data.packetIdx, player);
 
             if (!_pendingAsyncObservers.TryGetValue(data.packetIdx, out var pending) ||
                 pending.player != player || !pending.sent)
@@ -2600,12 +2607,72 @@ namespace PurrNet.Modules
             return root;
         }
 
+        private struct PrototypeCacheEntry
+        {
+            public PlayerID observer;
+            public GameObjectPrototype prototype;
+            public List<NetworkIdentity> children;
+            public List<NetworkIdentity> components;
+        }
+
+        private readonly Dictionary<Transform, PrototypeCacheEntry> _prototypeCache = new();
+
+        private bool TryGetPrototypeCached(Transform scope, PlayerID player, List<NetworkIdentity> children,
+            out GameObjectPrototype prototype)
+        {
+            if (_prototypeCache.TryGetValue(scope, out var cached))
+            {
+                if (HierarchyPool.SameObserverPattern(cached.components, cached.observer, player))
+                {
+                    children.AddRange(cached.children);
+                    prototype = cached.prototype.Clone();
+                    return true;
+                }
+
+                return HierarchyPool.TryGetPrototype(scope, player, children, out prototype, null, cached.components);
+            }
+
+            var components = ListPool<NetworkIdentity>.Instantiate();
+            if (!HierarchyPool.TryGetPrototype(scope, player, children, out prototype, components))
+            {
+                ListPool<NetworkIdentity>.Destroy(components);
+                return false;
+            }
+
+            var keep = ListPool<NetworkIdentity>.Instantiate();
+            keep.AddRange(children);
+            _prototypeCache.Add(scope, new PrototypeCacheEntry
+            {
+                observer = player,
+                prototype = prototype.Clone(),
+                children = keep,
+                components = components
+            });
+            return true;
+        }
+
+        private void ClearPrototypeCache()
+        {
+            if (_prototypeCache.Count == 0)
+                return;
+
+            foreach (var entry in _prototypeCache.Values)
+            {
+                var prototype = entry.prototype;
+                prototype.Dispose();
+                ListPool<NetworkIdentity>.Destroy(entry.children);
+                ListPool<NetworkIdentity>.Destroy(entry.components);
+            }
+
+            _prototypeCache.Clear();
+        }
+
         private void OnVisibilityChanged(PlayerID player, Transform scope, bool isVisible)
         {
             if (isVisible)
             {
                 var children = ListPool<NetworkIdentity>.Instantiate();
-                if (HierarchyPool.TryGetPrototype(scope, player, children, out var prototype))
+                if (TryGetPrototypeCached(scope, player, children, out var prototype))
                 {
                     if (_scenePlayers.IsPlayerLoadedInScene(player, _sceneId))
                     {
@@ -2634,89 +2701,105 @@ namespace PurrNet.Modules
             {
                 var children = ListPool<NetworkIdentity>.Instantiate();
                 GetComponentsInChildren(identity.gameObject, children);
+                OnVisibilityLost(player, identity, children);
+                ListPool<NetworkIdentity>.Destroy(children);
+            }
+        }
 
-                if (!HasActiveAsyncObserverState)
-                {
-                    for (var i = 0; i < children.Count; i++)
-                    {
-                        var child = children[i];
-                        ClearPendingLateObserverAdded(player, child);
-                        child.TriggerOnObserverRemoved(player);
-                        onObserverRemoved?.Invoke(player, child);
-                    }
+        private void OnVisibilityCleared(Transform scope, HashSet<PlayerID> players)
+        {
+            if (!scope.TryGetComponent<NetworkIdentity>(out var identity))
+                return;
 
-                    ListPool<NetworkIdentity>.Destroy(children);
+            var children = ListPool<NetworkIdentity>.Instantiate();
+            GetComponentsInChildren(identity.gameObject, children);
+            foreach (var player in players)
+                OnVisibilityLost(player, identity, children);
+            ListPool<NetworkIdentity>.Destroy(children);
+        }
 
-                    if (_scenePlayers.IsPlayerLoadedInScene(player, _sceneId))
-                    {
-                        _manager.FlushBatchedRPCs();
-                        SendDespawnPacket(player, identity, true);
-                    }
-                    return;
-                }
+        private void OnVisibilityLost(PlayerID player, NetworkIdentity identity, List<NetworkIdentity> children)
+        {
 
-                var unconfirmed = HashSetPool<NetworkIdentity>.Instantiate();
-                var cancelledRoots = ListPool<NetworkIdentity>.Instantiate();
-                var confirmedRemoved = ListPool<NetworkIdentity>.Instantiate();
-                var failedRoots = ListPool<NetworkIdentity>.Instantiate();
-                RemovePendingAsyncObservers(player, children, unconfirmed, cancelledRoots, confirmedRemoved);
-                ConsumeFailedAsyncObserverRoots(player, children, failedRoots, unconfirmed);
-
+            if (!HasActiveAsyncObserverState)
+            {
                 for (var i = 0; i < children.Count; i++)
                 {
                     var child = children[i];
-
-                    if (unconfirmed.Contains(child))
-                        continue;
-
                     ClearPendingLateObserverAdded(player, child);
                     child.TriggerOnObserverRemoved(player);
                     onObserverRemoved?.Invoke(player, child);
                 }
 
-                for (var i = 0; i < confirmedRemoved.Count; i++)
-                {
-                    var removed = confirmedRemoved[i];
-                    if (!removed || children.Contains(removed))
-                        continue;
-                    ClearPendingLateObserverAdded(player, removed);
-                    removed.TriggerOnObserverRemoved(player);
-                    onObserverRemoved?.Invoke(player, removed);
-                }
-
-                HashSetPool<NetworkIdentity>.Destroy(unconfirmed);
-                ListPool<NetworkIdentity>.Destroy(children);
-                ListPool<NetworkIdentity>.Destroy(confirmedRemoved);
 
                 if (_scenePlayers.IsPlayerLoadedInScene(player, _sceneId))
                 {
                     _manager.FlushBatchedRPCs();
-                    bool identityCovered = false;
-                    for (var i = 0; i < cancelledRoots.Count; i++)
-                    {
-                        var cancelledRoot = cancelledRoots[i];
-                        if (!cancelledRoot)
-                            continue;
-                        identityCovered |= identity.transform.IsChildOf(cancelledRoot.transform);
-                        SendDespawnPacket(player, cancelledRoot, true);
-
-                        if (cancelledRoot != identity)
-                            _collateralCancelRetries.Add((player, cancelledRoot));
-                    }
-
-                    for (var i = 0; i < failedRoots.Count; i++)
-                    {
-                        var failedRoot = failedRoots[i];
-                        if (failedRoot)
-                            identityCovered |= identity.transform.IsChildOf(failedRoot.transform);
-                    }
-
-                    if (!identityCovered)
-                        SendDespawnPacket(player, identity, true);
+                    SendDespawnPacket(player, identity, true);
                 }
-                ListPool<NetworkIdentity>.Destroy(cancelledRoots);
-                ListPool<NetworkIdentity>.Destroy(failedRoots);
+                return;
             }
+
+            var unconfirmed = HashSetPool<NetworkIdentity>.Instantiate();
+            var cancelledRoots = ListPool<NetworkIdentity>.Instantiate();
+            var confirmedRemoved = ListPool<NetworkIdentity>.Instantiate();
+            var failedRoots = ListPool<NetworkIdentity>.Instantiate();
+            RemovePendingAsyncObservers(player, children, unconfirmed, cancelledRoots, confirmedRemoved);
+            ConsumeFailedAsyncObserverRoots(player, children, failedRoots, unconfirmed);
+
+            for (var i = 0; i < children.Count; i++)
+            {
+                var child = children[i];
+
+                if (unconfirmed.Contains(child))
+                    continue;
+
+                ClearPendingLateObserverAdded(player, child);
+                child.TriggerOnObserverRemoved(player);
+                onObserverRemoved?.Invoke(player, child);
+            }
+
+            for (var i = 0; i < confirmedRemoved.Count; i++)
+            {
+                var removed = confirmedRemoved[i];
+                if (!removed || children.Contains(removed))
+                    continue;
+                ClearPendingLateObserverAdded(player, removed);
+                removed.TriggerOnObserverRemoved(player);
+                onObserverRemoved?.Invoke(player, removed);
+            }
+
+            HashSetPool<NetworkIdentity>.Destroy(unconfirmed);
+            ListPool<NetworkIdentity>.Destroy(confirmedRemoved);
+
+            if (_scenePlayers.IsPlayerLoadedInScene(player, _sceneId))
+            {
+                _manager.FlushBatchedRPCs();
+                bool identityCovered = false;
+                for (var i = 0; i < cancelledRoots.Count; i++)
+                {
+                    var cancelledRoot = cancelledRoots[i];
+                    if (!cancelledRoot)
+                        continue;
+                    identityCovered |= identity.transform.IsChildOf(cancelledRoot.transform);
+                    SendDespawnPacket(player, cancelledRoot, true);
+
+                    if (cancelledRoot != identity)
+                        _collateralCancelRetries.Add((player, cancelledRoot));
+                }
+
+                for (var i = 0; i < failedRoots.Count; i++)
+                {
+                    var failedRoot = failedRoots[i];
+                    if (failedRoot)
+                        identityCovered |= identity.transform.IsChildOf(failedRoot.transform);
+                }
+
+                if (!identityCovered)
+                    SendDespawnPacket(player, identity, true);
+            }
+            ListPool<NetworkIdentity>.Destroy(cancelledRoots);
+            ListPool<NetworkIdentity>.Destroy(failedRoots);
         }
 
         private void SendDespawnPacket(PlayerID player, NetworkIdentity identity, bool batched)
@@ -2766,10 +2849,31 @@ namespace PurrNet.Modules
             }
         }
 
+        private SpawnID RestoreTarget(SpawnID id, PlayerID sender)
+        {
+            if (!_asServer || id.scope.Equals(sender))
+                return id;
+            return id.WithTarget(sender);
+        }
+
+        private readonly Dictionary<NetworkID, ulong> _spawnIdxByRoot = new();
+
         private SpawnID SendSpawnPacket(PlayerID player, GameObjectPrototype prototype,
             List<NetworkIdentity> spawned, bool batched, bool isAsync = false)
         {
-            var spawnId = new SpawnID(_nextPacketIdx++, player, _playersManager.localPlayerId);
+            ulong idx;
+            if (batched && _asServer && spawned.Count > 0 && spawned[0] && spawned[0].id.HasValue)
+            {
+                var rootId = spawned[0].id.Value;
+                if (!_spawnIdxByRoot.TryGetValue(rootId, out idx))
+                {
+                    idx = _nextPacketIdx++;
+                    _spawnIdxByRoot.Add(rootId, idx);
+                }
+            }
+            else idx = _nextPacketIdx++;
+
+            var spawnId = new SpawnID(idx, player, _playersManager.localPlayerId);
             if (_asServer && isAsync)
                 isAsync = MoveObserversToAsyncPending(spawnId, player, spawned);
             var data = BitPackerPool.Get();
@@ -3264,8 +3368,125 @@ namespace PurrNet.Modules
             }
         }
 
+        private static bool SamePrototype(in GameObjectPrototype a, in GameObjectPrototype b)
+        {
+            if (a.position != b.position || a.rotation != b.rotation || a.scale != b.scale ||
+                !Nullable.Equals(a.parentID, b.parentID) || a.defaultParentSiblingIndex != b.defaultParentSiblingIndex)
+                return false;
+
+            if (!SameInts(a.path, b.path))
+                return false;
+
+            var fa = a.framework;
+            var fb = b.framework;
+            if (fa.Count != fb.Count)
+                return false;
+
+            for (var i = 0; i < fa.Count; i++)
+            {
+                var pa = fa[i];
+                var pb = fb[i];
+                if (!pa.pid.Equals(pb.pid) || !pa.id.Equals(pb.id) || pa.childCount.value != pb.childCount.value ||
+                    pa.isActive != pb.isActive || !pa.localTransform.Equals(pb.localTransform) ||
+                    !SameInts(pa.inversedRelativePath, pb.inversedRelativePath))
+                    return false;
+            }
+
+            return true;
+        }
+
+        private static bool SameInts(int[] a, int[] b)
+        {
+            int la = a?.Length ?? 0;
+            int lb = b?.Length ?? 0;
+            if (la != lb)
+                return false;
+            for (var i = 0; i < la; i++)
+            {
+                if (a![i] != b![i])
+                    return false;
+            }
+
+            return true;
+        }
+
+        private static bool SameBatch(in SpawnPacketBatch a, in SpawnPacketBatch b)
+        {
+            var sa = a.spawnPackets;
+            var sb = b.spawnPackets;
+            if (sa.Count != sb.Count)
+                return false;
+
+            for (var i = 0; i < sa.Count; i++)
+            {
+                var pa = sa[i];
+                var pb = sb[i];
+                if (!pa.packetIdx.SameWire(pb.packetIdx) || pa.isAsync != pb.isAsync || pa.bypassPool != pb.bypassPool ||
+                    !pa.customData.Equals(pb.customData) || !SamePrototype(pa.prototype, pb.prototype))
+                    return false;
+            }
+
+            var da = a.despawnPackets;
+            var db = b.despawnPackets;
+            if (da.Count != db.Count)
+                return false;
+
+            for (var i = 0; i < da.Count; i++)
+            {
+                if (!da[i].parentId.Equals(db[i].parentId))
+                    return false;
+            }
+
+            return true;
+        }
+
+        private readonly List<(PlayerID first, List<PlayerID> members)> _batchGroups = new();
+
         private void FlushSpawnPackets()
         {
+            _spawnIdxByRoot.Clear();
+            ClearPrototypeCache();
+
+            if (_spawnPackets.Count == 0)
+                return;
+
+            foreach (var (player, batch) in _spawnPackets)
+            {
+                if (player.isServer)
+                    continue;
+
+                bool grouped = false;
+                for (var g = 0; g < _batchGroups.Count && !grouped; g++)
+                {
+                    var group = _batchGroups[g];
+                    if (SameBatch(_spawnPackets[group.first], batch))
+                    {
+                        group.members.Add(player);
+                        grouped = true;
+                    }
+                }
+
+                if (!grouped)
+                {
+                    var members = ListPool<PlayerID>.Instantiate();
+                    members.Add(player);
+                    _batchGroups.Add((player, members));
+                }
+            }
+
+            for (var g = 0; g < _batchGroups.Count; g++)
+            {
+                var (first, members) = _batchGroups[g];
+                var batch = _spawnPackets[first];
+                if (members.Count == 1)
+                    _playersManager.Send(first, batch);
+                else
+                    _playersManager.Send(members, batch);
+                ListPool<PlayerID>.Destroy(members);
+            }
+
+            _batchGroups.Clear();
+
             foreach (var (player, batch) in _spawnPackets)
             {
                 using (batch)
@@ -3277,8 +3498,6 @@ namespace PurrNet.Modules
                     }
                     else
                     {
-                        _playersManager.Send(player, batch);
-
                         for (var i = 0; i < count; i++)
                         {
                             var packet = batch.spawnPackets[i];
@@ -3382,19 +3601,62 @@ namespace PurrNet.Modules
             }
         }
 
+        private readonly Dictionary<(NetworkIdentity nid, bool isSpawner), List<PlayerID>> _observerBatches = new();
+        private readonly List<(NetworkIdentity nid, bool isSpawner)> _observerBatchOrder = new();
+
         private void SendDelayedObserverEvents()
         {
-            for (var i = 0; i < _triggerLateObserverAdded.Count; i++)
+            int count = _triggerLateObserverAdded.Count;
+            if (count == 0)
+                return;
+
+            if (count == 1)
             {
-                var nid = _triggerLateObserverAdded[i];
-                if (!nid.nid || !nid.nid.isSpawned)
+                var single = _triggerLateObserverAdded[0];
+                _triggerLateObserverAdded.Clear();
+                if (single.nid && single.nid.isSpawned)
+                {
+                    single.nid.TriggerOnObserverAdded(single.player, single.isSpawner);
+                    onLateObserverAdded?.Invoke(single.player, single.nid);
+                }
+                return;
+            }
+
+            for (var i = 0; i < count; i++)
+            {
+                var entry = _triggerLateObserverAdded[i];
+                if (!entry.nid || !entry.nid.isSpawned)
                     continue;
 
-                nid.nid.TriggerOnObserverAdded(nid.player, nid.isSpawner);
-                onLateObserverAdded?.Invoke(nid.player, nid.nid);
+                var key = (entry.nid, entry.isSpawner);
+                if (!_observerBatches.TryGetValue(key, out var players))
+                {
+                    players = ListPool<PlayerID>.Instantiate();
+                    _observerBatches.Add(key, players);
+                    _observerBatchOrder.Add(key);
+                }
+
+                players.Add(entry.player);
             }
 
             _triggerLateObserverAdded.Clear();
+
+            for (var g = 0; g < _observerBatchOrder.Count; g++)
+            {
+                var key = _observerBatchOrder[g];
+                var players = _observerBatches[key];
+                if (key.nid && key.nid.isSpawned)
+                {
+                    key.nid.TriggerOnObserversAdded(players, key.isSpawner);
+                    for (var i = 0; i < players.Count; i++)
+                        onLateObserverAdded?.Invoke(players[i], key.nid);
+                }
+
+                ListPool<PlayerID>.Destroy(players);
+            }
+
+            _observerBatches.Clear();
+            _observerBatchOrder.Clear();
         }
 
         private void SendDelayedCompleteSpawns()
@@ -3958,22 +4220,13 @@ namespace PurrNet.Modules
         readonly List<SpawnID> _toCompleteNextFrame = new List<SpawnID>();
 
         /// <summary>
-        /// For manual spawning of identities.
-        /// After this call, you should call <see cref="ManualFinalizeSpawn(NetworkIdentity)"/> to finalize the spawning.
-        /// This needs to be called manually on all conserned clients.
-        /// </summary>
-        public void ManualEarlySpawn(NetworkIdentity identity, NetworkID id)
-        {
-            ManualEarlySpawn(identity, id, default);
-        }
-
-        /// <summary>
         /// For manual spawning of identities with custom spawn data.
         /// Custom data is deserialized after identity setup and before early-spawn callbacks.
         /// After this call, you should call <see cref="ManualFinalizeSpawn(NetworkIdentity)"/> to finalize the spawning.
         /// This needs to be called manually on all conserned clients.
         /// </summary>
-        public void ManualEarlySpawn(NetworkIdentity identity, NetworkID id, BitData customData)
+        [PublicAPI]
+        public void ManualEarlySpawn(NetworkIdentity identity, NetworkID id, BitData customData = default)
         {
             _spawnedIdentities.Add(identity);
             _spawnedIdentitiesMap.Add(id, identity);

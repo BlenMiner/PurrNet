@@ -21,6 +21,10 @@ namespace PurrNet.Modules
 
         public event VisibilityChanged visibilityChanged;
 
+        public delegate void VisibilityCleared(Transform scope, HashSet<PlayerID> players);
+
+        public event VisibilityCleared visibilityCleared;
+
         public VisilityV2(NetworkManager manager)
         {
             _manager = manager;
@@ -129,8 +133,19 @@ namespace PurrNet.Modules
             try
             {
                 ClearObservers(identity, null, affectedPlayers);
-                foreach (var player in affectedPlayers)
-                    Notify(player, scope, false);
+                if (visibilityCleared != null)
+                {
+                    if (affectedPlayers.Count > 0)
+                    {
+                        using var notify = _notifyMarker.Auto();
+                        visibilityCleared.Invoke(scope, affectedPlayers);
+                    }
+                }
+                else
+                {
+                    foreach (var player in affectedPlayers)
+                        Notify(player, scope, false);
+                }
             }
             finally
             {
