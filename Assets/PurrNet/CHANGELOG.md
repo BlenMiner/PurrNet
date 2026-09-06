@@ -1,3 +1,10 @@
+# [1.23.0-beta.36](https://github.com/PurrNet/PurrNet/compare/v1.23.0-beta.35...v1.23.0-beta.36) (2026-09-06)
+
+
+### Performance Improvements
+
+* introduce a new `OnObserversAdded` with a list of batches; cache visibility results; NetworkTransform uses new observer event for fanout ([0bf65a6](https://github.com/PurrNet/PurrNet/commit/0bf65a68aec2e4a8811f2ff27cc37d13b6e95666))
+
 # [1.23.0-beta.35](https://github.com/PurrNet/PurrNet/compare/v1.23.0-beta.34...v1.23.0-beta.35) (2026-09-06)
 
 
