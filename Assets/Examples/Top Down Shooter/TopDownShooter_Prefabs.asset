@@ -20,28 +20,12 @@ MonoBehaviour:
   linkedNetworkPrefabs:
   - {fileID: 11400000, guid: d5daa8c5cd9771a4da0c623682b0c9a3, type: 2}
   prefabs:
-  - guid: ac5f6929e1b0b3d43beacda0a058ee6b
-    prefab: {fileID: 2003487104454383947, guid: ac5f6929e1b0b3d43beacda0a058ee6b, type: 3}
-    pooled: 0
-    warmupCount: 5
-  - guid: c72760a687a4eb848a3d49729c1cc26c
-    prefab: {fileID: 2021845121686469242, guid: c72760a687a4eb848a3d49729c1cc26c, type: 3}
-    pooled: 0
-    warmupCount: 5
   - guid: 20ec334e1da5edf44ac0079941c62c2b
     prefab: {fileID: 2021845121686469242, guid: 20ec334e1da5edf44ac0079941c62c2b, type: 3}
     pooled: 0
     warmupCount: 5
   - guid: 6ed01b8a124e8c74788db5bf2caa512b
     prefab: {fileID: 5061703843092929407, guid: 6ed01b8a124e8c74788db5bf2caa512b, type: 3}
-    pooled: 0
-    warmupCount: 5
-  - guid: 6f332b4b684075840b8e8ec2c0b4ee8a
-    prefab: {fileID: 8498387641620522843, guid: 6f332b4b684075840b8e8ec2c0b4ee8a, type: 3}
-    pooled: 0
-    warmupCount: 5
-  - guid: bffcac4e3732f334995c0baa8a5d04a0
-    prefab: {fileID: 2343299082570380905, guid: bffcac4e3732f334995c0baa8a5d04a0, type: 3}
     pooled: 0
     warmupCount: 5
   - guid: e013d4a382956084e907feb2a3501cf8
