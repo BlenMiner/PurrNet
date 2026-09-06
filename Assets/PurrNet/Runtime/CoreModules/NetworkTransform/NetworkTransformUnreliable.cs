@@ -193,6 +193,7 @@ namespace PurrNet.Modules
         public long latestOrder;
         public uint ackBits;
         public bool ackDirty;
+        public bool urgentAck;
         public byte ackDelayTicks;
         public byte packetsSinceAck;
         public bool offsetInit;
