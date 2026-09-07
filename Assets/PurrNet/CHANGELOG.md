@@ -1,3 +1,10 @@
+# [1.23.0-beta.39](https://github.com/PurrNet/PurrNet/compare/v1.23.0-beta.38...v1.23.0-beta.39) (2026-09-07)
+
+
+### Bug Fixes
+
+* ensure siblings is populated before assuming ([2cced88](https://github.com/PurrNet/PurrNet/commit/2cced88490cc22d9b109068801d71a1536a753df))
+
 # [1.23.0-beta.38](https://github.com/PurrNet/PurrNet/compare/v1.23.0-beta.37...v1.23.0-beta.38) (2026-09-06)
 
 
