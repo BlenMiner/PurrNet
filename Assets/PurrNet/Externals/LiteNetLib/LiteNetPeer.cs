@@ -1,4 +1,4 @@
-﻿#if DEBUG
+#if DEBUG
 #define STATS_ENABLED
 #endif
 using System;
@@ -677,6 +677,12 @@ namespace LiteNetLib
 
                     length -= sendLength;
                 }
+                return;
+            }
+
+            if (userData == null && length > 0 && mtu <= NetConstants.MaxPacketSize && channel is ReliableChannel reliableChannel)
+            {
+                reliableChannel.AddToQueue(data, mtu);
                 return;
             }
 
