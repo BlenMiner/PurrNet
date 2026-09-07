@@ -93,6 +93,9 @@ namespace PurrNet.Modules
             NetworkVisibilityRuleSet rules, bool isParentVisible, bool wasParentDirtied)
         {
             var identities = identity.siblingIdentities;
+            if (identities.Length == 0)
+                return default;
+
             var scope = identity.transform;
             bool isVisible = Evaluate(player, identities, ref rules, isParentVisible, out bool fullyChanged);
             bool shouldTrigger = !wasParentDirtied && fullyChanged;
@@ -198,6 +201,9 @@ namespace PurrNet.Modules
             HashSet<PlayerID> affectedPlayers)
         {
             var identities = current.siblingIdentities;
+            if (identities.Length == 0)
+                return null;
+
             for (var i = 0; i < identities.Length; i++)
             {
                 var identity = identities[i];
@@ -239,7 +245,11 @@ namespace PurrNet.Modules
                         continue;
                     var root = identity.GetRootIdentity();
                     if (root)
-                        roots.Add(root.siblingIdentities[0]);
+                    {
+                        var siblings = root.siblingIdentities;
+                        if (siblings.Length > 0)
+                            roots.Add(siblings[0]);
+                    }
                 }
 
                 for (var i = 0; i < players.Count; i++)
