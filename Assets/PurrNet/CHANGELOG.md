@@ -1,3 +1,10 @@
+# [1.23.0-beta.40](https://github.com/PurrNet/PurrNet/compare/v1.23.0-beta.39...v1.23.0-beta.40) (2026-09-07)
+
+
+### Performance Improvements
+
+* udp reliable messages now coalesce while queued ([f046c4c](https://github.com/PurrNet/PurrNet/commit/f046c4c26bf5fab20bc79daf4f3f0788bc7a8ac5))
+
 # [1.23.0-beta.39](https://github.com/PurrNet/PurrNet/compare/v1.23.0-beta.38...v1.23.0-beta.39) (2026-09-07)
 
 
