@@ -1,6 +1,5 @@
 using System;
 using System.Collections.Generic;
-using System.Reflection;
 using JetBrains.Annotations;
 using PurrNet.Logging;
 using PurrNet.Modules;
@@ -905,30 +904,8 @@ namespace PurrNet
         {
         }
 
-        static readonly Dictionary<Type, List<MethodInfo>> _methodCache = new();
-
-        private void CallInitMethods()
-        {
-            if (!_methodCache.TryGetValue(GetType(), out var cached))
-            {
-                var type = GetType();
-                var methods = type.GetMethods(BindingFlags.Instance | BindingFlags.Public);
-                cached = new List<MethodInfo>(methods.Length);
-
-                for (int i = 0; i < methods.Length; i++)
-                {
-                    var m = methods[i];
-                    if (m.Name.EndsWith("_CodeGen_Initialize"))
-                        cached.Add(m);
-                }
-
-                _methodCache[type] = cached;
-            }
-
-            int count = cached.Count;
-            for (var i = 0; i < count; i++)
-                cached[i].Invoke(this, Array.Empty<object>());
-        }
+        [UsedByIL, UsedImplicitly]
+        public virtual void CallGeneratedInitMethods() { }
 
         /// <summary>
         /// The layer of this object. Avoids gameObject.layer.
@@ -1059,7 +1036,7 @@ namespace PurrNet
                 _moduleId = 0;
 
                 OnInitializeModules();
-                CallInitMethods();
+                CallGeneratedInitMethods();
 
                 foreach (var module in _externalModulesView)
                     module.OnInitializeModules();
