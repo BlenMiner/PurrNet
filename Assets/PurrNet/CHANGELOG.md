@@ -1,3 +1,11 @@
+# [1.23.0-beta.43](https://github.com/PurrNet/PurrNet/compare/v1.23.0-beta.42...v1.23.0-beta.43) (2026-09-09)
+
+
+### Performance Improvements
+
+* dispatch generated module initializers without reflection ([dd1133e](https://github.com/PurrNet/PurrNet/commit/dd1133e6f0702126b53f8270718fc093360b1f61))
+* resolve prefab data by lookup instead of scanning ([38b3964](https://github.com/PurrNet/PurrNet/commit/38b3964db1af53401a667a5670918b04f9bd8fe5))
+
 # [1.23.0-beta.42](https://github.com/PurrNet/PurrNet/compare/v1.23.0-beta.41...v1.23.0-beta.42) (2026-09-09)
 
 
