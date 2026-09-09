@@ -83,10 +83,12 @@ namespace PurrNet
 
         public double rollbackTick => networkManager ? networkManager.tickModule.rollbackTick : 0;
 
-        public int[] invertedPathToNearestParent
+        public ReadOnlySpan<int> invertedPathToNearestParent => _invertedPathToNearestParent;
+
+        internal int[] invertedPathToNearestParentArray
         {
             get => _invertedPathToNearestParent;
-            internal set => _invertedPathToNearestParent = value;
+            set => _invertedPathToNearestParent = value;
         }
 
         public IReadOnlyList<NetworkIdentity> directChildren => _directChildren;

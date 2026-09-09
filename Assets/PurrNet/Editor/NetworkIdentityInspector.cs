@@ -1,4 +1,4 @@
-using System.Collections.Generic;
+﻿using System.Collections.Generic;
 using System.Reflection;
 using PurrNet.Contributors;
 using PurrNet.Utils;
@@ -347,14 +347,13 @@ namespace PurrNet.Editor
 
             string path = "";
 
-            if (identity.invertedPathToNearestParent != null)
+            var invertedPath = identity.invertedPathToNearestParent;
+
+            for (var index = 0; index < invertedPath.Length; index++)
             {
-                for (var index = 0; index < identity.invertedPathToNearestParent.Length; index++)
-                {
-                    var parent = identity.invertedPathToNearestParent[index];
-                    bool isLast = index == identity.invertedPathToNearestParent.Length - 1;
-                    path += parent + (isLast ? ";" : " -> ");
-                }
+                var parent = invertedPath[index];
+                bool isLast = index == invertedPath.Length - 1;
+                path += parent + (isLast ? ";" : " -> ");
             }
 
             EditorGUILayout.LabelField($"pathToNearestParent: {path}");

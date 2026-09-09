@@ -626,7 +626,7 @@ namespace PurrNet.Modules
             {
                 var child = tmpList[i];
                 child.parent = parent;
-                child.invertedPathToNearestParent = path;
+                child.invertedPathToNearestParentArray = path;
             }
 
             ListPool<NetworkIdentity>.Destroy(tmpList);
@@ -701,7 +701,7 @@ namespace PurrNet.Modules
                 if (!identity || !identity.isSpawned)
                     continue;
 
-                ApplyParentChange(identity, identity.parent, identity.invertedPathToNearestParent, false);
+                ApplyParentChange(identity, identity.parent, identity.invertedPathToNearestParentArray, false);
             }
 
             ListPool<NetworkIdentity>.Destroy(toRevert);
@@ -747,7 +747,7 @@ namespace PurrNet.Modules
             {
                 var child = tmpList[i];
                 child.parent = closestNid;
-                child.invertedPathToNearestParent = first.invertedPathToNearestParent;
+                child.invertedPathToNearestParentArray = first.invertedPathToNearestParentArray;
             }
 
             ListPool<NetworkIdentity>.Destroy(tmpList);
@@ -765,7 +765,7 @@ namespace PurrNet.Modules
                     sceneId = _sceneId,
                     childId = identity.id.Value,
                     newParentId = closestNid?.id,
-                    path = identity.invertedPathToNearestParent,
+                    path = identity.invertedPathToNearestParentArray,
                     worldPositionStays = worldPositionStays
                 };
 
@@ -2523,7 +2523,7 @@ namespace PurrNet.Modules
                         sceneId = _sceneId,
                         childId = identity.id.Value,
                         newParentId = identity.parent ? identity.parent.id : null,
-                        path = identity.invertedPathToNearestParent,
+                        path = identity.invertedPathToNearestParentArray,
                         worldPositionStays = false
                     });
                 }
@@ -3115,7 +3115,7 @@ namespace PurrNet.Modules
 
             var baseNid = new NetworkID(_nextId++, scope);
             SetupIdsLocally(id, ref baseNid);
-            ApplyParentChange(id, id.parent, id.invertedPathToNearestParent, false, applyToTransform: false);
+            ApplyParentChange(id, id.parent, id.invertedPathToNearestParentArray, false, applyToTransform: false);
 
             if (!_asServer)
             {
@@ -3914,7 +3914,7 @@ namespace PurrNet.Modules
                     var sibling = siblings[siblingIndex];
                     sibling.SetID(new NetworkID(current.id, (ulong)siblingIndex));
                     sibling.parent = i == 0 ? null : sibling.GetNearestParent();
-                    sibling.invertedPathToNearestParent = current.inversedRelativePath;
+                    sibling.invertedPathToNearestParentArray = current.inversedRelativePath;
                 }
                 ListPool<NetworkIdentity>.Destroy(siblings);
 

@@ -993,7 +993,7 @@ namespace PurrNet.Modules
                 foreach (var sib in siblings)
                 {
                     sib.parent = p;
-                    sib.invertedPathToNearestParent = current.inversedRelativePath;
+                    sib.invertedPathToNearestParentArray = current.inversedRelativePath;
                 }
             }
             else
@@ -1004,7 +1004,7 @@ namespace PurrNet.Modules
                 foreach (var sib in siblings)
                 {
                     sib.parent = null;
-                    sib.invertedPathToNearestParent = current.inversedRelativePath;
+                    sib.invertedPathToNearestParentArray = current.inversedRelativePath;
                 }
             }
 
