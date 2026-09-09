@@ -319,6 +319,13 @@ namespace PurrNet
         Interpolated<QuaternionWithParent> _rotation;
         Interpolated<ScaleWithParent> _scale;
 
+        static readonly LerpFunction<Vector3WithParent> _positionLerp = Vector3WithParent.Lerp;
+        static readonly LerpFunction<Vector3WithParent> _positionNoLerp = Vector3WithParent.NoLerp;
+        static readonly LerpFunction<QuaternionWithParent> _rotationLerp = QuaternionWithParent.Lerp;
+        static readonly LerpFunction<QuaternionWithParent> _rotationNoLerp = QuaternionWithParent.NoLerp;
+        static readonly LerpFunction<ScaleWithParent> _scaleLerp = ScaleWithParent.Lerp;
+        static readonly LerpFunction<ScaleWithParent> _scaleNoLerp = ScaleWithParent.NoLerp;
+
         public Vector3 latestReadPosition
         {
             get
@@ -475,8 +482,11 @@ namespace PurrNet
             if (syncPosition)
             {
                 var currentPos = MakePositionSample(p, data);
-                _position = new Interpolated<Vector3WithParent>(interpolatePosition ? Vector3WithParent.Lerp : Vector3WithParent.NoLerp,
-                    sendDelta, currentPos, _maxBufferSize, _minBufferSize);
+                var lerp = interpolatePosition ? _positionLerp : _positionNoLerp;
+
+                if (_position == null)
+                    _position = new Interpolated<Vector3WithParent>(lerp, sendDelta, currentPos, _maxBufferSize, _minBufferSize);
+                else _position.Reset(lerp, sendDelta, currentPos, _maxBufferSize, _minBufferSize);
             }
 
             if (syncRotation)
@@ -484,16 +494,21 @@ namespace PurrNet
                 var currentRot = _syncRotation == SyncMode.World ?
                     new QuaternionWithParent(p, false, _trs.rotation) :
                     new QuaternionWithParent(p, true, _trs.localRotation);
-                _rotation = new Interpolated<QuaternionWithParent>(
-                    interpolateRotation ? QuaternionWithParent.Lerp : QuaternionWithParent.NoLerp,
-                    sendDelta, currentRot, _maxBufferSize, _minBufferSize);
+                var lerp = interpolateRotation ? _rotationLerp : _rotationNoLerp;
+
+                if (_rotation == null)
+                    _rotation = new Interpolated<QuaternionWithParent>(lerp, sendDelta, currentRot, _maxBufferSize, _minBufferSize);
+                else _rotation.Reset(lerp, sendDelta, currentRot, _maxBufferSize, _minBufferSize);
             }
 
             if (syncScale)
             {
                 var currentScale = new ScaleWithParent(p, _trs.localScale);
-                _scale = new Interpolated<ScaleWithParent>(interpolateScale ? ScaleWithParent.Lerp : ScaleWithParent.NoLerp,
-                    sendDelta, currentScale, _maxBufferSize, _minBufferSize);
+                var lerp = interpolateScale ? _scaleLerp : _scaleNoLerp;
+
+                if (_scale == null)
+                    _scale = new Interpolated<ScaleWithParent>(lerp, sendDelta, currentScale, _maxBufferSize, _minBufferSize);
+                else _scale.Reset(lerp, sendDelta, currentScale, _maxBufferSize, _minBufferSize);
             }
 
             _currentData = data;
