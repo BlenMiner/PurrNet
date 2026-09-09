@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.Collections.Generic;
 using JetBrains.Annotations;
 using PurrNet.Logging;
@@ -797,6 +797,8 @@ namespace PurrNet.Modules
         private readonly Dictionary<SpawnID, PendingAsyncObserverSpawn> _pendingAsyncObservers = new();
         private readonly Dictionary<SpawnID, PendingAsyncObserverSpawn> _readyAsyncObservers = new();
         private readonly HashSet<(PlayerID player, NetworkID root)> _failedAsyncObserverRoots = new();
+        private NetworkID _failedAsyncObserverRootFilter;
+        private Predicate<(PlayerID player, NetworkID root)> _failedAsyncObserverRootPredicate;
         private readonly HashSet<SpawnID> _relayAsyncSpawns = new();
         private readonly HashSet<NetworkID> _failedAsyncSpawnRoots = new();
         private int _asyncVisibilityDepth;
@@ -4489,7 +4491,14 @@ namespace PurrNet.Modules
             if (_failedAsyncObserverRoots.Count == 0)
                 return;
 
-            _failedAsyncObserverRoots.RemoveWhere(pair => pair.root == root);
+            _failedAsyncObserverRootFilter = root;
+            _failedAsyncObserverRootPredicate ??= MatchesFailedAsyncObserverRootFilter;
+            _failedAsyncObserverRoots.RemoveWhere(_failedAsyncObserverRootPredicate);
+        }
+
+        private bool MatchesFailedAsyncObserverRootFilter((PlayerID player, NetworkID root) pair)
+        {
+            return pair.root == _failedAsyncObserverRootFilter;
         }
 
         internal void CleanupDestroyedIdentity(NetworkIdentity identity)
