@@ -46,6 +46,10 @@ namespace PurrNet.Modules
 
         private static readonly Dictionary<PrefabID, GameObjectPrototype> _prefabPrototypes = new();
 
+        private const int MAX_INTERNED_PATHS_PER_LENGTH = 64;
+
+        private static readonly Dictionary<int, List<int[]>> _internedPaths = new();
+
         /// <summary>
         /// Drops cached prototypes of prefabs scoped to the given scene so nothing outlives it.
         /// </summary>
@@ -572,6 +576,46 @@ namespace PurrNet.Modules
             if (_prefabs.TryGetPrefabData(pid.prefabId, out var prefabData))
                 Warmup(prefabData);
             else PurrLogger.LogError($"Prefab with piece id of '{pid}' was not found");
+        }
+
+        public static int[] InternPath(DisposableList<int> path)
+        {
+            if (path.Count == 0)
+                return Array.Empty<int>();
+
+            if (!_internedPaths.TryGetValue(path.Count, out var candidates))
+            {
+                candidates = new List<int[]>();
+                _internedPaths.Add(path.Count, candidates);
+            }
+
+            for (var i = 0; i < candidates.Count; i++)
+            {
+                var candidate = candidates[i];
+                var matches = true;
+
+                for (var j = 0; j < candidate.Length; j++)
+                {
+                    if (candidate[j] == path[j])
+                        continue;
+
+                    matches = false;
+                    break;
+                }
+
+                if (matches)
+                    return candidate;
+            }
+
+            var interned = new int[path.Count];
+
+            for (var i = 0; i < interned.Length; i++)
+                interned[i] = path[i];
+
+            if (candidates.Count < MAX_INTERNED_PATHS_PER_LENGTH)
+                candidates.Add(interned);
+
+            return interned;
         }
 
         public static DisposableList<int> GetInvPath(Transform parent, Transform transform)

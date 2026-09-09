@@ -221,14 +221,7 @@ namespace PurrNet
             if (_parent)
             {
                 using var invPath = HierarchyPool.GetInvPath(_parent.transform, transform);
-
-                if (_invertedPathToNearestParent == null)
-                    _invertedPathToNearestParent = new int[invPath.Count];
-                else if (_invertedPathToNearestParent.Length != invPath.Count)
-                    _invertedPathToNearestParent = new int[invPath.Count];
-
-                for (int i = 0; i < invPath.Count; i++)
-                    _invertedPathToNearestParent[i] = invPath[i];
+                _invertedPathToNearestParent = HierarchyPool.InternPath(invPath);
             }
             else
             {
