@@ -579,10 +579,13 @@ namespace PurrNet.Modules
             else PurrLogger.LogError($"Prefab with piece id of '{pid}' was not found");
         }
 
-        public static int[] InternPath(DisposableList<int> path)
+        internal static bool TryInternPath(DisposableList<int> path, out int[] interned)
         {
             if (path.Count == 0)
-                return Array.Empty<int>();
+            {
+                interned = Array.Empty<int>();
+                return true;
+            }
 
             if (!_internedPaths.TryGetValue(path.Count, out var candidates))
             {
@@ -605,18 +608,25 @@ namespace PurrNet.Modules
                 }
 
                 if (matches)
-                    return candidate;
+                {
+                    interned = candidate;
+                    return true;
+                }
             }
 
-            var interned = new int[path.Count];
+            if (candidates.Count >= MAX_INTERNED_PATHS_PER_LENGTH)
+            {
+                interned = null;
+                return false;
+            }
+
+            interned = new int[path.Count];
 
             for (var i = 0; i < interned.Length; i++)
                 interned[i] = path[i];
 
-            if (candidates.Count < MAX_INTERNED_PATHS_PER_LENGTH)
-                candidates.Add(interned);
-
-            return interned;
+            candidates.Add(interned);
+            return true;
         }
 
         public static DisposableList<int> GetInvPath(Transform parent, Transform transform)

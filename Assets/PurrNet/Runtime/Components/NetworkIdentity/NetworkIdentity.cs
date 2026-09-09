@@ -32,6 +32,8 @@ namespace PurrNet
 
         [SerializeField, HideInInspector] private int[] _invertedPathToNearestParent;
 
+        private bool _ownsInvertedPath;
+
         [SerializeField, HideInInspector] private List<NetworkIdentity> _directChildren;
 
         private NetworkIdentity[] _siblingIdentities;
@@ -88,7 +90,11 @@ namespace PurrNet
         internal int[] invertedPathToNearestParentArray
         {
             get => _invertedPathToNearestParent;
-            set => _invertedPathToNearestParent = value;
+            set
+            {
+                _invertedPathToNearestParent = value;
+                _ownsInvertedPath = false;
+            }
         }
 
         public IReadOnlyList<NetworkIdentity> directChildren => _directChildren;
@@ -223,11 +229,27 @@ namespace PurrNet
             if (_parent)
             {
                 using var invPath = HierarchyPool.GetInvPath(_parent.transform, transform);
-                _invertedPathToNearestParent = HierarchyPool.InternPath(invPath);
+
+                if (HierarchyPool.TryInternPath(invPath, out var interned))
+                {
+                    _invertedPathToNearestParent = interned;
+                    _ownsInvertedPath = false;
+                    return;
+                }
+
+                if (!_ownsInvertedPath || _invertedPathToNearestParent.Length != invPath.Count)
+                {
+                    _invertedPathToNearestParent = new int[invPath.Count];
+                    _ownsInvertedPath = true;
+                }
+
+                for (var i = 0; i < invPath.Count; i++)
+                    _invertedPathToNearestParent[i] = invPath[i];
             }
             else
             {
                 _invertedPathToNearestParent = Array.Empty<int>();
+                _ownsInvertedPath = false;
             }
         }
 
