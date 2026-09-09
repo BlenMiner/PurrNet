@@ -31,6 +31,8 @@ namespace PurrNet
 
         [SerializeField, HideInInspector] private int[] _invertedPathToNearestParent;
 
+        private bool _ownsInvertedPath;
+
         [SerializeField, HideInInspector] private List<NetworkIdentity> _directChildren;
 
         private NetworkIdentity[] _siblingIdentities;
@@ -82,10 +84,16 @@ namespace PurrNet
 
         public double rollbackTick => networkManager ? networkManager.tickModule.rollbackTick : 0;
 
-        public int[] invertedPathToNearestParent
+        public ReadOnlySpan<int> invertedPathToNearestParent => _invertedPathToNearestParent;
+
+        internal int[] invertedPathToNearestParentArray
         {
             get => _invertedPathToNearestParent;
-            internal set => _invertedPathToNearestParent = value;
+            set
+            {
+                _invertedPathToNearestParent = value;
+                _ownsInvertedPath = false;
+            }
         }
 
         public IReadOnlyList<NetworkIdentity> directChildren => _directChildren;
@@ -225,17 +233,26 @@ namespace PurrNet
             {
                 using var invPath = HierarchyPool.GetInvPath(_parent.transform, transform);
 
-                if (_invertedPathToNearestParent == null)
-                    _invertedPathToNearestParent = new int[invPath.Count];
-                else if (_invertedPathToNearestParent.Length != invPath.Count)
-                    _invertedPathToNearestParent = new int[invPath.Count];
+                if (HierarchyPool.TryInternPath(invPath, out var interned))
+                {
+                    _invertedPathToNearestParent = interned;
+                    _ownsInvertedPath = false;
+                    return;
+                }
 
-                for (int i = 0; i < invPath.Count; i++)
+                if (!_ownsInvertedPath || _invertedPathToNearestParent.Length != invPath.Count)
+                {
+                    _invertedPathToNearestParent = new int[invPath.Count];
+                    _ownsInvertedPath = true;
+                }
+
+                for (var i = 0; i < invPath.Count; i++)
                     _invertedPathToNearestParent[i] = invPath[i];
             }
             else
             {
                 _invertedPathToNearestParent = Array.Empty<int>();
+                _ownsInvertedPath = false;
             }
         }
 
