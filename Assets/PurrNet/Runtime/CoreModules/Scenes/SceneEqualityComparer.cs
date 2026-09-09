@@ -1,5 +1,10 @@
 using System.Collections.Generic;
 using UnityEngine.SceneManagement;
+#if UNITY_6000_3_OR_NEWER
+using SceneHandle = UnityEngine.SceneManagement.SceneHandle;
+#else
+using SceneHandle = System.Int32;
+#endif
 
 namespace PurrNet.Modules
 {
@@ -14,11 +19,8 @@ namespace PurrNet.Modules
 
         public int GetHashCode(Scene obj)
         {
-#if UNITY_6000_5_OR_NEWER
-            return obj.handle.GetHashCode();
-#else
-            return obj.handle;
-#endif
+            SceneHandle handle = obj.handle;
+            return handle.GetHashCode();
         }
     }
 }
