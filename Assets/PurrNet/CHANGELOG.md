@@ -1,3 +1,10 @@
+# [1.23.0-beta.41](https://github.com/PurrNet/PurrNet/compare/v1.23.0-beta.40...v1.23.0-beta.41) (2026-09-09)
+
+
+### Bug Fixes
+
+* IL2CPP function pointer crashes webgl when exceptions are disabled ([1a7dbc3](https://github.com/PurrNet/PurrNet/commit/1a7dbc3692e7f2e83e7a3bf2f7cdd3e3a134f2e5))
+
 # [1.23.0-beta.40](https://github.com/PurrNet/PurrNet/compare/v1.23.0-beta.39...v1.23.0-beta.40) (2026-09-07)
 
 
