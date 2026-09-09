@@ -8,7 +8,7 @@ namespace PurrNet
     [DontPack]
     public class Interpolated<T>
     {
-        private readonly LerpFunction<T> _lerp;
+        private LerpFunction<T> _lerp;
         private readonly List<T> _buffer;
         private T _lastValue;
         private T _currentStateRaw;
@@ -48,6 +48,28 @@ namespace PurrNet
 
             _tickDelta = tickDelta;
             _lastValue = initialValue;
+            _waitForMinBufferSize = true;
+        }
+
+        public void Reset(LerpFunction<T> lerp, float tickDelta, T initialValue = default, int maxBufferSize = 2, int minBufferSize = 1)
+        {
+            _lerp = lerp ?? throw new ArgumentNullException(nameof(lerp));
+
+            if (tickDelta <= 0f)
+                throw new ArgumentException("tickDelta must be greater than 0", nameof(tickDelta));
+
+            if (_buffer.Capacity < maxBufferSize)
+                _buffer.Capacity = maxBufferSize;
+            _buffer.Clear();
+
+            this.maxBufferSize = maxBufferSize;
+            this.minBufferSize = minBufferSize;
+
+            _tickDelta = tickDelta;
+            _lastValue = initialValue;
+            _currentStateRaw = default;
+            _timer = 0f;
+            _idleTime = 0f;
             _waitForMinBufferSize = true;
         }
 
