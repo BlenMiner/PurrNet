@@ -1,4 +1,4 @@
-using System.Collections.Generic;
+﻿using System.Collections.Generic;
 using PurrNet.Pooling;
 using Unity.Profiling;
 using UnityEngine;
@@ -216,14 +216,20 @@ namespace PurrNet.Modules
                 }
                 else
                 {
-                    affectedPlayers.UnionWith(identity.observers);
+                    AddAll(affectedPlayers, identity.observers);
                     if (identity.hasPendingObservers)
-                        affectedPlayers.UnionWith(identity.pendingObservers);
+                        AddAll(affectedPlayers, identity.pendingObservers);
                     identity.ClearObservers();
                 }
             }
 
             return identities[0].directChildren;
+        }
+
+        private static void AddAll(HashSet<PlayerID> target, IReadOnlyList<PlayerID> players)
+        {
+            for (var i = 0; i < players.Count; i++)
+                target.Add(players[i]);
         }
 
         private void Notify(PlayerID player, Transform scope, bool isVisible)
