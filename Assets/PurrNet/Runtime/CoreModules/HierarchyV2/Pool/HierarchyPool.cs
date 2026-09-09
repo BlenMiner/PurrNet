@@ -112,6 +112,7 @@ namespace PurrNet.Modules
             foreach (var (_, prototype) in _prefabPrototypes)
                 prototype.Dispose();
             _prefabPrototypes.Clear();
+            _internedPaths.Clear();
         }
 
         readonly HashSet<GameObject> _alreadyWarmedUp = new HashSet<GameObject>();
