@@ -14,7 +14,11 @@ namespace PurrNet.Modules
 
         public int GetHashCode(Scene obj)
         {
+#if UNITY_6000_5_OR_NEWER
+            return obj.handle.GetHashCode();
+#else
             return obj.handle;
+#endif
         }
     }
 }
