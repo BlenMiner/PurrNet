@@ -1,3 +1,10 @@
+# [1.23.0-beta.42](https://github.com/PurrNet/PurrNet/compare/v1.23.0-beta.41...v1.23.0-beta.42) (2026-09-09)
+
+
+### Performance Improvements
+
+* reuse interpolation buffers across respawns ([a5603cc](https://github.com/PurrNet/PurrNet/commit/a5603cc9c33310430473d8b7cc6d3c8dd044b7d7))
+
 # [1.23.0-beta.41](https://github.com/PurrNet/PurrNet/compare/v1.23.0-beta.40...v1.23.0-beta.41) (2026-09-09)
 
 
