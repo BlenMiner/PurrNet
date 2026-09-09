@@ -65,7 +65,7 @@ namespace PurrNet.Modules
         private readonly Queue<SceneAction> _actionsQueue = new Queue<SceneAction>();
 
         private readonly Dictionary<SceneID, SceneState> _scenes = new Dictionary<SceneID, SceneState>();
-        private readonly Dictionary<Scene, SceneID> _idToScene = new Dictionary<Scene, SceneID>();
+        private readonly Dictionary<Scene, SceneID> _idToScene = new Dictionary<Scene, SceneID>(SceneEqualityComparer.instance);
         private readonly List<SceneID> _rawScenes = new List<SceneID>();
         private readonly HashSet<SceneID> _sceneActionScenes = new HashSet<SceneID>();
 
