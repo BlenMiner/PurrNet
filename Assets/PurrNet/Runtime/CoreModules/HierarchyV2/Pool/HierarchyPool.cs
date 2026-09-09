@@ -230,7 +230,8 @@ namespace PurrNet.Modules
             QueueVirtualNodesFromLeafToRoot(root, virtualNodes);
             QueueRealNodesFromLeafToRoot(root, realNodes);
 
-            realNodes.ExceptWith(virtualNodes);
+            foreach (var virtualNode in virtualNodes)
+                realNodes.Remove(virtualNode);
 
             // save the objects that should not be despawned
             foreach (var real in realNodes)
