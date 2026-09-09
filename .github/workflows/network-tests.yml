@@ -4,7 +4,7 @@ on:
   workflow_dispatch:
     inputs:
       clientCount:
-        description: "Number of client processes to spawn"
+        description: "Total players per mode (default batches require at least 3)"
         required: true
         default: "5"
       connectionDelaySeconds:
@@ -16,7 +16,7 @@ on:
         required: true
         default: "30"
       scenario:
-        description: "Run a single scenario component by name (empty runs the full suite)"
+        description: "Run one scenario by name (empty runs the full suite and isolated regressions)"
         required: false
         default: ""
   workflow_call:
@@ -39,7 +39,7 @@ on:
         required: false
         default: ""
       scenario:
-        description: "Run a single scenario component by name (empty runs the full suite)."
+        description: "Run one scenario by name (empty runs the full suite and isolated regressions)."
         type: string
         required: false
         default: ""
@@ -60,6 +60,19 @@ jobs:
         mode: [server, host]
 
     steps:
+      # The tracked runner and scenario manifest are needed even with a prebuilt player.
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Validate scenario runner
+        run: bash .github/scripts/test-network-tests.sh
+
+      - name: Validate host-loss process supervision
+        run: python3 .github/scripts/test-host-loss.py
+
+      - name: Validate content cache cleanup
+        run: bash .github/scripts/test-reset-addressable-build-caches.sh
+
       # Reuse a player built upstream (e.g. by the benchmark workflow) instead of building again.
       - name: Download prebuilt player
         if: inputs.player_artifact != ''
@@ -67,10 +80,6 @@ jobs:
         with:
           name: ${{ inputs.player_artifact }}
           path: build/StandaloneLinux64
-
-      - name: Checkout
-        if: inputs.player_artifact == ''
-        uses: actions/checkout@v4
 
       - name: Restore Library cache
         if: inputs.player_artifact == ''
@@ -83,6 +92,10 @@ jobs:
           key: Library-PurrNet-IL2CPP-rel-${{ hashFiles('Assets/**', 'Packages/**', 'ProjectSettings/**') }}
           restore-keys: |
             Library-PurrNet-IL2CPP-rel-
+
+      - name: Reset content caches after fallback Library restore
+        if: inputs.player_artifact == '' && steps.cache-library.outputs.cache-hit != 'true'
+        run: bash .github/scripts/reset-addressable-build-caches.sh "$GITHUB_WORKSPACE"
 
       - name: Build StandaloneLinux64 player (IL2CPP)
         if: inputs.player_artifact == ''
@@ -113,144 +126,28 @@ jobs:
         run: ls -la build/StandaloneLinux64/
 
       - name: Run scenarios
+        id: scenarios
         env:
           CLIENT_COUNT: ${{ inputs.clientCount }}
           CONNECT_DELAY: ${{ inputs.connectionDelaySeconds }}
           MODE: ${{ matrix.mode }}
           SCENARIO: ${{ inputs.scenario }}
         run: |
-          set -u
           BIN="$PWD/build/StandaloneLinux64/PurrNetTests"
-          # The IL2CPP player is produced inside the unity-builder Docker container as a non-runner
-          # user (e.g. 'packer') and is already +x. A plain chmod by the runner user fails with
-          # EPERM ("Operation not permitted") and, under set -e, aborts the whole step before any
-          # process launches. sudo (passwordless on GitHub runners) chmods regardless of owner.
+          # unity-builder can produce the binary as a different container user.
           sudo chmod +x "$BIN" || chmod +x "$BIN" || true
-          RESULTS_DIR="$PWD/test-results"
-          LOGS_DIR="$PWD/test-logs"
-          mkdir -p "$RESULTS_DIR" "$LOGS_DIR"
-
-          # Total player count we want exercised, regardless of host vs server-only mode.
-          TOTAL_COUNT="$CLIENT_COUNT"
-
-          # Server-only: 1 server process + N client processes (server has N connections).
-          # Host: 1 host process + (N-1) client processes (host has N connections, one
-          # of which is its own local client; cookies + static state shared with server).
-          if [ "$MODE" = "host" ]; then
-            EXTERNAL_CLIENTS=$((TOTAL_COUNT - 1))
-            if [ "$EXTERNAL_CLIENTS" -lt 1 ]; then
-              echo "::error::Host mode needs at least 1 external client (clientCount must be >= 2). Got $TOTAL_COUNT"
-              exit 1
-            fi
-          else
-            EXTERNAL_CLIENTS="$TOTAL_COUNT"
-          fi
-
-          # Unity 6 Linux player segfaults inside PlayerMain on ubuntu-latest
-          # even with -batchmode -nographics, so wrap each invocation in xvfb-run.
-          RUN=(xvfb-run -a --server-args="-screen 0 1024x768x24")
-
-          # Empty input -> full suite; otherwise every process runs just that scenario.
-          SCENARIO_ARGS=()
-          if [ -n "$SCENARIO" ]; then
-            SCENARIO_ARGS=(-scenario "$SCENARIO")
-            echo "Running single scenario: $SCENARIO"
-          fi
-
-          echo "::group::Launching $MODE process"
-          "${RUN[@]}" "$BIN" -batchmode -nographics \
-            -role "$MODE" -count "$TOTAL_COUNT" \
-            "${SCENARIO_ARGS[@]}" \
-            -results "$RESULTS_DIR/$MODE.json" \
-            -logFile "$LOGS_DIR/$MODE.log" &
-          SERVER_PID=$!
-          echo "$MODE PID: $SERVER_PID"
-          echo "::endgroup::"
-
-          sleep "$CONNECT_DELAY"
-
-          if ! kill -0 "$SERVER_PID" 2>/dev/null; then
-            echo "::error::$MODE process died before clients could start"
-            tail -n 200 "$LOGS_DIR/$MODE.log" || true
-            exit 1
-          fi
-
-          CLIENT_PIDS=()
-          for i in $(seq 1 "$EXTERNAL_CLIENTS"); do
-            echo "::group::Launching client $i"
-            "${RUN[@]}" "$BIN" -batchmode -nographics \
-              -role client \
-              "${SCENARIO_ARGS[@]}" \
-              -results "$RESULTS_DIR/client-$i.json" \
-              -logFile "$LOGS_DIR/client-$i.log" &
-            PID=$!
-            CLIENT_PIDS+=("$PID")
-            echo "Client $i PID: $PID"
-            echo "::endgroup::"
-          done
-
-          FAIL=0
-
-          for pid in "${CLIENT_PIDS[@]}"; do
-            if wait "$pid"; then
-              echo "Client PID $pid exited 0"
-            else
-              code=$?
-              echo "::error::Client PID $pid exited $code"
-              FAIL=1
-            fi
-          done
-
-          if wait "$SERVER_PID"; then
-            echo "$MODE process exited 0"
-          else
-            code=$?
-            echo "::error::$MODE process exited $code"
-            FAIL=1
-          fi
-
-          echo "::group::Result files"
-          for f in "$RESULTS_DIR"/*.json; do
-            [ -e "$f" ] || continue
-            echo "----- $f -----"
-            cat "$f"
-            echo
-          done
-          echo "::endgroup::"
-
-          # Cross-check the JSON: any scenario with success=false fails the run.
-          if command -v jq >/dev/null 2>&1; then
-            for f in "$RESULTS_DIR"/*.json; do
-              [ -e "$f" ] || continue
-              if jq -e 'any(.[]; .result.success == false)' "$f" >/dev/null; then
-                echo "::error::$f contains a failed scenario"
-                FAIL=1
-              fi
-            done
-          fi
-
-          # Some fatal networking/Unity failures can leave JSON looking incomplete or stale.
-          # Keep this narrow: scenario assertions remain the main signal, logs catch hard failures.
-          FATAL_LOG_PATTERN="CompleteSpawn: CreatePrototype failed|SceneID '[0-9]+' not found|Address already in use|UDPTransport Bind exception|Unhandled Exception|NullReferenceException|InvalidOperationException|Segmentation fault|SIGSEGV|Crash!!!|Native Crash Reporting"
-          for f in "$LOGS_DIR"/*.log; do
-            [ -e "$f" ] || continue
-            if grep -E -n "$FATAL_LOG_PATTERN" "$f" >/tmp/purrnet-fatal-log-matches.txt; then
-              echo "::error::$f contains fatal log patterns"
-              cat /tmp/purrnet-fatal-log-matches.txt
-              FAIL=1
-            fi
-          done
-
-          exit $FAIL
+          bash .github/scripts/network-tests.sh
 
       - name: Render results to job summary
         if: always()
         env:
           MODE: ${{ matrix.mode }}
+          RUN_OUTCOME: ${{ steps.scenarios.outcome }}
         run: |
           set -u
           shopt -s nullglob
-          files=(test-results/*.json)
+          # Crash readiness/injection markers are metadata, not peer result arrays.
+          files=(test-results/*/server.json test-results/*/host.json test-results/*/client-*.json)
           if [ ${#files[@]} -eq 0 ]; then
             {
               echo "## Network Test Results"
@@ -285,7 +182,9 @@ jobs:
           {
             echo "## Network Test Results — ${MODE} mode"
             echo ""
-            if [ "$failed" -eq 0 ]; then
+            if [ "$RUN_OUTCOME" != "success" ]; then
+              echo "### :x: Runner or result validation failed — ${passed}/${total} recorded entries passed"
+            elif [ "$failed" -eq 0 ]; then
               echo "### :white_check_mark: All scenarios passed (${passed}/${total})"
             else
               echo "### :x: ${failed} failure(s) — ${passed}/${total} passed"
@@ -293,7 +192,8 @@ jobs:
             echo ""
 
             for f in "${files[@]}"; do
-              proc=$(basename "$f" .json)
+              batch=$(basename "$(dirname "$f")")
+              proc="$batch/$(basename "$f" .json)"
               pcount=$(jq 'length' "$f")
               ppass=$(jq '[.[] | select(.result.success == true)] | length' "$f")
               pfail=$((pcount - ppass))
@@ -302,7 +202,7 @@ jobs:
               # for clients. The server/host file always renders in full so it's clear which
               # scenarios actually ran and how the authoritative side viewed each one.
               case "$proc" in
-                client-*) is_client=1 ;;
+                */client-*) is_client=1 ;;
                 *)        is_client=0 ;;
               esac
 
@@ -338,7 +238,7 @@ jobs:
       - name: Tail logs on failure
         if: failure()
         run: |
-          for f in test-logs/*.log; do
+          for f in test-logs/*/*.log; do
             [ -e "$f" ] || continue
             echo "::group::$f (last 200 lines)"
             tail -n 200 "$f"

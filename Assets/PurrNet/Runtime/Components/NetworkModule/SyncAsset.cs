@@ -15,6 +15,13 @@ namespace PurrNet
 
         public event Action<T> onDataChanged;
 
+        public override void OnPoolReset()
+        {
+            base.OnPoolReset();
+            _content = default;
+            onDataChanged = null;
+        }
+
         public T assetToSync
         {
             get => _content;

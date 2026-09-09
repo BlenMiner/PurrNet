@@ -29,6 +29,11 @@ namespace PurrNet
 
         [UsedImplicitly] public bool isServer => parent && parent.isServer;
 
+        /// <summary>
+        /// Whether the parent manager is migrating servers, including during lifecycle callbacks.
+        /// </summary>
+        public bool isMigratingServer => parent && parent.isMigratingServer;
+
         [UsedImplicitly] public bool isServerOnly => parent && parent.isServerOnly;
 
         [UsedImplicitly] public bool isHost => parent && parent.isHost;

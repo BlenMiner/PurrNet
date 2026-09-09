@@ -156,6 +156,8 @@ namespace PurrNet.Modules
                 return;
             }
 
+            if (_manager.preserveWorldOnTransfer && !asserver)
+                hierarchy.DiscardTransferredScene();
             hierarchy.Disable();
 
             hierarchy.onEarlyIdentityAdded -= OnEarlyIdentityAdded;
@@ -233,6 +235,17 @@ namespace PurrNet.Modules
         {
             for (var i = 0; i < _rawHierarchies.Count; i++)
                 _rawHierarchies[i].TransferToNewServer();
+        }
+
+        internal bool isTransferComplete
+        {
+            get
+            {
+                for (var i = 0; i < _rawHierarchies.Count; i++)
+                    if (!_rawHierarchies[i].isTransferComplete)
+                        return false;
+                return true;
+            }
         }
 
         public void EvaluateVisibilityForPlayer(PlayerID player)

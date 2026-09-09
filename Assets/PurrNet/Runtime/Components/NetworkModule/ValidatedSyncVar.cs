@@ -111,6 +111,7 @@ namespace PurrNet
 
         public override void OnEarlySpawn()
         {
+            _display = _authoritative.value;
             if (!isServer)
                 _authoritative.onChangedWithOld += OnAuthoritativeChanged;
         }

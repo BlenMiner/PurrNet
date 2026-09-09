@@ -5,6 +5,8 @@ using System;
 using System.Collections;
 using System.Collections.Generic;
 using System.Reflection;
+using System.Threading;
+using System.Threading.Tasks;
 using JetBrains.Annotations;
 using PurrNet.Authentication;
 using PurrNet.Logging;
@@ -61,7 +63,7 @@ namespace PurrNet
         private NetworkPrefabs _networkPrefabs;
 
 #if ADDRESSABLES_PURRNET_SUPPORT
-        //[PurrDocs("systems-and-modules/addressables/addressable-spawning-and-despawning")] //TODO: Add this in the future
+        [PurrDocs("systems-and-modules/addressables/addressable-spawning-and-despawning")]
         [SerializeField]
         private AddressableNetworkPrefabs _addressableNetworkPrefabs;
 #endif
@@ -2023,7 +2025,7 @@ namespace PurrNet
         {
             if (!_transport)
                 PurrLogger.Throw<InvalidOperationException>("Transport is not set (null).");
-            
+
             _lastSendTime = 0d;
             _transport.StartServer(this);
         }
@@ -2031,6 +2033,36 @@ namespace PurrNet
         private const float PromoteToServerStartRetryIntervalSeconds = 0.1f;
 
         public bool isPromotingToServer { get; private set; }
+
+        /// <summary>
+        /// True while a promotion or transfer operation is active. A world-preserving transfer
+        /// keeps this true through reused objects' despawn and spawn callbacks. Promotion ends
+        /// when the server is ready; its optional local client then joins normally.
+        /// </summary>
+        public bool isMigratingServer => isPromotingToServer || isTranferingToNewServer;
+
+        internal bool preserveWorldOnTransfer { get; private set; }
+
+        private static bool CanStartMigration(float timeoutSeconds, CancellationToken cancellationToken)
+        {
+            if (cancellationToken.IsCancellationRequested)
+                return false;
+
+            if (float.IsNaN(timeoutSeconds) || timeoutSeconds <= 0f)
+            {
+                PurrLogger.LogError("Host migration timeout must be positive or PositiveInfinity.");
+                return false;
+            }
+
+            return true;
+        }
+
+        private static void CheckMigrationWait(double deadline, CancellationToken cancellationToken)
+        {
+            cancellationToken.ThrowIfCancellationRequested();
+            if (Time.unscaledTimeAsDouble >= deadline)
+                throw new TimeoutException("Host migration did not finish before its timeout.");
+        }
 
         /// <summary>
         /// Keeps the current client modules alive while an external host migration system
@@ -2065,15 +2097,31 @@ namespace PurrNet
         {
             try
             {
-                if (isPromotingToServer)
-                    return;
+                await PromoteToServerAsync(timeoutSeconds: float.PositiveInfinity);
+            }
+            catch (Exception e)
+            {
+                Debug.LogException(e);
+            }
+        }
 
-                if (serverState != ConnectionState.Disconnected)
-                {
-                    PurrLogger.LogError("Cannot promote to server, you already are a server.");
-                    return;
-                }
+        /// <summary>Promotes this client's replica, with a bounded, awaitable result.</summary>
+        public async Task<bool> PromoteToServerAsync(float timeoutSeconds = 30f,
+            CancellationToken cancellationToken = default)
+        {
+            if (isPromotingToServer || isTranferingToNewServer)
+                return false;
+            if (!CanStartMigration(timeoutSeconds, cancellationToken))
+                return false;
+            if (serverState != ConnectionState.Disconnected)
+            {
+                PurrLogger.LogError("Cannot promote to server, you already are a server.");
+                return false;
+            }
 
+            var deadline = Time.unscaledTimeAsDouble + timeoutSeconds;
+            try
+            {
                 isPromotingToServer = true;
                 _preserveClientStateForHostMigration = false;
 
@@ -2082,7 +2130,10 @@ namespace PurrNet
 
                 while (clientState != ConnectionState.Disconnected ||
                        serverState != ConnectionState.Disconnected)
+                {
+                    CheckMigrationWait(deadline, cancellationToken);
                     await UnityLatestUpdate.Yield();
+                }
 
                 StartServer();
 
@@ -2090,7 +2141,10 @@ namespace PurrNet
                 {
                     var nextRetryAt = Time.unscaledTimeAsDouble + PromoteToServerStartRetryIntervalSeconds;
                     while (serverState != ConnectionState.Connected && Time.unscaledTimeAsDouble < nextRetryAt)
+                    {
+                        CheckMigrationWait(deadline, cancellationToken);
                         await UnityLatestUpdate.Yield();
+                    }
 
                     if (serverState == ConnectionState.Disconnected)
                         _transport.StartServerInternalOnly();
@@ -2103,6 +2157,7 @@ namespace PurrNet
 
                 if (_networkRules && _networkRules.ShouldMigrateAsHost())
                     StartClient();
+                return true;
             }
             catch (Exception e)
             {
@@ -2110,6 +2165,9 @@ namespace PurrNet
                 isPromotingToServer = false;
                 StopClient();
                 StopServer();
+                _isCleaningClient = true;
+                _isCleaningServer = true;
+                return false;
             }
             finally
             {
@@ -2132,10 +2190,56 @@ namespace PurrNet
         {
             try
             {
-                if (isTranferingToNewServer)
-                    return;
+                await TransferToNewServerAsync(timeoutSeconds: float.PositiveInfinity);
+            }
+            catch (Exception e)
+            {
+                Debug.LogException(e);
+            }
+        }
 
+        /// <summary>
+        /// Opts into reconciling the replacement host's world against existing client objects.
+        /// Call PreserveClientStateForHostMigration before a delayed migration preparation.
+        /// </summary>
+        public async void TransferToNewServer(bool preserveWorld)
+        {
+            try
+            {
+                await TransferToNewServerAsync(preserveWorld);
+            }
+            catch (Exception e)
+            {
+                Debug.LogException(e);
+            }
+        }
+
+        /// <summary>
+        /// Transfers to the prepared endpoint. World preservation is opt-in; when enabled the
+        /// result waits for scene and hierarchy reconciliation, including spawn baselines.
+        /// </summary>
+        /// <param name="preserveWorld">Keep compatible scene and network object instances. The
+        /// replacement server's visible world is authoritative: missing objects are spawned,
+        /// obsolete objects are removed, and incompatible prefab frameworks are replaced.
+        /// Reused objects run their normal despawn, pool reset, and spawn callbacks.
+        /// Manual spawns remain application-managed. Defaults to the existing rebuild behavior.</param>
+        /// <param name="timeoutSeconds">Maximum transfer duration, or PositiveInfinity.</param>
+        /// <param name="cancellationToken">Cancels the transfer and disconnects if it has started.</param>
+        /// <returns>True after connection and, when requested, reconciliation complete; false
+        /// on cancellation, failure, timeout, or when another migration is already running.</returns>
+        public async Task<bool> TransferToNewServerAsync(bool preserveWorld = false,
+            float timeoutSeconds = 30f, CancellationToken cancellationToken = default)
+        {
+            if (isTranferingToNewServer || isPromotingToServer)
+                return false;
+            if (!CanStartMigration(timeoutSeconds, cancellationToken))
+                return false;
+
+            var deadline = Time.unscaledTimeAsDouble + timeoutSeconds;
+            try
+            {
                 isTranferingToNewServer = true;
+                preserveWorldOnTransfer = preserveWorld;
                 _preserveClientStateForHostMigration = false;
 
                 StopClient();
@@ -2143,7 +2247,10 @@ namespace PurrNet
 
                 while (clientState != ConnectionState.Disconnected ||
                        serverState != ConnectionState.Disconnected)
+                {
+                    CheckMigrationWait(deadline, cancellationToken);
                     await UnityLatestUpdate.Yield();
+                }
 
                 StartClient();
 
@@ -2152,7 +2259,10 @@ namespace PurrNet
                     var nextRetryAt = Time.unscaledTimeAsDouble + TransferToNewServerConnectRetryIntervalSeconds;
                     while ((clientState != ConnectionState.Connected || !isLocalPlayerReady) &&
                            Time.unscaledTimeAsDouble < nextRetryAt)
+                    {
+                        CheckMigrationWait(deadline, cancellationToken);
                         await UnityLatestUpdate.Yield();
+                    }
 
                     if (clientState == ConnectionState.Connected && isLocalPlayerReady)
                         break;
@@ -2161,12 +2271,28 @@ namespace PurrNet
                     _isCleaningClient = false;
 
                     while (_transportLayer != null && _transportLayer.clientState != ConnectionState.Disconnected)
+                    {
+                        CheckMigrationWait(deadline, cancellationToken);
                         await UnityLatestUpdate.Yield();
+                    }
 
                     _transport.StartClientInternalOnly();
                 }
 
+                if (preserveWorld)
+                {
+                    while (!_clientModules.TryGetModule<ScenesModule>(out var scenes) || !scenes.isTransferComplete ||
+                           !_clientModules.TryGetModule<HierarchyFactory>(out var hierarchy) || !hierarchy.isTransferComplete)
+                    {
+                        CheckMigrationWait(deadline, cancellationToken);
+                        if (clientState == ConnectionState.Disconnected)
+                            throw new InvalidOperationException("Disconnected while reconciling the replacement host's world.");
+                        await UnityLatestUpdate.Yield();
+                    }
+                }
+
                 _clientModules.PostTransferToNewServer();
+                return true;
             }
             catch (Exception e)
             {
@@ -2174,10 +2300,13 @@ namespace PurrNet
                 isTranferingToNewServer = false;
                 StopClient();
                 StopServer();
+                _isCleaningClient = true;
+                return false;
             }
             finally
             {
                 isTranferingToNewServer = false;
+                preserveWorldOnTransfer = false;
             }
         }
 
@@ -2326,7 +2455,7 @@ namespace PurrNet
                 yield return null;
             while (_isCleaningClient)
                 yield return null;
-            
+
             _lastSendTime = 0d;
             _transport.StartClient(this);
         }

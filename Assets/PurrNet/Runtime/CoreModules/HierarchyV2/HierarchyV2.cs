@@ -148,6 +148,8 @@ namespace PurrNet.Modules
             _scenePool.Warmup(manager.prefabResolver.GetScenePrefabs(sceneId));
             _prefabsPool = NetworkPoolManager.GetPool(manager);
 
+            _awaitingTransferScene = !asServer && manager.preserveWorldOnTransfer;
+
             UnityLatestUpdate.TriggerPendingAsaps();
 
             SetupSceneObjects(scene);
@@ -373,6 +375,8 @@ namespace PurrNet.Modules
         public void Disable()
         {
             _enabled = false;
+            ++_transferGeneration;
+            ReleaseRetainedTransferObjects();
             _pendingUnauthorizedParentReverts.Clear();
             ClearAsyncSpawnState();
             _cachedPrefabAsyncShapes.Clear();
@@ -408,16 +412,134 @@ namespace PurrNet.Modules
             if (_asServer)
                 return;
 
+            if (_awaitingTransferScene)
+            {
+                _awaitingTransferScene = false;
+                ReleaseRetainedTransferObjects();
+            }
+
             _scenePool.ReconcileActiveScenePieces();
+        }
+
+        // Allocated only for an explicitly requested world-preserving transfer.
+        private Dictionary<NetworkID, NetworkIdentity> _retainedTransferRoots;
+        private bool _awaitingTransferScene;
+        private int _transferGeneration;
+        private int _pendingTransferPrefabLoads;
+
+        internal bool isTransferComplete
+        {
+            get
+            {
+#if PURRNET_UNITY_INSTANTIATE_ASYNC
+                if (_pendingAsyncInstantiations.Count > 0 || _orphansWaitingForAsyncParent.Count > 0)
+                    return false;
+#endif
+                return !_awaitingTransferScene &&
+                       _pendingSpawns.Count == 0 && _pendingFinishSpawns.Count == 0 &&
+                       _pendingTransferPrefabLoads == 0;
+            }
+        }
+
+        private void ReleaseRetainedTransferObjects()
+        {
+            if (_retainedTransferRoots == null || _retainedTransferRoots.Count == 0)
+                return;
+
+            var pair = new PoolPair(_scenePool, _prefabsPool);
+            foreach (var root in _retainedTransferRoots.Values)
+                if (root)
+                    HierarchyPool.PutBackInPool(pair, root.gameObject);
+            _retainedTransferRoots.Clear();
+        }
+
+        internal void DiscardTransferredScene()
+        {
+            ReleaseRetainedTransferObjects();
+            using var identities = DisposableList<NetworkIdentity>.Create(_spawnedIdentities);
+            foreach (var identity in identities)
+                if (identity && identity.isSpawned && !identity.isManualSpawn)
+                    Despawn(identity.gameObject, true, true);
+        }
+
+        private void RetainTransferObjects()
+        {
+            _retainedTransferRoots ??= new Dictionary<NetworkID, NetworkIdentity>();
+            using var pendingSpawns = DisposableList<SpawnID>.Create(_pendingSpawns.Count);
+            foreach (var packet in _pendingSpawns.Keys)
+                pendingSpawns.Add(packet);
+            foreach (var packet in pendingSpawns)
+                if (_pendingSpawns.ContainsKey(packet))
+                    OnFinishSpawnPacket(packet.scope,
+                        new FinishSpawnPacket { sceneId = _sceneId, packetIdx = packet }, false);
+
+            using var identities = DisposableList<NetworkIdentity>.Create(_spawnedIdentities);
+            foreach (var identity in identities)
+                if (identity && !identity.isManualSpawn)
+                    CompletePendingSpawnsFor(identity, false);
+
+            foreach (var identity in identities)
+            {
+                if (!identity || identity.isManualSpawn)
+                    continue;
+
+                var root = identity.GetComponent<NetworkIdentity>();
+                if (root.parent && !root.parent.isManualSpawn && root.parent.isSpawned)
+                    continue;
+                if (root.id.HasValue)
+                    _retainedTransferRoots.TryAdd(root.id.Value, root);
+            }
+
+            // Keep the Unity hierarchy active, but stop the old network lifecycle before
+            // connecting. All callbacks precede reset so parents keep their child links.
+            foreach (var identity in identities)
+                if (identity && !identity.isManualSpawn)
+                    identity.TriggerDespawnEvent(false, true);
+
+            foreach (var identity in identities)
+            {
+                if (ReferenceEquals(identity, null) || identity.isManualSpawn)
+                    continue;
+                if (!identity)
+                {
+                    CleanupDestroyedIdentity(identity);
+                    continue;
+                }
+                UnregisterIdentity(identity);
+                identity.ResetIdentity();
+            }
         }
 
         public void TransferToNewServer()
         {
+            ReleaseRetainedTransferObjects();
+            ++_transferGeneration;
+            _pendingTransferPrefabLoads = 0;
             ClearAsyncSpawnState();
             _pendingLocalDespawnEchoes.Dispose();
             isReadyToSpawn = false;
             _nextId = default;
             _isPlayerReady = false;
+
+            if (_manager.preserveWorldOnTransfer)
+            {
+                _awaitingTransferScene = true;
+                RetainTransferObjects();
+
+                foreach (var pending in _pendingSpawns.Values)
+                    pending.Dispose();
+                _pendingSpawns.Clear();
+                _pendingFinishSpawns.Clear();
+                _pendingDespawns.Clear();
+                _toCompleteNextFrame.Clear();
+                _toSpawnNextFrame.Clear();
+                _toSpawnNextFrameBuffer.Clear();
+
+                Init();
+                return;
+            }
+
+            _awaitingTransferScene = false;
 
             var hash = HashSetPool<NetworkIdentity>.Instantiate();
 
@@ -470,6 +592,7 @@ namespace PurrNet.Modules
 
         public bool Cleanup()
         {
+            ReleaseRetainedTransferObjects();
             _pendingLocalDespawnEchoes.Dispose();
 
             var rules = _manager.networkRules;
@@ -1280,6 +1403,9 @@ namespace PurrNet.Modules
                     return;
             }
 
+            if (!_asServer && _awaitingTransferScene && TryReconcileTransferredSpawn(data, flushData))
+                return;
+
             ReplacePartialLocalHierarchy(data.prototype);
 
             if (data.prototype.framework.Count > 0)
@@ -1346,6 +1472,28 @@ namespace PurrNet.Modules
             CompleteReceivedSpawn(data, flushData);
         }
 
+        private bool TryReconcileTransferredSpawn(SpawnPacket data, bool flushData)
+        {
+            if (data.prototype.framework.Count == 0 || _retainedTransferRoots == null ||
+                !_retainedTransferRoots.Remove(data.prototype.framework[0].id, out var root) || !root)
+                return false;
+
+            var identities = DisposableList<NetworkIdentity>.Create(16);
+            if (!TryApplyPrototypeToExisting(root.gameObject, data.prototype, identities.list, out var activate))
+            {
+                identities.Dispose();
+                HierarchyPool.PutBackInPool(new PoolPair(_scenePool, _prefabsPool), root.gameObject);
+                return false;
+            }
+
+            var instance = FinalizePrototypeInstance(root.gameObject, data.prototype, activate);
+            // Reuse only the Unity instance. Registration, baselines, early spawn, async
+            // readiness and FinishSpawn are the same transaction as an ordinary late join.
+            if (!CompleteSpawnWithInstance(data, flushData, instance, identities))
+                RejectAsyncSpawn(data);
+            return true;
+        }
+
         private void ReplacePartialLocalHierarchy(GameObjectPrototype prototype)
         {
             if (_asServer || prototype.framework.Count <= 1)
@@ -1370,6 +1518,10 @@ namespace PurrNet.Modules
 
         private async void ProcessSpawnWhenLoadedAsync(SpawnPacket data, bool flushData, PrefabID rootPrefabId)
         {
+            var generation = _transferGeneration;
+            var trackTransfer = _manager.preserveWorldOnTransfer;
+            if (trackTransfer)
+                ++_pendingTransferPrefabLoads;
             try
             {
                 var prototypeCopy = data.prototype.Clone();
@@ -1382,17 +1534,17 @@ namespace PurrNet.Modules
                 try
                 {
                     var loaded = await _manager.prefabResolver.LoadPrefabAsync(rootPrefabId);
-                    if (loaded.prefab == null)
+                    if (_isDisposed || !_enabled || generation != _transferGeneration)
                     {
-                        PurrLogger.LogError($"ProcessSpawnWhenLoadedAsync: failed to load prefab {rootPrefabId}.");
-                        RejectDeferredAsyncSpawn(packetIdx, sceneId, isAsync, prototypeCopy);
                         prototypeCopy.Dispose();
                         customDataCopy.Dispose();
                         return;
                     }
 
-                    if (_isDisposed || !_enabled)
+                    if (loaded.prefab == null)
                     {
+                        PurrLogger.LogError($"ProcessSpawnWhenLoadedAsync: failed to load prefab {rootPrefabId}.");
+                        RejectDeferredAsyncSpawn(packetIdx, sceneId, isAsync, prototypeCopy);
                         prototypeCopy.Dispose();
                         customDataCopy.Dispose();
                         return;
@@ -1413,7 +1565,8 @@ namespace PurrNet.Modules
                 catch (Exception e)
                 {
                     PurrLogger.LogError($"ProcessSpawnWhenLoadedAsync: exception for prefab {rootPrefabId}: {e.Message}\n{e.StackTrace}");
-                    RejectDeferredAsyncSpawn(packetIdx, sceneId, isAsync, prototypeCopy);
+                    if (generation == _transferGeneration && _enabled)
+                        RejectDeferredAsyncSpawn(packetIdx, sceneId, isAsync, prototypeCopy);
                     try { prototypeCopy.Dispose(); } catch { /* ignore */ }
                     try { customDataCopy.Dispose(); } catch { /* ignore */ }
                 }
@@ -1421,6 +1574,11 @@ namespace PurrNet.Modules
             catch (Exception e)
             {
                 Debug.LogException(e);
+            }
+            finally
+            {
+                if (trackTransfer && generation == _transferGeneration)
+                    --_pendingTransferPrefabLoads;
             }
         }
 

@@ -63,6 +63,11 @@ namespace PurrNet.Modules
         {
         }
 
+        internal void TransferToNewServer()
+        {
+            ReleaseAllStreams();
+        }
+
         public void Enable(bool asServer)
         {
             _asServer = asServer;

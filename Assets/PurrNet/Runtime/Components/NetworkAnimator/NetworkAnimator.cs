@@ -111,6 +111,16 @@ namespace PurrNet
             _animator = GetComponent<Animator>();
         }
 
+        protected override void OnPoolReset()
+        {
+            _dirty.Clear();
+            _ikActions.Clear();
+            _reconcilePlayers.Clear();
+            _pendingTriggerActions.Clear();
+            _needsStateReconcile = false;
+            _hasPendingAnimatorParameterState = false;
+        }
+
         private void IfSameTypeReplace(NetAnimatorRPC action)
         {
             if (_dirty.Count > 0 && _dirty[^1].type == action.type)

@@ -19,7 +19,7 @@ namespace PurrNet.Modules
             (typeof(IEquatable<T>).IsAssignableFrom(typeof(T)) || typeof(T).IsEnum);
     }
 
-    public class DeltaModule : INetworkModule, IPostFixedUpdate, IPromoteToServerModule
+    public class DeltaModule : INetworkModule, IPostFixedUpdate, IPromoteToServerModule, ITransferToNewServer
     {
         static readonly ProfilerMarker _writeMarker = new ProfilerMarker("DeltaModule.Write");
         static readonly ProfilerMarker _writeReliableMarker = new ProfilerMarker("DeltaModule.WriteReliable");
@@ -315,6 +315,12 @@ namespace PurrNet.Modules
         }
 
         public void PostPromoteToServerModule() { }
+
+        public void TransferToNewServer()
+        {
+            _acknowledgements.Clear();
+            ClearTrackers();
+        }
 
         public void Enable(bool asServer)
         {

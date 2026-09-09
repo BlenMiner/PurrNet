@@ -431,6 +431,8 @@ namespace PurrNet
         {
             onChanged = null;
             _pendingChanges.Clear();
+            _array = _serializedItems?.ToArray() ?? Array.Empty<T>();
+            _length = _array.Length;
             _lastSendTime = default;
             _isDirty = default;
             _wasLastDirty = default;

@@ -16,13 +16,21 @@ namespace PurrNet
 
         public event Action<T> onDataChanged;
 
+        public override void OnPoolReset()
+        {
+            base.OnPoolReset();
+            _content = default;
+            onDataChanged = null;
+        }
+
         public string filePath
         {
             get => _filePath;
             set
             {
                 var trimmed = value?.Trim('"');
-                if (_filePath != trimmed)
+                // Pool reset keeps the configured path but clears its loaded payload.
+                if (_filePath != trimmed || progress == 0f)
                 {
                     _filePath = trimmed;
                     FilePathChanged();

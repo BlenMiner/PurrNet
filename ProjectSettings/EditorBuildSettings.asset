@@ -29,6 +29,18 @@ EditorBuildSettings:
   - enabled: 1
     path: Assets/PlayModeTestsScoped/SceneScopedSharedB.unity
     guid: e5f60718293a4b5c6d7e8f90a1b2c3d4
+  - enabled: 1
+    path: Assets/PlayModeTests/OrdinaryJoinSceneX.unity
+    guid: b2e8ec7e9c9644e4b52a184dab001481
+  - enabled: 1
+    path: Assets/PlayModeTests/OrdinaryJoinSceneY.unity
+    guid: b2e8ec7e9c9644e4b52a184dab001482
+  - enabled: 1
+    path: Assets/PlayModeTests/OrdinaryJoinSceneZ.unity
+    guid: b2e8ec7e9c9644e4b52a184dab001483
+  - enabled: 1
+    path: Assets/PlayModeTests/OrdinaryJoinSceneW.unity
+    guid: b2e8ec7e9c9644e4b52a184dab001484
   m_configObjects:
     com.unity.addressableassets: {fileID: 11400000, guid: f321fa2f9211178448ea4925059f7af5, type: 2}
     com.unity.dt.app-ui: {fileID: 11400000, guid: 1b1c20d82303e4b5781c3ef50ac1449f, type: 2}

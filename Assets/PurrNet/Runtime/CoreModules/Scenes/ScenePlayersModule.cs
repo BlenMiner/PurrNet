@@ -356,7 +356,7 @@ namespace PurrNet.Modules
             {
                 if (!IsPlayerLoadedInScene(player, scene))
                 {
-                    if (CanRestoreLoadedStateWithoutSceneAction(scene))
+                    if (CanRestoreLoadedStateWithoutSceneAction(player, scene))
                         MarkPlayerLoadedInScene(player, scene);
                 }
 
@@ -369,7 +369,7 @@ namespace PurrNet.Modules
                 NotifyBotSceneLoaded(player, scene);
         }
 
-        private bool CanRestoreLoadedStateWithoutSceneAction(SceneID scene)
+        private bool CanRestoreLoadedStateWithoutSceneAction(PlayerID player, SceneID scene)
         {
             if (!_scenes.TryGetSceneState(scene, out var state))
                 return false;
@@ -379,6 +379,18 @@ namespace PurrNet.Modules
 
             if (!state.scene.IsValid() || !state.scene.isLoaded)
                 return false;
+
+            if (!player.isBot)
+            {
+                if (!_manager.isHost || !_manager.isLocalPlayerReady || _manager.localPlayer != player)
+                    return false;
+
+                if (!_manager.TryGetModule<ScenesModule>(false, out var clientScenes) ||
+                    !clientScenes.TryGetSceneState(scene, out var clientState) ||
+                    !clientState.scene.IsValid() || !clientState.scene.isLoaded ||
+                    clientState.scene.handle != state.scene.handle)
+                    return false;
+            }
 
             if (_manager.gameObject.scene.handle == state.scene.handle)
                 return true;

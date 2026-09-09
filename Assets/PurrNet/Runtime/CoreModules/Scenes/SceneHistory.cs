@@ -10,7 +10,8 @@ namespace PurrNet.Modules
         Load,
         LoadAddressable,
         Unload,
-        SetActive
+        SetActive,
+        LoadDontDestroyOnLoad
     }
 
     internal struct SceneAction : IPackedSimple
@@ -29,6 +30,7 @@ namespace PurrNet.Modules
             switch (type)
             {
                 case SceneActionType.Load:
+                case SceneActionType.LoadDontDestroyOnLoad:
                     Packer<LoadSceneAction>.Serialize(packer, ref loadSceneAction);
                     break;
                 case SceneActionType.LoadAddressable:
@@ -66,6 +68,7 @@ namespace PurrNet.Modules
     internal struct FirstSceneActionsBatch
     {
         public List<SceneAction> actions;
+        public List<SceneAction> bootstrapScenes;
     }
 
     internal struct LoadSceneAction
@@ -73,12 +76,13 @@ namespace PurrNet.Modules
         public uint scenePathHash;
         public SceneID sceneID;
         public PurrSceneSettings parameters;
+        public bool loadAdditively;
 
         public LoadSceneParameters GetLoadSceneParameters()
         {
             return new LoadSceneParameters
             {
-                loadSceneMode = parameters.mode,
+                loadSceneMode = loadAdditively ? LoadSceneMode.Additive : parameters.mode,
                 localPhysicsMode = parameters.physicsMode
             };
         }
@@ -94,12 +98,13 @@ namespace PurrNet.Modules
         public StringUTF8 guid;
         public SceneID sceneID;
         public PurrSceneSettings parameters;
+        public bool loadAdditively;
 
         public LoadSceneParameters GetLoadSceneParameters()
         {
             return new LoadSceneParameters
             {
-                loadSceneMode = parameters.mode,
+                loadSceneMode = loadAdditively ? LoadSceneMode.Additive : parameters.mode,
                 localPhysicsMode = parameters.physicsMode
             };
         }
@@ -181,12 +186,12 @@ namespace PurrNet.Modules
                 switch (action.type)
                 {
                     case SceneActionType.Load:
-                        if (action.loadSceneAction.parameters.mode == LoadSceneMode.Single)
+                        if (!action.loadSceneAction.loadAdditively && action.loadSceneAction.parameters.mode == LoadSceneMode.Single)
                             _sceneIds.Clear();
                         _sceneIds.Add(action.loadSceneAction.sceneID);
                         break;
                     case SceneActionType.LoadAddressable:
-                        if (action.loadAddressableSceneAction.parameters.mode == LoadSceneMode.Single)
+                        if (!action.loadAddressableSceneAction.loadAdditively && action.loadAddressableSceneAction.parameters.mode == LoadSceneMode.Single)
                             _sceneIds.Clear();
                         _sceneIds.Add(action.loadAddressableSceneAction.sceneID);
                         break;

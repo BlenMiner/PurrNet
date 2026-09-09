@@ -73,7 +73,8 @@ public class Bootstrap : Scenario
         }
         else
         {
-            _scenarios = GetComponentsInChildren<Scenario>();
+            // Some migration variants end the run and are authored inactive for targeted execution.
+            _scenarios = GetComponentsInChildren<Scenario>(includeInactive: !string.IsNullOrEmpty(_scenarioFilter));
         }
 
         ApplyScenarioFilter();
@@ -349,8 +350,21 @@ public class Bootstrap : Scenario
         Assert.AreEqual(_networkManager.clientState, ConnectionState.Disconnected, "Client is not connected");
         Assert.AreEqual(_networkManager.serverState, ConnectionState.Disconnected, "Server is not started");
 
+        for (var i = 0; i < _scenarios.Length; i++)
+        {
+            if (_scenarios[i] is IScenarioConnectionPreparation preparation)
+                await preparation.BeforeConnection(ctx);
+        }
+
         if (ctx.isServer)
+        {
             _networkManager.StartServer();
+            for (var i = 0; i < _scenarios.Length; i++)
+            {
+                if (_scenarios[i] is IScenarioConnectionPreparation preparation)
+                    await preparation.AfterServerStarted(ctx);
+            }
+        }
         if (ctx.isClient)
             _networkManager.StartClient();
 
@@ -566,6 +580,9 @@ public class Bootstrap : Scenario
             details.benchmark = bench.LastMetrics;
 
         _results[i] = details;
+
+        if (!result.success)
+            Debug.LogError($"Scenario [{i}] `{details.name}` failed: {result.message}");
 
         return !result.success;
     }

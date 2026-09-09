@@ -108,6 +108,9 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
+      - name: Validate content cache cleanup
+        run: bash .github/scripts/test-reset-addressable-build-caches.sh
+
       - name: Restore Library cache
         id: cache-library
         uses: actions/cache/restore@v4
@@ -119,6 +122,10 @@ jobs:
           key: Library-PurrNet-IL2CPP-${{ inputs.profiling && 'dev' || 'rel' }}-${{ hashFiles('Assets/**', 'Packages/**', 'ProjectSettings/**') }}
           restore-keys: |
             Library-PurrNet-IL2CPP-${{ inputs.profiling && 'dev' || 'rel' }}-
+
+      - name: Reset content caches after fallback Library restore
+        if: steps.cache-library.outputs.cache-hit != 'true'
+        run: bash .github/scripts/reset-addressable-build-caches.sh "$GITHUB_WORKSPACE"
 
       - name: Build StandaloneLinux64 player (IL2CPP)
         uses: game-ci/unity-builder@v4

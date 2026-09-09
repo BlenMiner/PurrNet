@@ -10,6 +10,7 @@ public class SinglePromotedServerTransferScenario : Scenario
 {
     private const string TargetSceneName = "SceneMembershipTargetB";
     private const string TargetScenePath = "Assets/PlayModeTests/SceneMembershipTargetB.unity";
+    private const string PostMigrationSceneName = "SceneMembershipTargetA";
     private const int ExpectedChildren = 1;
     private const int RootServerStateValue = 8311;
     private const int ChildServerStateValue = 8312;
@@ -33,10 +34,19 @@ public class SinglePromotedServerTransferScenario : Scenario
     private static bool _promotionCommandReceived;
     private static int _initialObservedCount;
     private static int _transferRestoredCount;
+    private static int _postMigrationLoadedCount;
+    private static int _postMigrationUnloadedCount;
+    private static bool _probeVisibilityReady;
     private static bool _prePromotionOwnerStateSent;
     private static bool _postTransferOwnerStateSent;
+    private TransferContinuitySnapshot _retainedHierarchy;
+    private TransferContinuitySnapshot _retainedPlayers;
+    private int _rootSpawnsBeforeMigration;
+    private int _childSpawnsBeforeMigration;
     private SinglePromotedServerTransferRoot _prefab;
     private SinglePromotedPlayerPrefabRoot _playerPrefab;
+    private MigrationReconcileProbe _probePrefab;
+    private MigrationReconcileProbe _probeBeforeMigration;
 
     private void CreatePrefab()
     {
@@ -63,6 +73,12 @@ public class SinglePromotedServerTransferScenario : Scenario
 
         rootGo.SetActive(false);
         CreatePlayerPrefab();
+        var probeGo = new GameObject(nameof(MigrationReconcileProbe));
+        _probePrefab = probeGo.AddComponent<MigrationReconcileProbe>();
+        _probePrefab.skipSceneAutoSpawning = true;
+        _probePrefab.SetNetworkRules(_rules);
+        probeGo.SetActive(false);
+        MigrationReconcileProbe.ResetAll();
         SinglePromotedServerTransferRoot.ResetAll();
         SinglePromotedServerTransferChild.ResetAll();
         SinglePromotedPlayerPrefabRoot.ResetAll();
@@ -74,6 +90,9 @@ public class SinglePromotedServerTransferScenario : Scenario
         _promotionCommandReceived = false;
         _initialObservedCount = 0;
         _transferRestoredCount = 0;
+        _postMigrationLoadedCount = 0;
+        _postMigrationUnloadedCount = 0;
+        _probeVisibilityReady = false;
         _prePromotionOwnerStateSent = false;
         _postTransferOwnerStateSent = false;
     }
@@ -105,6 +124,7 @@ public class SinglePromotedServerTransferScenario : Scenario
         CreatePrefab();
         manager.prefabProvider.AddRuntimePrefab(_prefab.name, _prefab.gameObject);
         manager.prefabProvider.AddRuntimePrefab(_playerPrefab.name, _playerPrefab.gameObject);
+        manager.prefabProvider.AddRuntimePrefab(_probePrefab.name, _probePrefab.gameObject);
     }
 
     public override UniTask<ScenarioResult> RunScenario(ScenarioContext ctx)
@@ -199,6 +219,9 @@ public class SinglePromotedServerTransferScenario : Scenario
         instance.GiveOwnership(owner.Value, propagateToChildren: true);
         SetServerAuthState(instance);
 
+        var probes = await PrepareReconciliationProbes(ctx, promoted.Value);
+        if (!probes.success) return probes;
+
         try
         {
             await UniTaskUtils.WaitWithTimeout(
@@ -263,7 +286,7 @@ public class SinglePromotedServerTransferScenario : Scenario
         var initial = await WaitForClientScene(
             ctx,
             "initial single promotion transfer scene",
-            requireFreshSpawn: false,
+            requireRetainedSpawn: false,
             rootSpawnsBefore: 0,
             childSpawnsBefore: 0,
             requireOwnerState: IsLocal(_ownerId, ctx));
@@ -271,6 +294,24 @@ public class SinglePromotedServerTransferScenario : Scenario
 
         var playerInitial = await WaitForLocalPlayerPrefab(ctx, "initial player prefab");
         if (!playerInitial.success) return playerInitial;
+
+        if (!isOriginalHostLocal)
+        {
+            var probes = await WaitForInitialProbeVisibility(ctx, isPromoted);
+            if (!probes.success) return probes;
+            _probeBeforeMigration = MigrationReconcileProbe.Find(
+                isPromoted ? MigrationReconcileProbe.CandidateOnly : MigrationReconcileProbe.OldHostOnly);
+        }
+
+        if (!isOriginalHostLocal)
+        {
+            _retainedHierarchy = TransferContinuitySnapshot.Capture<SinglePromotedServerTransferRoot, SinglePromotedServerTransferChild>(TargetSceneName);
+            _retainedPlayers = TransferContinuitySnapshot.Capture<SinglePromotedPlayerPrefabRoot, SinglePromotedPlayerPrefabChild>(TargetSceneName);
+            _rootSpawnsBeforeMigration = SinglePromotedServerTransferRoot.ClientSpawnCount;
+            _childSpawnsBeforeMigration = SinglePromotedServerTransferChild.ClientSpawnCount;
+            // Arm every surviving peer before acknowledging; the old host can stop immediately afterward.
+            ctx.networkManager.PreserveClientStateForHostMigration();
+        }
 
         SignalInitialObserved();
 
@@ -300,8 +341,6 @@ public class SinglePromotedServerTransferScenario : Scenario
 
     private async UniTask<ScenarioResult> RunPromotedClient(ScenarioContext ctx)
     {
-        ctx.networkManager.PreserveClientStateForHostMigration();
-
         try
         {
             await UniTaskUtils.WaitWithTimeout(
@@ -383,6 +422,23 @@ public class SinglePromotedServerTransferScenario : Scenario
             return ScenarioResult.Fail($"single promotion transfer promoted server did not receive post-transfer owner state: {DescribeState(ctx)}");
         }
 
+        var continuity = _retainedHierarchy.Verify("promoted server continuity", asServer: true);
+        if (!continuity.success) return continuity;
+        var playerContinuity = _retainedPlayers.Verify("promoted player continuity", asServer: true);
+        if (!playerContinuity.success) return playerContinuity;
+        if (!_probeBeforeMigration || !_probeBeforeMigration.IsSpawned(true) ||
+            MigrationReconcileProbe.Count(MigrationReconcileProbe.OldHostOnly, asServer: true) != 0 ||
+            MigrationReconcileProbe.Count(MigrationReconcileProbe.CandidateOnly, asServer: true) != 1)
+            return ScenarioResult.Fail("promoted host did not retain its candidate-only probe");
+
+        var sceneCycle = await PostMigrationSceneCycle.RunServer(
+            ctx, TargetSceneName, PostMigrationSceneName, _sceneTimeoutSeconds,
+            () => _postMigrationLoadedCount, () => _postMigrationUnloadedCount, _expectedTransfers);
+        if (!sceneCycle.success) return sceneCycle;
+
+        continuity = _retainedHierarchy.Verify("promoted server after scene cycle", asServer: true);
+        if (!continuity.success) return continuity;
+
         ScenarioSequencer.IssueSequenceComplete();
         await UniTask.NextFrame(ctx.cancellationToken);
         await UniTask.NextFrame(ctx.cancellationToken);
@@ -392,8 +448,6 @@ public class SinglePromotedServerTransferScenario : Scenario
 
     private async UniTask<ScenarioResult> RunTransferClient(ScenarioContext ctx)
     {
-        int rootSpawnsBefore = SinglePromotedServerTransferRoot.ClientSpawnCount;
-        int childSpawnsBefore = SinglePromotedServerTransferChild.ClientSpawnCount;
         bool isOwner = IsLocal(_ownerId, ctx);
 
         try
@@ -410,7 +464,10 @@ public class SinglePromotedServerTransferScenario : Scenario
 
         await UniTask.WaitForSeconds(_promotionStartupDelaySeconds, cancellationToken: ctx.cancellationToken);
 
-        ctx.networkManager.TransferToNewServer();
+        bool transferred = await ctx.networkManager.TransferToNewServerAsync(
+            preserveWorld: true, timeoutSeconds: _transferTimeoutSeconds, cancellationToken: ctx.cancellationToken);
+        if (!transferred)
+            return ScenarioResult.Fail("world-preserving transfer did not complete reconciliation");
 
         try
         {
@@ -427,12 +484,21 @@ public class SinglePromotedServerTransferScenario : Scenario
         var restored = await WaitForClientScene(
             ctx,
             "post-single-promotion transfer restore",
-            requireFreshSpawn: true,
-            rootSpawnsBefore: rootSpawnsBefore,
-            childSpawnsBefore: childSpawnsBefore,
+            requireRetainedSpawn: true,
+            rootSpawnsBefore: _rootSpawnsBeforeMigration,
+            childSpawnsBefore: _childSpawnsBeforeMigration,
             requireOwnerState: isOwner,
             requirePreTransferState: isOwner);
         if (!restored.success) return restored;
+
+        var continuity = _retainedHierarchy.Verify("transferred client continuity");
+        if (!continuity.success) return continuity;
+        var playerContinuity = _retainedPlayers.Verify("transferred player continuity");
+        if (!playerContinuity.success) return playerContinuity;
+        if ((_probeBeforeMigration && _probeBeforeMigration.isSpawned) ||
+            MigrationReconcileProbe.Count(MigrationReconcileProbe.OldHostOnly) != 0 ||
+            MigrationReconcileProbe.Count(MigrationReconcileProbe.CandidateOnly) != 1)
+            return ScenarioResult.Fail("transfer did not remove the host-unknown probe and spawn the missing authoritative probe");
 
         var playerRestored = await WaitForLocalPlayerPrefab(ctx, "post-transfer player prefab");
         if (!playerRestored.success) return playerRestored;
@@ -456,6 +522,17 @@ public class SinglePromotedServerTransferScenario : Scenario
         if (!postOwnerState.success) return postOwnerState;
 
         SignalTransferRestored();
+        var sceneCycle = await PostMigrationSceneCycle.RunClient(
+            ctx, TargetSceneName, PostMigrationSceneName, _sceneTimeoutSeconds,
+            () => SignalPostMigrationLoaded(), () => SignalPostMigrationUnloaded());
+        if (!sceneCycle.success) return sceneCycle;
+
+        continuity = _retainedHierarchy.Verify("transferred client after scene cycle");
+        if (!continuity.success) return continuity;
+        if (SinglePromotedServerTransferRoot.ClientSpawnCount != _rootSpawnsBeforeMigration + 1 ||
+            SinglePromotedServerTransferChild.ClientSpawnCount != _childSpawnsBeforeMigration + ExpectedChildren)
+            return ScenarioResult.Fail("retained identities did not replay exactly one client spawn callback during migration");
+
         await UniTask.WaitForSeconds(_flushDelaySeconds, cancellationToken: ctx.cancellationToken);
 
         return ScenarioResult.Ok(isOwner ? "owner restored through single promoted server" : "peer restored through single promoted server");
@@ -477,6 +554,56 @@ public class SinglePromotedServerTransferScenario : Scenario
         }
 
         return ScenarioResult.Ok("original host shut down");
+    }
+
+    private async UniTask<ScenarioResult> PrepareReconciliationProbes(ScenarioContext ctx, PlayerID promoted)
+    {
+        var scene = SceneManager.GetSceneByName(TargetSceneName);
+        var oldHostOnly = UnityProxy.Instantiate(_probePrefab.gameObject, Vector3.zero, Quaternion.identity, scene)
+            .GetComponent<MigrationReconcileProbe>();
+        oldHostOnly.SetKind(MigrationReconcileProbe.OldHostOnly);
+        var candidateOnly = UnityProxy.Instantiate(_probePrefab.gameObject, Vector3.one, Quaternion.identity, scene)
+            .GetComponent<MigrationReconcileProbe>();
+        candidateOnly.SetKind(MigrationReconcileProbe.CandidateOnly);
+
+        try
+        {
+            await UniTaskUtils.WaitWithTimeout(
+                () => oldHostOnly.IsSpawned(true) && candidateOnly.IsSpawned(true),
+                _spawnTimeoutSeconds, ctx.cancellationToken);
+            oldHostOnly.BlacklistPlayer(promoted);
+            foreach (var player in ctx.networkManager.players)
+                if (!player.isServer && player != promoted)
+                    candidateOnly.BlacklistPlayer(player);
+            oldHostOnly.EvaluateVisibility();
+            candidateOnly.EvaluateVisibility();
+            await UniTask.WaitForSeconds(_flushDelaySeconds, cancellationToken: ctx.cancellationToken);
+            BroadcastProbeVisibilityReady();
+        }
+        catch (TimeoutException)
+        {
+            return ScenarioResult.Fail("migration reconciliation probes did not spawn on the original host");
+        }
+
+        return ScenarioResult.Ok();
+    }
+
+    private async UniTask<ScenarioResult> WaitForInitialProbeVisibility(ScenarioContext ctx, bool isPromoted)
+    {
+        try
+        {
+            await UniTaskUtils.WaitWithTimeout(
+                () => _probeVisibilityReady &&
+                      MigrationReconcileProbe.Count(MigrationReconcileProbe.OldHostOnly) == (isPromoted ? 0 : 1) &&
+                      MigrationReconcileProbe.Count(MigrationReconcileProbe.CandidateOnly) == (isPromoted ? 1 : 0),
+                _spawnTimeoutSeconds, ctx.cancellationToken);
+        }
+        catch (TimeoutException)
+        {
+            return ScenarioResult.Fail("migration reconciliation probes did not establish different client views");
+        }
+
+        return ScenarioResult.Ok();
     }
 
     private SinglePromotedServerTransferRoot SpawnInScene(Scene targetScene)
@@ -574,7 +701,7 @@ public class SinglePromotedServerTransferScenario : Scenario
     private async UniTask<ScenarioResult> WaitForClientScene(
         ScenarioContext ctx,
         string phase,
-        bool requireFreshSpawn,
+        bool requireRetainedSpawn,
         int rootSpawnsBefore,
         int childSpawnsBefore,
         bool requireOwnerState,
@@ -587,9 +714,9 @@ public class SinglePromotedServerTransferScenario : Scenario
                       && SinglePromotedServerTransferChild.ClientAliveCount == ExpectedChildren
                       && SinglePromotedServerTransferRoot.ClientSceneName == TargetSceneName
                       && SinglePromotedServerTransferRoot.LocalClientInstance != null
-                      && (!requireFreshSpawn ||
-                          (SinglePromotedServerTransferRoot.ClientSpawnCount > rootSpawnsBefore
-                           && SinglePromotedServerTransferChild.ClientSpawnCount > childSpawnsBefore))
+                      && (!requireRetainedSpawn ||
+                          (SinglePromotedServerTransferRoot.ClientSpawnCount == rootSpawnsBefore + 1
+                           && SinglePromotedServerTransferChild.ClientSpawnCount == childSpawnsBefore + ExpectedChildren))
                       && (!requirePreTransferState ||
                           HasClientState(RootOwnerPrePromotionValue, ChildOwnerPrePromotionValue))
                       && (!requireOwnerState ||
@@ -607,14 +734,12 @@ public class SinglePromotedServerTransferScenario : Scenario
         if (SinglePromotedServerTransferRoot.SawBadId || SinglePromotedServerTransferChild.SawBadId)
             return ScenarioResult.Fail($"{phase}: missing/default id observed: {DescribeState(ctx)}");
 
-        if (!requireFreshSpawn || !requireOwnerState)
+        if (!requireRetainedSpawn || !requireOwnerState)
             return ScenarioResult.Ok();
 
-        var root = CheckRootSpawnRecord(phase);
-        if (!root.success) return root;
-
-        var child = CheckChildSpawnRecord(phase);
-        if (!child.success) return child;
+        var child = SinglePromotedServerTransferChild.LocalClientInstance;
+        if (!child || !child.isOwner || !child.isController || !child.hasConnectedOwner || child.owner?.id.value != _ownerId)
+            return ScenarioResult.Fail($"{phase}: retained child ownership was not restored");
 
         return ScenarioResult.Ok();
     }
@@ -769,42 +894,6 @@ public class SinglePromotedServerTransferScenario : Scenario
                     && child.HasState(ChildServerStateValue, childOwnerValue);
     }
 
-    private static ScenarioResult CheckRootSpawnRecord(string phase)
-    {
-        if (!SinglePromotedServerTransferRoot.HasLastClientSpawn)
-            return ScenarioResult.Fail($"{phase}: missing root client spawn record");
-
-        var rec = SinglePromotedServerTransferRoot.LastClientSpawn;
-        if (rec.ownerId != _ownerId || !rec.ownerHasValue || !rec.isOwner || !rec.isController || !rec.hasConnectedOwner)
-        {
-            return ScenarioResult.Fail(
-                $"{phase}: root owner state missing from client spawn record: " +
-                $"ownerId={rec.ownerId}, expected={_ownerId}, ownerHasValue={rec.ownerHasValue}, " +
-                $"isOwner={rec.isOwner}, isController={rec.isController}, hasConnectedOwner={rec.hasConnectedOwner}, " +
-                $"scene={rec.sceneName}");
-        }
-
-        return ScenarioResult.Ok();
-    }
-
-    private static ScenarioResult CheckChildSpawnRecord(string phase)
-    {
-        if (!SinglePromotedServerTransferChild.HasLastClientSpawn)
-            return ScenarioResult.Fail($"{phase}: missing child client spawn record");
-
-        var rec = SinglePromotedServerTransferChild.LastClientSpawn;
-        if (rec.ownerId != _ownerId || !rec.ownerHasValue || !rec.isOwner || !rec.isController || !rec.hasConnectedOwner)
-        {
-            return ScenarioResult.Fail(
-                $"{phase}: child owner state missing from client spawn record: " +
-                $"ownerId={rec.ownerId}, expected={_ownerId}, ownerHasValue={rec.ownerHasValue}, " +
-                $"isOwner={rec.isOwner}, isController={rec.isController}, hasConnectedOwner={rec.hasConnectedOwner}, " +
-                $"scene={rec.sceneName}");
-        }
-
-        return ScenarioResult.Ok();
-    }
-
     private static int GetBuildIndex(string scenePath) => SceneUtility.GetBuildIndexByScenePath(scenePath);
 
     private static bool IsNetworkSceneLoaded(ScenarioContext ctx, int buildIndex)
@@ -942,6 +1031,12 @@ public class SinglePromotedServerTransferScenario : Scenario
     }
 
     [ObserversRpc(runLocally: true)]
+    private static void BroadcastProbeVisibilityReady()
+    {
+        _probeVisibilityReady = true;
+    }
+
+    [ObserversRpc(runLocally: true)]
     private static void BroadcastPromotionCommand()
     {
         _promotionCommandReceived = true;
@@ -951,6 +1046,18 @@ public class SinglePromotedServerTransferScenario : Scenario
     private static void SignalInitialObserved(RPCInfo info = default)
     {
         _initialObservedCount++;
+    }
+
+    [ServerRpc(requireOwnership: false)]
+    private static void SignalPostMigrationLoaded(RPCInfo info = default)
+    {
+        _postMigrationLoadedCount++;
+    }
+
+    [ServerRpc(requireOwnership: false)]
+    private static void SignalPostMigrationUnloaded(RPCInfo info = default)
+    {
+        _postMigrationUnloadedCount++;
     }
 
     [ServerRpc(requireOwnership: false)]

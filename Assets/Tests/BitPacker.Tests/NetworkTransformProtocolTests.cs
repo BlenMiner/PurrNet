@@ -540,6 +540,106 @@ public class NetworkTransformProtocolTests
         }
     }
 
+    [TestCase(false)]
+    [TestCase(true)]
+    public void ReusedTransformRegistrationAcceptsFreshConnectionPackets(bool preserveWorld)
+    {
+        var objects = new List<GameObject>();
+        var managerObject = new GameObject("Transform connection reset manager");
+        managerObject.SetActive(false);
+        var manager = managerObject.AddComponent<NetworkManager>();
+        typeof(NetworkManager).GetProperty("preserveWorldOnTransfer", BindingFlags.Instance | BindingFlags.NonPublic)
+            .SetValue(manager, preserveWorld);
+        var module = new NetworkTransformModule(null, null, null, default, null);
+        var factory = new NetworkTransformFactory(null, null, null, manager, null);
+        ((List<NetworkTransformModule>)typeof(NetworkTransformFactory)
+            .GetField("_rawModules", BindingFlags.Instance | BindingFlags.NonPublic).GetValue(factory)).Add(module);
+        var nt = CreateNetworkTransform(10, objects);
+
+        try
+        {
+            module.Register(nt);
+            var previousSend = module.GetSendStream(PlayerID.Server);
+            var previousReceive = module.GetRecvStream(PlayerID.Server);
+            Assert.That(NetworkTransformModule.MarkReceived(previousReceive, 1000, out _), Is.True);
+
+            module.Unregister(nt);
+            factory.TransferToNewServer();
+            module.Register(nt);
+
+            var newReceive = module.GetRecvStream(PlayerID.Server);
+            Assert.That(nt.ntRegistered, Is.True);
+            Assert.That(module.GetSendStream(PlayerID.Server), Is.Not.SameAs(previousSend));
+            Assert.That(newReceive, Is.Not.SameAs(previousReceive));
+            Assert.That(NetworkTransformModule.MarkReceived(newReceive, 1, out _), Is.True);
+            module.Unregister(nt);
+            factory.TransferToNewServer();
+        }
+        finally
+        {
+            for (int i = 0; i < objects.Count; i++)
+                Object.DestroyImmediate(objects[i]);
+            Object.DestroyImmediate(managerObject);
+        }
+    }
+
+    [Test]
+    public void ReusedTransformInitializesFromTheSpawnPoseBeforeOwnerControl()
+    {
+        using var fixture = new PooledOwnerFixture();
+        var nt = fixture.Transform;
+        var module = fixture.Module;
+        nt.transform.position = Vector3.right * 10;
+        typeof(NetworkTransform).GetMethod("OnEarlySpawn", BindingFlags.NonPublic | BindingFlags.Instance,
+                null, System.Type.EmptyTypes, null)
+            .Invoke(nt, null);
+        Assert.That(nt.TryApplyUnreliableState(PositionState(11), 7, 100, 1, null, true), Is.True);
+        typeof(NetworkTransform).GetMethod("OnDespawned", BindingFlags.NonPublic | BindingFlags.Instance,
+                null, new[] { typeof(bool) }, null)
+            .Invoke(nt, new object[] { false });
+
+        // Normal spawn applies the incoming prototype transform before OnEarlySpawn.
+        nt.transform.position = Vector3.right * 20;
+        typeof(NetworkTransform).GetMethod("OnEarlySpawn", BindingFlags.NonPublic | BindingFlags.Instance,
+                null, System.Type.EmptyTypes, null)
+            .Invoke(nt, null);
+        SetField(nt, "_wasOnSpawnedCalled", true);
+        module.Register(nt);
+        var send = module.GetSendStream(PlayerID.Server);
+        uint revision = nt.capturedRevision;
+
+        Assert.That(nt.IsControlling(fixture.Player, false), Is.False);
+        module.PostFixedUpdate();
+        Assert.That(nt.capturedRevision, Is.EqualTo(revision));
+        Assert.That(send.pending.Count, Is.Zero, "Normal authority rules exclude the old pose until ownership arrives.");
+
+        var hostState = PositionState(20);
+        Assert.That(nt.TryApplyTargetedState(hostState, false, 1), Is.True);
+        Assert.That(nt.transform.position, Is.EqualTo(Vector3.right * 20),
+            "The normal spawn pose already matches the host before a non-position baseline.");
+
+        fixture.RestoreOwnership();
+        InvokePrivate(nt, "UpdateNT");
+        nt.GatherState();
+        nt.CaptureUnreliableState();
+        Assert.That(nt.IsControlling(fixture.Player, false), Is.True);
+        Assert.That(Vector3.Distance((Vector3)nt.capturedState.data.position.Value, Vector3.right * 20),
+            Is.LessThan(CompressedFloat.PRECISION), "Restored owner capture starts from the host's pose.");
+
+        nt.transform.position = Vector3.right * 30;
+        InvokePrivate(nt, "UpdateNT");
+        nt.GatherState();
+        nt.CaptureUnreliableState();
+        Assert.That(nt.IsControlling(fixture.Player, false), Is.True);
+        Assert.That(Vector3.Distance((Vector3)nt.capturedState.data.position.Value, Vector3.right * 30),
+            Is.LessThan(CompressedFloat.PRECISION),
+            "Future owner movement must enter the normal outgoing capture.");
+
+        Assert.That(nt.TryApplyTargetedState(hostState, false, 2), Is.True);
+        Assert.That(nt.transform.position, Is.EqualTo(Vector3.right * 30),
+            "Normal owner authority still ignores a later targeted pose.");
+    }
+
     [Test]
     public void OnlyAnchorPacketsMoveAnEstablishedBaseline()
     {
@@ -890,6 +990,94 @@ public class NetworkTransformProtocolTests
                 Object.DestroyImmediate(objects[i]);
         }
     }
+
+    private sealed class PooledOwnerFixture : System.IDisposable
+    {
+        public readonly PlayerID Player = new(2, false);
+        public readonly NetworkTransform Transform;
+        public readonly NetworkTransformModule Module;
+        private readonly GameObject _managerObject;
+        private readonly NetworkManager _manager;
+        private readonly object _previousModules;
+
+        public PooledOwnerFixture()
+        {
+            const BindingFlags flags = BindingFlags.NonPublic | BindingFlags.Instance;
+            _managerObject = new GameObject("Pooled transform test manager");
+            _managerObject.SetActive(false);
+            _manager = _managerObject.AddComponent<NetworkManager>();
+            typeof(NetworkManager).GetField("_clientTickManager", flags)
+                .SetValue(_manager, new TickManager(30, _manager, null, false));
+
+            // The tick needs only the authenticated local ID; no transport or player lifecycle is run here.
+            var players = (PlayersManager)System.Runtime.Serialization.FormatterServices
+                .GetUninitializedObject(typeof(PlayersManager));
+            typeof(PlayersManager).GetProperty(nameof(PlayersManager.localPlayerId)).SetValue(players, (PlayerID?)Player);
+            var modules = new ModulesCollection(_manager, false);
+            modules.AddModule(players);
+            var modulesField = typeof(NetworkManager).GetField("_clientModules", flags);
+            _previousModules = modulesField.GetValue(_manager);
+            modulesField.SetValue(_manager, modules);
+
+            var go = new GameObject("Pooled owner transform");
+            go.SetActive(false);
+            Transform = go.AddComponent<NetworkTransform>();
+            typeof(NetworkIdentity).GetProperty(nameof(NetworkIdentity.networkManager)).SetValue(Transform, _manager);
+            typeof(NetworkIdentity).GetField("_isSpawnedClient", flags).SetValue(Transform, true);
+            typeof(NetworkIdentity).GetField("_localPlayer", flags).SetValue(Transform, (PlayerID?)Player);
+            typeof(NetworkIdentity).GetField("_idClient", flags).SetValue(Transform, (NetworkID?)new NetworkID(10));
+            SetField(Transform, "_syncPosition", SyncMode.World);
+            SetField(Transform, "_syncRotation", SyncMode.No);
+            SetField(Transform, "_syncScale", false);
+            SetField(Transform, "_ownerAuth", true);
+            SetField(Transform, "_wasOnSpawnedCalled", true);
+            Module = new NetworkTransformModule(_manager, null, null, default, null);
+        }
+
+        public void RestoreOwnership()
+        {
+            Transform.internalOwnerClient = Player;
+            typeof(NetworkIdentity).GetField("_cachedHasConnectedOwner", BindingFlags.NonPublic | BindingFlags.Instance)
+                .SetValue(Transform, true);
+            // Exercise the normal ownership/controller callback with the component disabled,
+            // keeping this pose test independent of a live RPC transport.
+            Transform.enabled = false;
+            try
+            {
+                typeof(NetworkTransform).GetMethod("OnOwnerChanged", BindingFlags.NonPublic | BindingFlags.Instance,
+                        null, new[] { typeof(PlayerID?), typeof(PlayerID?), typeof(bool) }, null)
+                    .Invoke(Transform, new object[] { null, (PlayerID?)Player, false });
+            }
+            finally
+            {
+                Transform.enabled = true;
+            }
+        }
+
+        public void Dispose()
+        {
+            Module.Unregister(Transform);
+            Module.TransferToNewServer();
+            InvokePrivate(Transform, "ReleaseUnreliableHistory");
+            typeof(NetworkIdentity).GetField("_isSpawnedClient", BindingFlags.NonPublic | BindingFlags.Instance)
+                .SetValue(Transform, false);
+            typeof(NetworkManager).GetField("_clientModules", BindingFlags.NonPublic | BindingFlags.Instance)
+                .SetValue(_manager, _previousModules);
+            Object.DestroyImmediate(Transform.gameObject);
+            Object.DestroyImmediate(_managerObject);
+        }
+    }
+
+    private static NetworkTransformState PositionState(float x) => new()
+    {
+        frame = NetworkTransformFrame.World,
+        data = new NetworkTransformData
+        {
+            position = (CompressedVector3)(Vector3.right * x),
+            rotation = Quaternion.identity,
+            scale = Vector3.one
+        }
+    };
 
     private static NTUnreliableSlot SlotWith(NetworkID nid, uint genEpoch)
     {

@@ -15,6 +15,8 @@ namespace PurrNet.Modules
         public uint scenePathHash;
         public SceneID idToAssign;
         public PurrSceneSettings settings;
+        public bool loadAdditively;
+        public bool discardOnCompletion;
         [UsedImplicitly]
         public AsyncOperation operation;
     }
@@ -110,7 +112,25 @@ namespace PurrNet.Modules
         public IReadOnlyList<SceneID> scenes => _rawScenes;
         public IReadOnlyDictionary<SceneID, SceneState> sceneStates => _scenes;
 
-        private SceneID GetNextID() => new(_nextSceneID++);
+        private SceneID GetNextID()
+        {
+            for (var i = 0; i < ushort.MaxValue; i++)
+            {
+                var id = new SceneID(_nextSceneID++);
+                if (_nextSceneID == 0)
+                    _nextSceneID = 1;
+                if (!_scenes.ContainsKey(id) && !IsScenePending(id) && !_sceneActionScenes.Contains(id))
+                    return id;
+            }
+
+            throw new System.InvalidOperationException("No network scene IDs are available.");
+        }
+
+        private void ReserveSceneID(SceneID id)
+        {
+            if (id.id >= _nextSceneID && id.id < ushort.MaxValue)
+                _nextSceneID = (ushort)(id.id + 1);
+        }
 
         [RuntimeInitializeOnLoadMethod(RuntimeInitializeLoadType.SubsystemRegistration)]
         private static void ResetSceneHashCache()
@@ -139,6 +159,7 @@ namespace PurrNet.Modules
 
         private void AddScene(Scene scene, PurrSceneSettings settings, SceneID id)
         {
+            ReserveSceneID(id);
             if (_scenes.TryGetValue(id, out var state))
             {
                 PurrLogger.LogError($"Scene with ID {id} already exists under {state.scene.name}");
@@ -259,8 +280,17 @@ namespace PurrNet.Modules
 
         public void PromoteToServerModule()
         {
+            ClearInitialSceneReconciliation(true);
             _asServer = true;
+            // Commands not yet started belong to the old authority. The promoted
+            // replica and operations Unity has already started define its new world.
+            _actionsQueue.Clear();
             RemoveUnloadedSceneStates();
+            foreach (var id in _sceneActionScenes)
+                ReserveSceneID(id);
+            foreach (var operation in _pendingOperations)
+                ReserveSceneID(operation.idToAssign);
+            ReservePendingAddressableSceneIDs();
             _rebuildHistoryOnNextPlayerJoin = true;
             _players.Unsubscribe<SceneActionsBatch>(OnSceneActionsBatch);
             _players.Unsubscribe<FirstSceneActionsBatch>(OnSceneActionsBatch);
@@ -298,7 +328,7 @@ namespace PurrNet.Modules
             }
         }
 
-        private void RebuildHistoryFromLoadedBuildScenes()
+        private void RebuildSceneHistory()
         {
             _history.Clear();
 
@@ -313,6 +343,13 @@ namespace PurrNet.Modules
 
                 if (!state.scene.IsValid() || !state.scene.isLoaded)
                     continue;
+#if ADDRESSABLES_PURRNET_SUPPORT
+                if (TryGetLoadedAddressableSceneAction(id, out var addressable))
+                {
+                    _history.AddLoadAddressableAction(addressable);
+                    continue;
+                }
+#endif
 
                 var buildIndex = state.scene.buildIndex;
                 if (buildIndex < 0)
@@ -322,15 +359,45 @@ namespace PurrNet.Modules
                 {
                     scenePathHash = ScenePathHashFromBuildIndex(buildIndex),
                     sceneID = id,
-                    parameters = state.settings
+                    parameters = state.settings,
+                    loadAdditively = true
                 });
             }
 
-            RebuildAddressableHistoryFromLoadedScenes();
+            foreach (var operation in _pendingOperations)
+            {
+                if (operation.discardOnCompletion || _scenes.ContainsKey(operation.idToAssign))
+                    continue;
+                _history.AddLoadAction(new LoadSceneAction
+                {
+                    scenePathHash = operation.scenePathHash,
+                    sceneID = operation.idToAssign,
+                    parameters = operation.settings,
+                    loadAdditively = true
+                });
+            }
+            RebuildPendingAddressableHistory();
             _history.Flush();
         }
 
         private bool _isTransferingToNewServer;
+        private bool _isReconcilingTransferScenes;
+        private List<SceneAction> _pendingTransferActions;
+        private HashSet<SceneID> _authoritativeBootstrapScenes;
+        private List<SceneAction> _actionsAfterTransferManifest;
+
+        internal bool isTransferComplete
+        {
+            get
+            {
+                var pendingAddressables = false;
+                HasPendingAddressableTransfers(ref pendingAddressables);
+                var sceneUnloadsDone = ArePendingSceneUnloadsDone();
+                return !_isTransferingToNewServer && !_isReconcilingTransferScenes &&
+                       _actionsQueue.Count == 0 && _pendingOperations.Count == 0 && !pendingAddressables &&
+                       _pendingTransferActions == null && sceneUnloadsDone;
+            }
+        }
 
         public void PostPromoteToServerModule()
         {
@@ -339,13 +406,27 @@ namespace PurrNet.Modules
 
         public void TransferToNewServer()
         {
+            ClearInitialSceneReconciliation(true);
             _isTransferingToNewServer = true;
+            _actionsQueue.Clear();
+            _pendingTransferActions = null;
+            _actionsAfterTransferManifest?.Clear();
         }
 
         private void Setup(bool asServer)
         {
             _wasSetup = true;
             _asServer = asServer;
+
+            if (!asServer)
+            {
+                _awaitingInitialSceneManifest = true;
+                MirrorAlreadyLoadedHostScenes();
+                _players.Subscribe<SceneActionsBatch>(OnSceneActionsBatch);
+                _players.Subscribe<FirstSceneActionsBatch>(OnSceneActionsBatch);
+                SceneManager.sceneLoaded += SceneManagerOnSceneLoaded;
+                return;
+            }
 
             var currentScene = _networkManager.gameObject.scene;
             var originalScene = _networkManager.originalScene;
@@ -357,7 +438,7 @@ namespace PurrNet.Modules
             {
                 mode = LoadSceneMode.Single,
                 isPublic = true,
-                physicsMode = LocalPhysicsMode.None
+                physicsMode = GetScenePhysicsMode(currentScene)
             }, GetNextID());
 
             if (currentScene != originalScene && originalScene.IsValid())
@@ -366,7 +447,7 @@ namespace PurrNet.Modules
                 {
                     mode = LoadSceneMode.Additive,
                     isPublic = true,
-                    physicsMode = LocalPhysicsMode.None
+                    physicsMode = GetScenePhysicsMode(originalScene)
                 }, GetNextID());
             }
 
@@ -383,20 +464,9 @@ namespace PurrNet.Modules
                 }, GetNextID());
             }
 
-            if (!asServer)
-                MirrorAlreadyLoadedHostScenes();
-
-            if (!asServer)
-            {
-                _players.Subscribe<SceneActionsBatch>(OnSceneActionsBatch);
-                _players.Subscribe<FirstSceneActionsBatch>(OnSceneActionsBatch);
-            }
-            else
-            {
-                _players.onPrePlayerJoined += OnPlayerJoined;
-                _scenePlayers.onPlayerJoinedScene += OnPlayerJoinedScene;
-                _scenePlayers.onPlayerLeftScene += OnPlayerLeftScene;
-            }
+            _players.onPrePlayerJoined += OnPlayerJoined;
+            _scenePlayers.onPlayerJoinedScene += OnPlayerJoinedScene;
+            _scenePlayers.onPlayerLeftScene += OnPlayerLeftScene;
 
             SceneManager.sceneLoaded += SceneManagerOnSceneLoaded;
         }
@@ -409,13 +479,9 @@ namespace PurrNet.Modules
             if (!_networkManager.TryGetModule<ScenesModule>(true, out var serverModule))
                 return;
 
-            foreach (var pair in serverModule.sceneStates)
+            foreach (var sceneId in serverModule.scenes)
             {
-                var sceneId = pair.Key;
-                var state = pair.Value;
-
-                if (!serverModule._sceneActionScenes.Contains(sceneId))
-                    continue;
+                var state = serverModule.sceneStates[sceneId];
 
                 if (!state.scene.IsValid() || !state.scene.isLoaded)
                     continue;
@@ -423,12 +489,13 @@ namespace PurrNet.Modules
                 if (_scenes.ContainsKey(sceneId) || HasScene(state.scene))
                     continue;
 
-                _sceneActionScenes.Add(sceneId);
+                if (serverModule._sceneActionScenes.Contains(sceneId))
+                    _sceneActionScenes.Add(sceneId);
+#if ADDRESSABLES_PURRNET_SUPPORT
+                if (serverModule.TryGetLoadedAddressableSceneAction(sceneId, out var addressable))
+                    RegisterAddressableSceneGuid(addressable.sceneID, addressable.guid.value);
+#endif
                 AddScene(state.scene, state.settings, sceneId);
-
-                var nextSceneId = (int)sceneId.id + 1;
-                if (nextSceneId > _nextSceneID && nextSceneId <= ushort.MaxValue)
-                    _nextSceneID = (ushort)nextSceneId;
             }
         }
 
@@ -476,11 +543,24 @@ namespace PurrNet.Modules
             if (_rebuildHistoryOnNextPlayerJoin)
             {
                 _rebuildHistoryOnNextPlayerJoin = false;
-                RebuildHistoryFromLoadedBuildScenes();
+                RebuildSceneHistory();
             }
 
-            var history = _history.GetFullHistory();
+            if (_history.hasUnflushedActions)
+                FlushActions();
+            // This callback precedes public-scene membership setup, including for
+            // fresh players. The first manifest must already describe those scenes.
+            FilterHistoryForJoiningPlayer(player);
+            _players.Send(player, new FirstSceneActionsBatch
+            {
+                actions = _playerFilteredActions,
+                bootstrapScenes = GetBootstrapScenesForJoin(player)
+            });
+        }
 
+        private void FilterHistoryForJoiningPlayer(PlayerID player)
+        {
+            var history = _history.GetFullHistory();
             _playerFilteredActions.Clear();
 
             for (var i = 0; i < history.actions.Count; i++)
@@ -496,20 +576,15 @@ namespace PurrNet.Modules
                     _ => default
                 };
 
-                if (ShouldSendSceneActionOnJoin(player, target, isReconnect))
+                if (ShouldSendSceneActionOnJoin(player, target))
                     _playerFilteredActions.Add(action);
             }
-
-            _players.Send(player, new FirstSceneActionsBatch { actions = _playerFilteredActions });
         }
 
-        private bool ShouldSendSceneActionOnJoin(PlayerID player, SceneID target, bool isReconnect)
+        private bool ShouldSendSceneActionOnJoin(PlayerID player, SceneID target)
         {
             if (_scenePlayers.IsPlayerInScene(player, target))
                 return true;
-
-            if (!isReconnect)
-                return false;
 
             return _scenes.TryGetValue(target, out var state) && state.settings.isPublic;
         }
@@ -572,11 +647,18 @@ namespace PurrNet.Modules
             {
                 var operation = _pendingOperations[i];
 
-                if (operation.scenePathHash == loadedHash && operation.settings.mode == mode)
+                var expectedMode = operation.loadAdditively ? LoadSceneMode.Additive : operation.settings.mode;
+                if (operation.scenePathHash == loadedHash && expectedMode == mode)
                 {
-                    _sceneActionScenes.Add(operation.idToAssign);
-                    AddScene(scene, operation.settings, operation.idToAssign);
                     _pendingOperations.RemoveAt(i);
+                    if (operation.discardOnCompletion)
+                    {
+                        _pendingUnloads.Add(SceneManager.UnloadSceneAsync(scene));
+                        if (!_scenes.ContainsKey(operation.idToAssign) && !IsScenePending(operation.idToAssign))
+                            _sceneActionScenes.Remove(operation.idToAssign);
+                        break;
+                    }
+                    RegisterReceivedScene(scene, operation.settings, operation.idToAssign);
                     break;
                 }
             }
@@ -586,7 +668,7 @@ namespace PurrNet.Modules
         {
             for (int i = 0; i < _pendingOperations.Count; i++)
             {
-                if (_pendingOperations[i].idToAssign == sceneId)
+                if (!_pendingOperations[i].discardOnCompletion && _pendingOperations[i].idToAssign == sceneId)
                     return true;
             }
 #if ADDRESSABLES_PURRNET_SUPPORT
@@ -617,7 +699,7 @@ namespace PurrNet.Modules
 
         private void HandleNextSceneAction()
         {
-            if (_actionsQueue.Count == 0) return;
+            if (_isTransferingToNewServer || _initialSceneActions != null || _awaitingInitialSceneManifest || _actionsQueue.Count == 0) return;
 
             var action = _actionsQueue.Peek();
             switch (action.type)
@@ -664,9 +746,9 @@ namespace PurrNet.Modules
                             break;
                         }
 
-                        if (loadAction.parameters.mode == LoadSceneMode.Single)
+                        if (!loadAction.loadAdditively && loadAction.parameters.mode == LoadSceneMode.Single)
                         {
-                            for (int i = 0; i < _rawScenes.Count; i++)
+                            for (int i = _rawScenes.Count - 1; i >= 0; i--)
                             {
                                 if (!IsDontDestroyOnLoadScene(_scenes[_rawScenes[i]].scene))
                                     RemoveScene(_scenes[_rawScenes[i]].scene);
@@ -678,6 +760,7 @@ namespace PurrNet.Modules
                             buildIndex = localBuildIndex,
                             scenePathHash = loadAction.scenePathHash,
                             settings = loadAction.parameters,
+                            loadAdditively = loadAction.loadAdditively,
                             idToAssign = loadAction.sceneID,
                             operation = operation
                         });
@@ -748,130 +831,300 @@ namespace PurrNet.Modules
         {
             if (!_isTransferingToNewServer)
             {
-                HandleScenes(data.actions);
+                BeginInitialSceneReconciliation(data);
                 return;
             }
 
-            _isTransferingToNewServer = false;
+            _actionsQueue.Clear();
+            _pendingTransferActions = new List<SceneAction>();
+            if (_networkManager.preserveWorldOnTransfer)
+            {
+                // Initial joins and transfers share the same authoritative scene
+                // inventory. History was flushed before this reliable batch was sent.
+                _authoritativeBootstrapScenes = new HashSet<SceneID>();
+                _initialBootstrapSceneIds = null;
+                if (data.bootstrapScenes != null)
+                    foreach (var scene in data.bootstrapScenes)
+                    {
+                        var id = GetInitialSceneID(scene);
+                        _authoritativeBootstrapScenes.Add(id);
+                        if (_scenes.ContainsKey(id) || scene.type == SceneActionType.LoadDontDestroyOnLoad)
+                            continue;
 
-            ReconcileTransferScenes(data.actions);
+                        // A bootstrap load may still be pending locally when the
+                        // new host has finished it. Reuse or load it through the
+                        // same reconciliation as history scenes, keeping its origin.
+                        _initialBootstrapSceneIds ??= new HashSet<SceneID>();
+                        _initialBootstrapSceneIds.Add(id);
+                        _pendingTransferActions.Add(scene);
+                    }
+            }
+            _actionsAfterTransferManifest?.Clear();
+            if (data.actions != null)
+                _pendingTransferActions.AddRange(data.actions);
+            TryApplyTransferManifest();
+        }
+
+        private void TryApplyTransferManifest()
+        {
+            if (_pendingTransferActions == null)
+                return;
+
+            // A Single load already submitted to Unity cannot be canceled. Let it
+            // finish before choosing which scene instances can actually survive.
+            foreach (var operation in _pendingOperations)
+                if (!operation.loadAdditively && operation.settings.mode == LoadSceneMode.Single)
+                    return;
+            var pendingSingleAddressable = false;
+            HasPendingSingleAddressableLoad(ref pendingSingleAddressable);
+            if (pendingSingleAddressable)
+                return;
+
+            var actions = _pendingTransferActions;
+            _pendingTransferActions = null;
+            _isTransferingToNewServer = false;
+            ReconcileTransferScenes(actions);
+            if (_actionsAfterTransferManifest != null && _actionsAfterTransferManifest.Count > 0)
+            {
+                HandleScenes(_actionsAfterTransferManifest);
+                _actionsAfterTransferManifest.Clear();
+            }
         }
 
         private void ReconcileTransferScenes(List<SceneAction> actions)
         {
             _actionsQueue.Clear();
-
             if (actions == null)
                 return;
 
-            var targetScenes = new HashSet<SceneID>();
-            var targetBuildScenes = new Dictionary<SceneID, uint>();
-#if ADDRESSABLES_PURRNET_SUPPORT
-            var targetAddressableScenes = new Dictionary<SceneID, string>();
-#endif
-            var missingActions = new List<SceneAction>();
-            var replayLoadEvents = new List<SceneID>();
-
-            for (var i = 0; i < actions.Count; i++)
+            _isReconcilingTransferScenes = true;
+            try
             {
-                var action = actions[i];
+                var targetBuildScenes = new Dictionary<SceneID, uint>();
+                var targetSettings = new Dictionary<SceneID, PurrSceneSettings>();
+                var matches = new Dictionary<SceneID, SceneState>();
+                var claimedScenes = new HashSet<Scene>();
+                var previousScenes = new Dictionary<SceneID, SceneState>(_scenes);
+#if ADDRESSABLES_PURRNET_SUPPORT
+                var targetAddressableScenes = new Dictionary<SceneID, string>();
+                var addressableRegistrations = CaptureAddressableTransferRegistrations();
+#endif
+                var missingActions = new List<SceneAction>();
 
-                switch (action.type)
+                // Reserve exact instance matches before considering any asset fallback.
+                // Otherwise an earlier missing instance could steal a later exact match.
+                foreach (var action in actions)
                 {
-                    case SceneActionType.Load:
+                    if (action.type == SceneActionType.Load)
                     {
-                        var loadAction = action.loadSceneAction;
-                        targetScenes.Add(loadAction.sceneID);
-                        targetBuildScenes[loadAction.sceneID] = loadAction.scenePathHash;
-                        _sceneActionScenes.Add(loadAction.sceneID);
+                        var load = action.loadSceneAction;
+#if ADDRESSABLES_PURRNET_SUPPORT
+                        if (IsAddressableScene(load.sceneID))
+                            continue;
+#endif
+                        var buildIndex = BuildIndexFromScenePathHash(load.scenePathHash);
+                        if (buildIndex >= 0 && _scenes.TryGetValue(load.sceneID, out var state) && state.scene.IsValid() &&
+                            state.scene.isLoaded && state.scene.buildIndex == buildIndex &&
+                            state.settings.physicsMode == load.parameters.physicsMode && claimedScenes.Add(state.scene))
+                            matches[load.sceneID] = new SceneState(state.scene, load.parameters);
+                    }
+#if ADDRESSABLES_PURRNET_SUPPORT
+                    else if (action.type == SceneActionType.LoadAddressable)
+                    {
+                        var load = action.loadAddressableSceneAction;
+                        if (_scenes.TryGetValue(load.sceneID, out var state) &&
+                            IsLoadedAddressableScene(load.sceneID, load.guid.value, state) &&
+                            state.settings.physicsMode == load.parameters.physicsMode && claimedScenes.Add(state.scene))
+                            matches[load.sceneID] = new SceneState(state.scene, load.parameters);
+                    }
+#endif
+                }
 
-                        var buildIndex = BuildIndexFromScenePathHash(loadAction.scenePathHash);
-                        if (buildIndex == -1)
+                for (var i = 0; i < actions.Count; i++)
+                {
+                    var action = actions[i];
+
+                    switch (action.type)
+                    {
+                        case SceneActionType.Load:
                         {
-                            missingActions.Add(action);
+                            var loadAction = action.loadSceneAction;
+                            loadAction.loadAdditively = true;
+                            action.loadSceneAction = loadAction;
+                            targetBuildScenes[loadAction.sceneID] = loadAction.scenePathHash;
+                            targetSettings[loadAction.sceneID] = loadAction.parameters;
+                            if (_initialBootstrapSceneIds?.Contains(loadAction.sceneID) != true)
+                                _sceneActionScenes.Add(loadAction.sceneID);
+
+                            var buildIndex = BuildIndexFromScenePathHash(loadAction.scenePathHash);
+                            if (buildIndex == -1)
+                            {
+                                missingActions.Add(action);
+                                break;
+                            }
+
+                            if (matches.ContainsKey(loadAction.sceneID))
+                                break;
+
+                            var loadedScene = FindUnclaimedBuildScene(buildIndex, loadAction.parameters, claimedScenes);
+                            if (loadedScene.IsValid())
+                            {
+                                claimedScenes.Add(loadedScene);
+                                matches[loadAction.sceneID] = new SceneState(loadedScene, loadAction.parameters);
+                                break;
+                            }
+
+                            if (!IsBuildScenePending(loadAction.sceneID, loadAction.scenePathHash, loadAction.parameters))
+                                missingActions.Add(action);
+
                             break;
                         }
-
-                        if (TryReconcileLoadedTransferScene(loadAction, buildIndex, replayLoadEvents))
-                            break;
-
-                        if (!IsBuildScenePending(loadAction.sceneID, loadAction.scenePathHash))
-                            missingActions.Add(action);
-
-                        break;
-                    }
-                    case SceneActionType.LoadAddressable:
-                    {
-                        var loadAction = action.loadAddressableSceneAction;
-                        targetScenes.Add(loadAction.sceneID);
-                        _sceneActionScenes.Add(loadAction.sceneID);
+                        case SceneActionType.LoadAddressable:
+                        {
+                            var loadAction = action.loadAddressableSceneAction;
+                            loadAction.loadAdditively = true;
+                            action.loadAddressableSceneAction = loadAction;
+                            targetSettings[loadAction.sceneID] = loadAction.parameters;
+                            if (_initialBootstrapSceneIds?.Contains(loadAction.sceneID) != true)
+                                _sceneActionScenes.Add(loadAction.sceneID);
 #if ADDRESSABLES_PURRNET_SUPPORT
-                        var guid = loadAction.guid.value;
-                        targetAddressableScenes[loadAction.sceneID] = guid;
+                            var guid = loadAction.guid.value;
+                            targetAddressableScenes[loadAction.sceneID] = guid;
 
-                        if (TryReconcileLoadedAddressableTransferScene(loadAction, replayLoadEvents))
-                            break;
+                            if (matches.ContainsKey(loadAction.sceneID))
+                                break;
 
-                        if (!IsAddressableScenePending(loadAction.sceneID, guid))
-                            missingActions.Add(action);
+                            var loadedScene = FindUnclaimedAddressableScene(guid, loadAction.parameters,
+                                claimedScenes, addressableRegistrations);
+                            if (loadedScene.IsValid())
+                            {
+                                claimedScenes.Add(loadedScene);
+                                matches[loadAction.sceneID] = new SceneState(loadedScene, loadAction.parameters);
+                                break;
+                            }
+
+                            if (!IsAddressableScenePending(loadAction.sceneID, guid, loadAction.parameters))
+                                missingActions.Add(action);
 #else
-                        missingActions.Add(action);
+                            missingActions.Add(action);
 #endif
-                        break;
+                            break;
+                        }
+                        case SceneActionType.Unload:
+                        case SceneActionType.SetActive:
+                        default:
+                            missingActions.Add(action);
+                            break;
                     }
-                    case SceneActionType.Unload:
-                    case SceneActionType.SetActive:
-                    default:
-                        missingActions.Add(action);
-                        break;
                 }
-            }
 
 #if ADDRESSABLES_PURRNET_SUPPORT
-            RemoveStaleAddressableTransferScenes(targetAddressableScenes);
+                DiscardStalePendingAddressableTransfers(targetAddressableScenes, targetSettings, matches);
 #endif
-            RemoveStaleTransferScenes(targetScenes, targetBuildScenes);
+                DiscardStalePendingBuildTransfers(targetBuildScenes, targetSettings, matches);
 
-            for (var i = 0; i < replayLoadEvents.Count; i++)
-                PlayLoadEventsForScene(replayLoadEvents[i]);
-
-            if (missingActions.Count > 0)
-                HandleScenes(missingActions);
-        }
-
-        private bool TryReconcileLoadedTransferScene(
-            LoadSceneAction loadAction,
-            int buildIndex,
-            ICollection<SceneID> replayLoadEvents)
-        {
-            if (_scenes.TryGetValue(loadAction.sceneID, out var existing))
-            {
-                if (existing.scene.IsValid() && existing.scene.isLoaded && existing.scene.buildIndex == buildIndex)
+                // Detach all changed registrations before rebinding. This also handles
+                // SceneID swaps without unloading an instance selected by another target.
+                foreach (var pair in previousScenes)
                 {
-                    _scenes[loadAction.sceneID] = new SceneState(existing.scene, loadAction.parameters);
-                    _sceneActionScenes.Add(loadAction.sceneID);
-                    replayLoadEvents.Add(loadAction.sceneID);
-                    return true;
+                    var id = pair.Key;
+                    var state = pair.Value;
+                    if (matches.TryGetValue(id, out var match) && match.scene == state.scene)
+                        continue;
+                    if (!claimedScenes.Contains(state.scene) && !targetSettings.ContainsKey(id) &&
+                        ShouldRetainLocalSceneRegistrationDuringTransfer(id, state.scene))
+                        continue;
+
+                    if (claimedScenes.Contains(state.scene))
+                    {
+#if ADDRESSABLES_PURRNET_SUPPORT
+                        UnregisterAddressableScene(id);
+#endif
+                        RemoveScene(state.scene, true);
+                        continue;
+                    }
+#if ADDRESSABLES_PURRNET_SUPPORT
+                    if (TryRemoveAddressableScene(id, UnloadSceneOptions.None, true, false, out _))
+                        continue;
+#endif
+                    RemoveScene(state.scene, true);
+                    if (!ShouldKeepLocalSceneDuringTransfer(state.scene) && state.scene.IsValid() && state.scene.isLoaded)
+                        _pendingUnloads.Add(SceneManager.UnloadSceneAsync(state.scene));
                 }
 
-                RemoveScene(existing.scene, true);
+                foreach (var pair in matches)
+                {
+                    BindLoadedTransferScene(pair.Value.scene, pair.Value.settings, pair.Key);
+#if ADDRESSABLES_PURRNET_SUPPORT
+                    if (targetAddressableScenes.TryGetValue(pair.Key, out var guid))
+                        RestoreAddressableTransferRegistration(pair.Key, pair.Value.scene, guid, addressableRegistrations);
+#endif
+                }
+
+                foreach (var pair in matches)
+                    PlayLoadEventsForScene(pair.Key);
+
+                // Bootstrap/DDOL scenes have no load action in either transfer mode.
+                // A retained registration still needs a fresh client acknowledgement;
+                // the server cannot infer readiness from reconnecting membership.
+                foreach (var pair in _scenes)
+                    if (!matches.ContainsKey(pair.Key) && pair.Value.scene.IsValid() && pair.Value.scene.isLoaded &&
+                        ShouldRetainLocalSceneRegistrationDuringTransfer(pair.Key, pair.Value.scene))
+                        PlayLoadEventsForScene(pair.Key);
+
+                // Start missing loads on the next network tick, after all bindings
+                // and load acknowledgements describe the reconciled scene set.
+                foreach (var action in missingActions)
+                    _actionsQueue.Enqueue(action);
             }
-
-            var loadedScene = SceneManager.GetSceneByBuildIndex(buildIndex);
-            if (!loadedScene.IsValid() || !loadedScene.isLoaded)
-                return false;
-
-            BindLoadedTransferScene(loadedScene, loadAction.parameters, loadAction.sceneID);
-            replayLoadEvents.Add(loadAction.sceneID);
-            return true;
+            finally
+            {
+                _isReconcilingTransferScenes = false;
+            }
         }
 
-        private bool IsBuildScenePending(SceneID sceneId, uint scenePathHash)
+        private Scene FindUnclaimedBuildScene(
+            int buildIndex,
+            PurrSceneSettings settings,
+            HashSet<Scene> claimedScenes)
+        {
+            for (var i = 0; i < SceneManager.sceneCount; i++)
+            {
+                var scene = SceneManager.GetSceneAt(i);
+                if (!scene.IsValid() || !scene.isLoaded || scene.buildIndex != buildIndex || claimedScenes.Contains(scene))
+                    continue;
+                if (_idToScene.TryGetValue(scene, out var id) && _scenes.TryGetValue(id, out var state) &&
+                    state.settings.physicsMode != settings.physicsMode)
+                    continue;
+#if ADDRESSABLES_PURRNET_SUPPORT
+                if (_idToScene.TryGetValue(scene, out var addressableId) && IsAddressableScene(addressableId))
+                    continue;
+#endif
+                if (!HasMatchingScenePhysics(scene, settings.physicsMode))
+                    continue;
+                // An in-flight operation still owns its completion callback and ID.
+                if (!_idToScene.ContainsKey(scene) && HasPendingBuildScenePath(Hash.Hash(scene.path)))
+                    continue;
+                return scene;
+            }
+            return default;
+        }
+
+        private bool HasPendingBuildScenePath(uint pathHash)
+        {
+            foreach (var operation in _pendingOperations)
+                if (operation.scenePathHash == pathHash)
+                    return true;
+            return false;
+        }
+
+        private bool IsBuildScenePending(SceneID sceneId, uint scenePathHash, PurrSceneSettings settings)
         {
             for (var i = 0; i < _pendingOperations.Count; i++)
             {
                 var operation = _pendingOperations[i];
-                if (operation.idToAssign == sceneId && operation.scenePathHash == scenePathHash)
+                if (!operation.discardOnCompletion && operation.idToAssign == sceneId && operation.scenePathHash == scenePathHash &&
+                    operation.settings.physicsMode == settings.physicsMode)
                     return true;
             }
 
@@ -880,12 +1133,13 @@ namespace PurrNet.Modules
 
         private void BindLoadedTransferScene(Scene scene, PurrSceneSettings settings, SceneID id)
         {
+            ReserveSceneID(id);
             if (_idToScene.TryGetValue(scene, out var oldId))
             {
                 if (oldId == id)
                 {
                     _scenes[id] = new SceneState(scene, settings);
-                    _sceneActionScenes.Add(id);
+                    RegisterReceivedSceneProvenance(id);
                     _scenesToTriggerUnloadEvent.Remove(id);
                     return;
                 }
@@ -898,43 +1152,34 @@ namespace PurrNet.Modules
 
             _scenes[id] = new SceneState(scene, settings);
             _idToScene[scene] = id;
-            _sceneActionScenes.Add(id);
+            RegisterReceivedSceneProvenance(id);
             if (!_rawScenes.Contains(id))
                 _rawScenes.Add(id);
 
             _scenesToTriggerUnloadEvent.Remove(id);
         }
 
-        private void RemoveStaleTransferScenes(
-            HashSet<SceneID> targetScenes,
-            IReadOnlyDictionary<SceneID, uint> targetBuildScenes)
+        private void DiscardStalePendingBuildTransfers(
+            IReadOnlyDictionary<SceneID, uint> targetBuildScenes,
+            IReadOnlyDictionary<SceneID, PurrSceneSettings> targetSettings,
+            IReadOnlyDictionary<SceneID, SceneState> matches)
         {
             for (var i = _pendingOperations.Count - 1; i >= 0; i--)
             {
                 var operation = _pendingOperations[i];
                 if (!targetBuildScenes.TryGetValue(operation.idToAssign, out var scenePathHash) ||
-                    operation.scenePathHash != scenePathHash)
+                    operation.scenePathHash != scenePathHash || matches.ContainsKey(operation.idToAssign) ||
+                    operation.settings.physicsMode != targetSettings[operation.idToAssign].physicsMode)
                 {
-                    _pendingOperations.RemoveAt(i);
+                    operation.discardOnCompletion = true;
                 }
-            }
-
-            for (var i = _rawScenes.Count - 1; i >= 0; i--)
-            {
-                var id = _rawScenes[i];
-                if (targetScenes.Contains(id))
-                    continue;
-
-                if (!_scenes.TryGetValue(id, out var state))
-                    continue;
-
-                if (ShouldKeepLocalSceneDuringTransfer(state.scene))
-                    continue;
-
-                RemoveScene(state.scene, true);
-
-                if (state.scene.IsValid() && state.scene.isLoaded)
-                    SceneManager.UnloadSceneAsync(state.scene);
+                else
+                {
+                    var actualMode = operation.loadAdditively ? LoadSceneMode.Additive : operation.settings.mode;
+                    operation.settings = targetSettings[operation.idToAssign];
+                    operation.loadAdditively = actualMode == LoadSceneMode.Additive && operation.settings.mode == LoadSceneMode.Single;
+                }
+                _pendingOperations[i] = operation;
             }
         }
 
@@ -949,12 +1194,35 @@ namespace PurrNet.Modules
             if (_networkManager.gameObject.scene.handle == scene.handle)
                 return true;
 
+            // A former bootstrap scene may no longer exist on the replacement
+            // host after a Single transition. Matched/authorized scenes have already
+            // been retained; only the manager's live scene and DDOL are mandatory.
+            if (_networkManager.preserveWorldOnTransfer)
+                return false;
+
             var originalScene = _networkManager.originalScene;
             return originalScene.IsValid() && originalScene.handle == scene.handle;
         }
 
+        private bool ShouldRetainLocalSceneRegistrationDuringTransfer(SceneID id, Scene scene)
+        {
+            if (!scene.IsValid())
+                return false;
+            if (_networkManager.preserveWorldOnTransfer)
+                return _authoritativeBootstrapScenes != null && _authoritativeBootstrapScenes.Contains(id);
+            return ShouldKeepLocalSceneDuringTransfer(scene);
+        }
+
         private void OnSceneActionsBatch(PlayerID player, SceneActionsBatch data, bool asServer)
         {
+            if (_awaitingInitialSceneManifest)
+                return;
+            if (_pendingTransferActions != null)
+            {
+                _actionsAfterTransferManifest ??= new List<SceneAction>();
+                _actionsAfterTransferManifest.AddRange(data.actions);
+                return;
+            }
             HandleScenes(data.actions);
         }
 
@@ -1185,7 +1453,7 @@ namespace PurrNet.Modules
                     }
                 }
 
-                for (int i = 0; i < _rawScenes.Count; i++)
+                for (int i = _rawScenes.Count - 1; i >= 0; i--)
                 {
                     bool isDontDestroyOnLoad = IsDontDestroyOnLoadScene(_scenes[_rawScenes[i]].scene);
                     if (!isDontDestroyOnLoad)
@@ -1373,12 +1641,18 @@ namespace PurrNet.Modules
         }
 
         partial void ProcessCompletedAddressableLoads();
-        partial void RebuildAddressableHistoryFromLoadedScenes();
+        partial void RebuildPendingAddressableHistory();
+        partial void ReservePendingAddressableSceneIDs();
+        partial void HasPendingAddressableTransfers(ref bool pending);
+        partial void HasPendingSingleAddressableLoad(ref bool pending);
 
         public void FixedUpdate()
         {
             ProcessCompletedAddressableLoads();
-            HandleNextSceneAction();
+            ProcessInitialSceneActions();
+            TryApplyTransferManifest();
+            if (_pendingTransferActions == null)
+                HandleNextSceneAction();
 
             if (_history.hasUnflushedActions)
                 FlushActions();
@@ -1416,6 +1690,15 @@ namespace PurrNet.Modules
         }
 
         private readonly List<AsyncOperation> _pendingUnloads = new List<AsyncOperation>();
+
+        private bool ArePendingSceneUnloadsDone()
+        {
+            for (var i = _pendingUnloads.Count - 1; i >= 0; i--)
+                if (_pendingUnloads[i] == null || _pendingUnloads[i].isDone)
+                    _pendingUnloads.RemoveAt(i);
+            return _pendingUnloads.Count == 0;
+        }
+
         private CleanupStage _cleanupStage;
 
         enum CleanupStage
@@ -1599,8 +1882,6 @@ namespace PurrNet.Modules
             // unload all scenes that aren't the network manager scene
             if (_scenes.Count > 0)
             {
-                _pendingUnloads.Clear();
-
                 foreach (var (id, scene) in _scenes)
                 {
                     var unityScene = scene.scene;
@@ -1630,14 +1911,8 @@ namespace PurrNet.Modules
                 _scenes.Clear();
             }
 
-            if (_pendingUnloads.Count > 0)
-            {
-                for (int i = 0; i < _pendingUnloads.Count; i++)
-                {
-                    if (_pendingUnloads[i] != null && !_pendingUnloads[i].isDone)
-                        return false;
-                }
-            }
+            if (!ArePendingSceneUnloadsDone())
+                return false;
 
 #if ADDRESSABLES_PURRNET_SUPPORT
             if (!ArePendingAddressableUnloadsDone())

@@ -118,6 +118,31 @@ namespace PurrNet
             }
         }
 
+        public override void OnPoolReset()
+        {
+            onSyncStatusChanged = null;
+            if (!_receivingState.confirmedParts.isDisposed)
+                _receivingState.confirmedParts.Dispose();
+            _receivingState = default;
+            if (_pending != null)
+            {
+                foreach (var state in _pending)
+                {
+                    if (!state.confirmedParts.isDisposed)
+                        state.confirmedParts.Dispose();
+                    if (!state.requestedParts.isDisposed)
+                        state.requestedParts.Dispose();
+                }
+                _pending.Clear();
+            }
+            _partsCounter = 0;
+            _nextId = 0;
+            _uncompressedData = null;
+            _compressedData = null;
+            _totalParts = 0;
+            _syncStatus = default;
+        }
+
         public void ClearData()
         {
             SetData(default);

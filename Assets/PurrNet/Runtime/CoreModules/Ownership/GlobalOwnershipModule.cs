@@ -99,7 +99,7 @@ namespace PurrNet.Modules
             _scenes.onSceneUnloaded += OnSceneUnloaded;
 
             _hierarchy.onIdentityRemoved += OnIdentityDespawned;
-            _hierarchy.onObserverAdded += OnPlayerObserverAdded;
+            _hierarchy.onLateObserverAdded += OnPlayerObserverAdded;
             _hierarchy.onPreFinishSpawn += HandlePendingChanges;
 
             _scenePlayers.onPlayerUnloadedScene += OnPlayerUnloadedScene;
@@ -118,7 +118,7 @@ namespace PurrNet.Modules
             _scenes.onSceneUnloaded -= OnSceneUnloaded;
 
             _hierarchy.onIdentityRemoved -= OnIdentityDespawned;
-            _hierarchy.onObserverAdded -= OnPlayerObserverAdded;
+            _hierarchy.onLateObserverAdded -= OnPlayerObserverAdded;
             _hierarchy.onPreFinishSpawn -= HandlePendingChanges;
 
             _scenePlayers.onPlayerUnloadedScene -= OnPlayerUnloadedScene;
@@ -256,7 +256,8 @@ namespace PurrNet.Modules
             if (!ownerships.TryGetOwner(target, out _))
                 return;
 
-            // Owner is intentionally not captured here; it is re-queried at flush time
+            // Module baselines have been queued before the late observer event. Owner
+            // is intentionally not captured here; it is re-queried at flush time
             // (HandlePendingChanges) to avoid sending a stale snapshot when ownership
             // mutates between OnObserverAdded and the flush (e.g. user code calling
             // GiveOwnership from inside OnObserverAdded).
@@ -287,9 +288,6 @@ namespace PurrNet.Modules
         {
             if (!_sceneOwnerships.TryGetValue(scene, out var ownerships)) return;
 
-            if (_asServer)
-                SendOwnershipSnapshot(player, scene, ownerships);
-
             var owned = ownerships.TryGetOwnedObjects(player);
 
             foreach (var id in owned)
@@ -297,22 +295,6 @@ namespace PurrNet.Modules
                 if (_hierarchy.TryGetIdentity(scene, id, out var identity))
                     identity.TriggerOnOwnerReconnected(player, asServer);
             }
-        }
-
-        private void SendOwnershipSnapshot(PlayerID player, SceneID scene, SceneOwnership ownerships)
-        {
-            var state = ownerships.GetState();
-            if (state.Count == 0)
-                return;
-
-            using var snapshot = DisposableList<OwnershipInfo>.Create(state.Count);
-            snapshot.AddRange(state);
-
-            _playersManager.Send(player, new OwnershipChangeBatch
-            {
-                scene = scene,
-                state = snapshot
-            });
         }
 
         private void OnPlayerLeft(PlayerID player, bool asServer)

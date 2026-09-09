@@ -90,6 +90,38 @@ public class DeltaModuleSharedBaselineTests
     static WriteOp SendAndAck(Vector3 v, uint ackId) => new() { value = v, ackAfter = true, ackId = ackId };
 
     [Test]
+    public void TransferStartsNewServerDeltaHistory()
+    {
+        var transferred = new DeltaModule(null, null);
+        var fresh = new DeltaModule(null, null);
+        const uint key = 9517;
+        var value = new Vector3(11, 12, 13);
+
+        using (var oldPacket = BitPackerPool.Get())
+        {
+            PackedUInt oldKey = default;
+            transferred.Write(oldPacket, PlayerID.Server, key, value, ref oldKey);
+            transferred.ConfirmDeliveryForTests<Vector3>(PlayerID.Server, key, new PackedUInt(1));
+        }
+
+        transferred.TransferToNewServer();
+
+        using var actualPacket = BitPackerPool.Get();
+        using var expectedPacket = BitPackerPool.Get();
+        PackedUInt actualKey = default;
+        PackedUInt expectedKey = default;
+        transferred.Write(actualPacket, PlayerID.Server, key, value, ref actualKey);
+        fresh.Write(expectedPacket, PlayerID.Server, key, value, ref expectedKey);
+
+        var actual = BitsOf(actualPacket);
+        var expected = BitsOf(expectedPacket);
+        Assert.That(actual.bits, Is.EqualTo(expected.bits));
+        Assert.That(actual.bytes, Is.EqualTo(expected.bytes));
+        transferred.TransferToNewServer();
+        fresh.TransferToNewServer();
+    }
+
+    [Test]
     public void SharedFanout_FreshPlayers_MatchesSoloReplay()
     {
         var ops = new Dictionary<int, List<WriteOp>>();

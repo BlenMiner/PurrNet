@@ -15,6 +15,11 @@ MonoBehaviour:
   m_GroupName: Default Local Group
   m_GUID: 9ebd81d5f1d245c4d844773650d29e79
   m_SerializeEntries:
+  - m_GUID: 2d67a3f702cb4fd3bb984de0c1d22fc8
+    m_Address: Assets/PlayModeTests/OrdinaryJoinAddressableTarget.unity
+    m_ReadOnly: 0
+    m_SerializedLabels: []
+    FlaggedDuringContentUpdateRestriction: 0
   - m_GUID: c41b9a783d694893a97bc1cae588df22
     m_Address: Assets/PlayModeTests/AddressableSceneTransferTarget.unity
     m_ReadOnly: 0

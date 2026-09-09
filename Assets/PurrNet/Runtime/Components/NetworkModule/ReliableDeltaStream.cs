@@ -38,6 +38,11 @@ namespace PurrNet
             _dirtyIndices.Clear();
         }
 
+        public override void OnPoolReset()
+        {
+            Clear();
+        }
+
         public void OnTick(float delta)
         {
             if (!isServer || _dirtyIndices.Count == 0)

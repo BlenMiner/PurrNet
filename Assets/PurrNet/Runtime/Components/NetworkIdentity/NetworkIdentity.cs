@@ -284,6 +284,11 @@ namespace PurrNet
 
         public bool isClient => isSpawned && networkManager.isClient;
 
+        /// <summary>
+        /// Whether the manager is migrating servers. Available during spawn and despawn callbacks.
+        /// </summary>
+        public bool isMigratingServer => networkManager && networkManager.isMigratingServer;
+
         public bool isClientAndObserving => isClient && _observers.Contains(localPlayerForced);
 
         public bool isHost => isSpawned && networkManager.isHost;
