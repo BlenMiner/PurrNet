@@ -1,3 +1,17 @@
+# [1.23.0-beta.45](https://github.com/PurrNet/PurrNet/compare/v1.23.0-beta.44...v1.23.0-beta.45) (2026-09-09)
+
+
+### Bug Fixes
+
+* keep interned paths internal and reuse owned path buffers ([9fa9f3e](https://github.com/PurrNet/PurrNet/commit/9fa9f3e9fe75856eadce90f253ab854d4e89c2bb))
+
+
+### Performance Improvements
+
+* drop interned paths when pools are cleared ([ef95034](https://github.com/PurrNet/PurrNet/commit/ef9503457e05769cb6b9de80c6998e3b5dd8b344))
+* expose interned nearest parent paths as read only ([3ca5811](https://github.com/PurrNet/PurrNet/commit/3ca5811e6d42089d7586623b842ecd85a95d4e0e))
+* intern nearest parent paths to avoid per spawn allocations ([bf5ba3e](https://github.com/PurrNet/PurrNet/commit/bf5ba3e5c9d38a071dead34d1a436a5b5011b870))
+
 # [1.23.0-beta.44](https://github.com/PurrNet/PurrNet/compare/v1.23.0-beta.43...v1.23.0-beta.44) (2026-09-09)
 
 
