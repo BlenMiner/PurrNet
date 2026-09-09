@@ -39,6 +39,7 @@ namespace PurrNet
         public int count => prefabLookup.Count;
 
         private readonly Dictionary<int, PrefabData> prefabLookup = new();
+        private readonly Dictionary<GameObject, PrefabData> prefabToData = new();
         private readonly Dictionary<string, PrefabData> persistentIdToPrefabData = new();
         private readonly Dictionary<int, string> prefabIdToPersistentId = new();
         private readonly Dictionary<GameObject, string> prefabToPersistentId = new();
@@ -50,14 +51,8 @@ namespace PurrNet
 
         public override bool TryGetPrefabData(GameObject prefab, out PrefabData prefabData)
         {
-            foreach (var data in this.allPrefabs)
-            {
-                if (data.prefab == prefab)
-                {
-                    prefabData = data;
-                    return true;
-                }
-            }
+            if (prefab)
+                return prefabToData.TryGetValue(prefab, out prefabData);
 
             prefabData = default;
             return false;
@@ -151,6 +146,7 @@ namespace PurrNet
         private void RegeneratePrefabLookup()
         {
             prefabLookup.Clear();
+            prefabToData.Clear();
             persistentIdToPrefabData.Clear();
             prefabIdToPersistentId.Clear();
             prefabToPersistentId.Clear();
@@ -174,6 +170,10 @@ namespace PurrNet
                 };
 
                 prefabLookup.Add(i, data);
+
+                if (!prefabToData.ContainsKey(ud.prefab))
+                    prefabToData.Add(ud.prefab, data);
+
                 RegisterPersistentId(ud.guid, data);
             }
 

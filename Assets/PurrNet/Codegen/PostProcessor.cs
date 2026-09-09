@@ -4908,6 +4908,57 @@ namespace PurrNet.Codegen
             }
 
             code.Append(Instruction.Create(OpCodes.Ret));
+
+            if (isNetworkIdentity && type.FullName != typeof(NetworkIdentity).FullName)
+                CreateInitDispatchOverride(module, type, newMethod);
+        }
+
+        private static void CreateInitDispatchOverride(ModuleDefinition module, TypeDefinition type,
+            MethodDefinition initMethod)
+        {
+            const string DISPATCH_NAME = "CallGeneratedInitMethods";
+
+            var dispatch = new MethodDefinition(DISPATCH_NAME,
+                MethodAttributes.Public | MethodAttributes.HideBySig | MethodAttributes.Virtual |
+                MethodAttributes.ReuseSlot, module.TypeSystem.Void)
+            {
+                HasThis = true
+            };
+
+            type.Methods.Add(dispatch);
+
+            var body = dispatch.Body.GetILProcessor();
+
+            if (type.BaseType != null)
+            {
+                var baseRef = new MethodReference(DISPATCH_NAME, module.TypeSystem.Void, type.BaseType.Import(module))
+                {
+                    HasThis = true
+                };
+
+                body.Append(Instruction.Create(OpCodes.Ldarg_0));
+                body.Append(Instruction.Create(OpCodes.Call, baseRef));
+
+                dispatch.Overrides.Add(baseRef);
+            }
+
+            MethodReference selfInit = initMethod;
+
+            if (type.HasGenericParameters)
+            {
+                var git = new GenericInstanceType(type);
+                foreach (var gp in type.GenericParameters)
+                    git.GenericArguments.Add(gp);
+
+                selfInit = new MethodReference(initMethod.Name, module.TypeSystem.Void, git)
+                {
+                    HasThis = true
+                };
+            }
+
+            body.Append(Instruction.Create(OpCodes.Ldarg_0));
+            body.Append(Instruction.Create(OpCodes.Call, selfInit));
+            body.Append(Instruction.Create(OpCodes.Ret));
         }
 
         private static void FindUsedTypes(ModuleDefinition module, DisposableList<TypeDefinition> allTypes,
