@@ -131,7 +131,16 @@ class HostLossTests(unittest.TestCase):
         self.run_fault("early-exit", "Authority exited")
 
     def test_authority_exit_after_ready_is_not_an_injected_crash(self):
-        self.run_fault("early-ready-exit", "Authority exited|no longer alive|did not exit from SIGKILL")
+        verify_authority = runner.owned_authority
+
+        def wait_for_authority_exit(identity_path, process):
+            # Ensure the ordinary exit wins instead of racing sys.exit against SIGKILL.
+            self.assertEqual(process.wait(timeout=self.args.timeout), 18)
+            return verify_authority(identity_path, process)
+
+        with patch.object(runner, "owned_authority", side_effect=wait_for_authority_exit):
+            self.run_fault("early-ready-exit", "Authority exited")
+        self.assertTrue((self.results / "migration-crash-ready.json").exists())
 
     def test_wrong_marker_fails_without_injection(self):
         self.run_fault("wrong-marker", "Invalid authority crash readiness marker")
