@@ -1,3 +1,19 @@
+# [1.23.0-beta.44](https://github.com/PurrNet/PurrNet/compare/v1.23.0-beta.43...v1.23.0-beta.44) (2026-09-09)
+
+
+### Bug Fixes
+
+* guard scene handle hash for Unity 6000.5 ([724db75](https://github.com/PurrNet/PurrNet/commit/724db757728ddb0a167a0a57b461502f4c7181fe))
+
+
+### Performance Improvements
+
+* avoid boxed enumerator when clearing observers ([af90813](https://github.com/PurrNet/PurrNet/commit/af90813c65e528a8af64fbd62be0ae8f6c1511e1))
+* avoid boxed enumerator when despawning pooled hierarchies ([6f8d089](https://github.com/PurrNet/PurrNet/commit/6f8d089d6358748c44eb1186a56ae703483359c7))
+* avoid boxing on scene id lookups ([86cc45d](https://github.com/PurrNet/PurrNet/commit/86cc45d7f362ff99e4c0f61f91345c726b997b80))
+* avoid closure alloc when clearing failed async observer roots ([b876833](https://github.com/PurrNet/PurrNet/commit/b8768331abba33bf2f8c6ac2bac6125348415440))
+* reuse direct children list in PreparePrefabInfo ([657fe19](https://github.com/PurrNet/PurrNet/commit/657fe194f772da4a62863539ac9b99e7bfd08fd8))
+
 # [1.23.0-beta.43](https://github.com/PurrNet/PurrNet/compare/v1.23.0-beta.42...v1.23.0-beta.43) (2026-09-09)
 
 
