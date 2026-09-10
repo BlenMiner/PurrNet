@@ -211,8 +211,10 @@ namespace PurrNet
             _targetLinearVelocity = ReadLinearVelocity(parent);
             _targetAngularVelocity = ReadAngularVelocity(parent);
             _targetParent = parent;
+            _targetPositionFrame = GetPositionFrame(parent);
             _latestRawSnapshotPos = _targetPosition;
             _latestRawSnapshotParent = parent;
+            _latestRawSnapshotFrame = _targetPositionFrame;
             _prePredictionTarget = _targetPosition;
             _predictionOffset = 0f;
             _bufferSampleMode = "Invalid state rejected";
