@@ -3600,6 +3600,7 @@ namespace PurrNet.Codegen
                 .GetMethod("EnterLocalExecution").FullName;
             var exitLocalExecutionFlag = module.GetTypeDefinition(typeof(PurrCompilerFlags))
                 .GetMethod("ExitLocalExecution").FullName;
+            var localModeAttributeName = typeof(LocalModeAttribute).FullName;
 
             types.AddRange(module.Types);
             for (var i = 0; i < types.Count; i++)
@@ -3616,10 +3617,8 @@ namespace PurrNet.Codegen
 
                     if (method.Body == null) continue;
 
-                    var processor = method.Body.GetILProcessor();
-
                     bool hasLocalModeAttribute = method.CustomAttributes.Any(a =>
-                        a.AttributeType.FullName == typeof(LocalModeAttribute).FullName);
+                        a.AttributeType.FullName == localModeAttributeName);
 
                     if (hasLocalModeAttribute)
                         continue;
@@ -3633,9 +3632,9 @@ namespace PurrNet.Codegen
                                 DeclaringType: not null
                             } flag)
                         {
-                            if (flag.FullName == startLocalExecutionFlag)
+                            if (flag.Name == nameof(PurrCompilerFlags.EnterLocalExecution) &&
+                                flag.FullName == startLocalExecutionFlag)
                             {
-                                //processor.Replace(instruction, Instruction.Create(OpCodes.Nop));
                                 if (isSkipping)
                                 {
                                     Error(messages, "Local mode flag was already set, avoid nesting these flags.",
@@ -3647,9 +3646,9 @@ namespace PurrNet.Codegen
                                 continue;
                             }
 
-                            if (flag.FullName == exitLocalExecutionFlag)
+                            if (flag.Name == nameof(PurrCompilerFlags.ExitLocalExecution) &&
+                                flag.FullName == exitLocalExecutionFlag)
                             {
-                                //processor.Replace(instruction, Instruction.Create(OpCodes.Nop));
                                 if (!isSkipping)
                                 {
                                     Error(messages,
@@ -3758,12 +3757,18 @@ namespace PurrNet.Codegen
 
         public override ILPostProcessResult Process(ICompiledAssembly compiledAssembly)
         {
+            using var profile = IlppProfile.Start(compiledAssembly);
             try
             {
                 if (!WillProcess(compiledAssembly))
+                {
+                    profile?.Skip();
                     return null!;
+                }
 
-                var settings = PurrNetSettings.GetOrCreateSettings();
+                PurrNetSettings settings;
+                using (profile?.Measure(IlppProfile.Phase.SettingsRead))
+                    settings = PurrNetSettings.GetOrCreateSettings();
                 bool isEditor = false;
                 bool isServerBuild = false;
 
@@ -3795,27 +3800,37 @@ namespace PurrNet.Codegen
                 using var pdbStream = new MemoryStream(compiledAssembly.InMemoryAssembly.PdbData);
                 var resolver = new AssemblyResolver(compiledAssembly);
 
-                var assemblyDefinition = AssemblyDefinition.ReadAssembly(peStream, new ReaderParameters
+                AssemblyDefinition assemblyDefinition;
+                using (profile?.Measure(IlppProfile.Phase.AssemblyRead))
                 {
-                    ReadSymbols = true,
-                    SymbolStream = pdbStream,
-                    SymbolReaderProvider = new PortablePdbReaderProvider(),
-                    AssemblyResolver = resolver
-                });
+                    assemblyDefinition = AssemblyDefinition.ReadAssembly(peStream, new ReaderParameters
+                    {
+                        ReadSymbols = true,
+                        SymbolStream = pdbStream,
+                        SymbolReaderProvider = new PortablePdbReaderProvider(),
+                        AssemblyResolver = resolver
+                    });
+                }
 
                 resolver.SetSelf(assemblyDefinition);
+                profile?.SetCounter("moduleCount", assemblyDefinition.Modules.Count);
 
                 for (var m = 0; m < assemblyDefinition.Modules.Count; m++)
                 {
                     var module = assemblyDefinition.Modules[m];
 
                     var hasPurrNetAsReference = HasPurrNetAsReference(compiledAssembly.Name, module);
+                    if (hasPurrNetAsReference)
+                        profile?.AddCounter("modulesWithPurrNetReference", 1);
 
                     using var types = GetAllTypes(module);
+                    profile?.AddCounter("visitedTypeCount", types.Count);
                     var usedTypes = new HashSet<TypeReference>(TypeReferenceEqualityComparer.Default);
 
                     for (var t = 0; t < types.Count; t++)
                     {
+                        using var discoveryScope = profile?.Measure(IlppProfile.Phase.TypeDiscovery);
+                        profile?.AddCounter("methodsAtTypeVisit", types[t].Methods.Count);
                         if (types[t].FullName == typeof(ApplicationConstants).FullName)
                             BakeApplicationConstants.Process(types[t], isEditor, messages);
 
@@ -3855,9 +3870,11 @@ namespace PurrNet.Codegen
                             }
                         }
 
-                        UnityProxyProcessor.Process(types[t], messages);
-                        RegisterSerializersProcessor.HandleType(types[t], module, types[t], typesToIgnoreForDelta,
-                            typesToIgnoreForSerialization);
+                        using (profile?.Measure(IlppProfile.Phase.ProxyScan))
+                            UnityProxyProcessor.Process(types[t], messages);
+                        using (profile?.Measure(IlppProfile.Phase.SerializerRegistration))
+                            RegisterSerializersProcessor.HandleType(types[t], module, types[t], typesToIgnoreForDelta,
+                                typesToIgnoreForSerialization);
 
                         var type = types[t];
 
@@ -3979,20 +3996,28 @@ namespace PurrNet.Codegen
                         if (inheritsFromNetworkIdentity || inheritsFromNetworkClass)
                             typesToGenerateSerializer.Add(type);
 
+                        profile?.AddCounter("rpcCount", _rpcMethods.Count);
                         for (var index = 0; index < _rpcMethods.Count; index++)
                         {
                             var method = _rpcMethods[index].originalMethod;
 
                             try
                             {
+                                using var rpcScope = profile?.Measure(IlppProfile.Phase.RpcGeneration);
                                 var newMethod = HandleRPC(module, idOffset + index, _rpcMethods[index],
                                     inheritsFromNetworkClass, isServerBuild, settings, usedTypes, messages);
 
                                 if (newMethod != null && method.DeclaringType != null)
                                 {
                                     type.Methods.Add(newMethod);
-                                    if (!UpdateMethodReferences(module, method, newMethod, messages))
-                                        return new ILPostProcessResult(compiledAssembly.InMemoryAssembly, messages);
+                                    using (profile?.Measure(IlppProfile.Phase.RpcReferenceRewrite))
+                                    {
+                                        if (!UpdateMethodReferences(module, method, newMethod, messages))
+                                        {
+                                            profile?.Complete(messages);
+                                            return new ILPostProcessResult(compiledAssembly.InMemoryAssembly, messages);
+                                        }
+                                    }
                                 }
                             }
                             catch (Exception e)
@@ -4003,6 +4028,7 @@ namespace PurrNet.Codegen
 
                         try
                         {
+                            using var receiverScope = profile?.Measure(IlppProfile.Phase.RpcGeneration);
                             if (_rpcMethods.Count > 0)
                                 HandleRPCReceiver(module, type, _rpcMethods, inheritsFromNetworkClass, idOffset);
 
@@ -4032,7 +4058,9 @@ namespace PurrNet.Codegen
                     {
                         try
                         {
+                            using var usedTypesScope = profile?.Measure(IlppProfile.Phase.UsedTypes);
                             FindUsedTypes(module, types, usedTypes);
+                            profile?.AddCounter("usedTypeCount", usedTypes.Count);
 
                             foreach (var usedType in usedTypes)
                             {
@@ -4051,6 +4079,7 @@ namespace PurrNet.Codegen
 
                         try
                         {
+                            using var reflectionScope = profile?.Measure(IlppProfile.Phase.ReflectionTargets);
                             ProcessReflectionRPCTargets(module, compiledAssembly, messages);
                         }
                         catch (Exception e)
@@ -4064,18 +4093,27 @@ namespace PurrNet.Codegen
                     }
                 }
 
-                ExpandNested(assemblyDefinition, typesToGenerateSerializer);
+                using (profile?.Measure(IlppProfile.Phase.ExpandNested))
+                    ExpandNested(assemblyDefinition, typesToGenerateSerializer);
 
                 // remove any typesToGenerateSerializer from typesToPrepareHasher
                 typesToPrepareHasher.ExceptWith(typesToGenerateSerializer);
 
-                foreach (var typeRef in typesToGenerateSerializer)
-                    GenerateSerializersProcessor.HandleType(false, assemblyDefinition, typeRef, visitedTypes,
-                        typesToIgnoreForSerialization, typesToIgnoreForDelta);
+                profile?.SetCounter("serializerCandidateCount", typesToGenerateSerializer.Count);
+                profile?.SetCounter("hasherCandidateCount", typesToPrepareHasher.Count);
+                using (profile?.Measure(IlppProfile.Phase.Serializers))
+                {
+                    foreach (var typeRef in typesToGenerateSerializer)
+                        GenerateSerializersProcessor.HandleType(false, assemblyDefinition, typeRef, visitedTypes,
+                            typesToIgnoreForSerialization, typesToIgnoreForDelta);
+                }
 
-                foreach (var typeRef in typesToPrepareHasher)
-                    GenerateSerializersProcessor.HandleType(true, assemblyDefinition, typeRef, visitedTypes,
-                        typesToIgnoreForSerialization, typesToIgnoreForDelta);
+                using (profile?.Measure(IlppProfile.Phase.Hashers))
+                {
+                    foreach (var typeRef in typesToPrepareHasher)
+                        GenerateSerializersProcessor.HandleType(true, assemblyDefinition, typeRef, visitedTypes,
+                            typesToIgnoreForSerialization, typesToIgnoreForDelta);
+                }
 
                 var pe = new MemoryStream();
                 var pdb = new MemoryStream();
@@ -4089,6 +4127,7 @@ namespace PurrNet.Codegen
 
                 try
                 {
+                    using var writeScope = profile?.Measure(IlppProfile.Phase.AssemblyWrite);
                     foreach (var mod in assemblyDefinition.Modules)
                     {
                         RedirectSystemPrivateCoreLibToNetStandard(mod);
@@ -4106,7 +4145,11 @@ namespace PurrNet.Codegen
                     });
                 }
 
-                return new ILPostProcessResult(new InMemoryAssembly(pe.ToArray(), pdb.ToArray()), messages);
+                var output = new InMemoryAssembly(pe.ToArray(), pdb.ToArray());
+                profile?.SetCounter("outputPeBytes", output.PeData.LongLength);
+                profile?.SetCounter("outputPdbBytes", output.PdbData.LongLength);
+                profile?.Complete(messages);
+                return new ILPostProcessResult(output, messages);
             }
             catch (Exception e)
             {
@@ -4119,6 +4162,7 @@ namespace PurrNet.Codegen
                     }
                 };
 
+                profile?.Complete(messages);
                 return new ILPostProcessResult(compiledAssembly.InMemoryAssembly, messages);
             }
         }
