@@ -3592,6 +3592,240 @@ namespace PurrNet.Codegen
             }
         }
 
+        // Rewrites still happen immediately after each RPC is generated. The index only
+        // avoids revisiting instructions in types that no generator has changed.
+        private sealed class RpcMethodReferenceIndex
+        {
+            private sealed class IdentityComparer<T> : IEqualityComparer<T> where T : class
+            {
+                internal static readonly IdentityComparer<T> Instance = new();
+                public bool Equals(T x, T y) => ReferenceEquals(x, y);
+                public int GetHashCode(T value) => System.Runtime.CompilerServices.RuntimeHelpers.GetHashCode(value);
+            }
+
+            private sealed class CallSite
+            {
+                internal MethodDefinition Caller;
+                internal MethodDefinition Target;
+                internal Instruction Instruction;
+            }
+
+            private readonly ModuleDefinition _module;
+            private readonly Dictionary<MethodDefinition, HashSet<CallSite>> _calls =
+                new(IdentityComparer<MethodDefinition>.Instance);
+            private readonly Dictionary<MethodDefinition, List<CallSite>> _methodCalls =
+                new(IdentityComparer<MethodDefinition>.Instance);
+            private readonly Dictionary<TypeDefinition, List<MethodDefinition>> _typeMethods =
+                new(IdentityComparer<TypeDefinition>.Instance);
+            private readonly Dictionary<TypeDefinition, List<TypeDefinition>> _nestedTypes =
+                new(IdentityComparer<TypeDefinition>.Instance);
+            private readonly HashSet<TypeDefinition> _dirtyTypes = new(IdentityComparer<TypeDefinition>.Instance);
+            private readonly HashSet<MethodDefinition> _invalidMethods = new(IdentityComparer<MethodDefinition>.Instance);
+            private readonly List<TypeDefinition> _rootTypes = new();
+            private readonly string _localModeAttributeName = typeof(LocalModeAttribute).FullName;
+            private string _enterLocal;
+            private string _exitLocal;
+            private bool _initialized;
+
+            public RpcMethodReferenceIndex(ModuleDefinition module) => _module = module;
+
+            // Call before mutating a type, including its attributes, bodies and nested
+            // types. Invalidations accumulate until the next successful RPC generation.
+            public void Invalidate(TypeDefinition type) => _dirtyTypes.Add(type);
+
+            public bool Update(MethodDefinition old, MethodDefinition @new, List<DiagnosticMessage> messages)
+            {
+                Refresh();
+
+                // Malformed flag sections use the original ordered traversal so the
+                // first diagnostic and any rewrites preceding it remain identical.
+                if (_invalidMethods.Count != 0)
+                    return UpdateMethodReferences(_module, old, @new, messages);
+
+                if (!_calls.TryGetValue(old, out var sites))
+                    return true;
+
+                foreach (var site in sites)
+                {
+                    if (site.Caller == @new || site.Caller.GetElementMethod() == @new)
+                        continue;
+
+                    // Earlier RPCs may have already rewritten this instruction. Keep
+                    // Cecil's reference-identity match; Resolve() would broaden it.
+                    if (site.Instruction.Operand is MethodReference reference && reference.GetElementMethod() == old)
+                        site.Instruction.Operand = GenerateNewRef(@new, reference);
+                }
+
+                return true;
+            }
+
+            private void Refresh()
+            {
+                if (!_initialized)
+                {
+                    _enterLocal = _module.GetTypeDefinition(typeof(PurrCompilerFlags))
+                        .GetMethod(nameof(PurrCompilerFlags.EnterLocalExecution)).FullName;
+                    _exitLocal = _module.GetTypeDefinition(typeof(PurrCompilerFlags))
+                        .GetMethod(nameof(PurrCompilerFlags.ExitLocalExecution)).FullName;
+                    foreach (var type in _module.Types)
+                    {
+                        ScanType(type);
+                        _rootTypes.Add(type);
+                    }
+                    _initialized = true;
+                }
+                else
+                {
+                    foreach (var type in _dirtyTypes)
+                    {
+                        RemoveType(type);
+                        if (IsAttached(type))
+                            ScanType(type);
+                    }
+
+                    RefreshRootTypes();
+                }
+
+                _dirtyTypes.Clear();
+            }
+
+            private bool IsAttached(TypeDefinition type)
+            {
+                while (type.DeclaringType != null)
+                {
+                    var parent = type.DeclaringType;
+                    if (!parent.NestedTypes.Contains(type))
+                        return false;
+                    type = parent;
+                }
+                return _module.Types.Contains(type);
+            }
+
+            private void RefreshRootTypes()
+            {
+                bool changed = _rootTypes.Count != _module.Types.Count;
+                for (var i = 0; !changed && i < _rootTypes.Count; i++)
+                    changed = !ReferenceEquals(_rootTypes[i], _module.Types[i]);
+                if (!changed)
+                    return;
+
+                var currentRoots = new HashSet<TypeDefinition>(_module.Types, IdentityComparer<TypeDefinition>.Instance);
+                foreach (var previous in _rootTypes)
+                {
+                    if (!currentRoots.Contains(previous))
+                        RemoveType(previous);
+                }
+                foreach (var type in _module.Types)
+                {
+                    // Manifest generation adds module-level types between RPC passes.
+                    if (!_typeMethods.ContainsKey(type))
+                        ScanType(type);
+                }
+                _rootTypes.Clear();
+                _rootTypes.AddRange(_module.Types);
+            }
+
+            private void RemoveType(TypeDefinition type)
+            {
+                if (_typeMethods.TryGetValue(type, out var methods))
+                {
+                    foreach (var method in methods)
+                    {
+                        _invalidMethods.Remove(method);
+                        if (!_methodCalls.TryGetValue(method, out var sites))
+                            continue;
+                        foreach (var site in sites)
+                        {
+                            var targetSites = _calls[site.Target];
+                            targetSites.Remove(site);
+                            if (targetSites.Count == 0)
+                                _calls.Remove(site.Target);
+                        }
+                        _methodCalls.Remove(method);
+                    }
+                    _typeMethods.Remove(type);
+                }
+
+                if (!_nestedTypes.TryGetValue(type, out var nested))
+                    return;
+                foreach (var child in nested)
+                    RemoveType(child);
+                _nestedTypes.Remove(type);
+            }
+
+            private void ScanType(TypeDefinition type)
+            {
+                _typeMethods[type] = new List<MethodDefinition>(type.Methods);
+                _nestedTypes[type] = new List<TypeDefinition>(type.NestedTypes);
+                foreach (var method in type.Methods)
+                    ScanMethod(type, method);
+                foreach (var nested in type.NestedTypes)
+                    ScanType(nested);
+            }
+
+            private void ScanMethod(TypeDefinition type, MethodDefinition method)
+            {
+                if (method.Body == null || method.CustomAttributes.Any(a =>
+                        a.AttributeType.FullName == _localModeAttributeName))
+                    return;
+
+                bool skipReferences = type.Name.StartsWith("RpcSendState", StringComparison.Ordinal) ||
+                                      type.Name.StartsWith("RpcReceiveState", StringComparison.Ordinal);
+                bool isLocal = false;
+                List<CallSite> methodSites = null;
+                foreach (var instruction in method.Body.Instructions)
+                {
+                    if (instruction.OpCode == OpCodes.Call && instruction.Operand is MethodReference
+                        { DeclaringType: not null } flag)
+                    {
+                        if (flag.Name == nameof(PurrCompilerFlags.EnterLocalExecution) && flag.FullName == _enterLocal)
+                        {
+                            if (isLocal)
+                            {
+                                _invalidMethods.Add(method);
+                                return;
+                            }
+                            isLocal = true;
+                            continue;
+                        }
+                        if (flag.Name == nameof(PurrCompilerFlags.ExitLocalExecution) && flag.FullName == _exitLocal)
+                        {
+                            if (!isLocal)
+                            {
+                                _invalidMethods.Add(method);
+                                return;
+                            }
+                            isLocal = false;
+                            continue;
+                        }
+                    }
+
+                    // RPC originals are MethodDefinitions. Other element references
+                    // cannot satisfy the old identity comparison and need no entry.
+                    if (isLocal || skipReferences || instruction.Operand is not MethodReference reference ||
+                        reference.GetElementMethod() is not MethodDefinition target)
+                        continue;
+
+                    var site = new CallSite { Caller = method, Target = target, Instruction = instruction };
+                    if (!_calls.TryGetValue(target, out var targetSites))
+                    {
+                        targetSites = new HashSet<CallSite>();
+                        _calls.Add(target, targetSites);
+                    }
+                    targetSites.Add(site);
+                    if (methodSites == null)
+                    {
+                        methodSites = new List<CallSite>();
+                        _methodCalls.Add(method, methodSites);
+                    }
+                    methodSites.Add(site);
+                }
+
+                if (isLocal)
+                    _invalidMethods.Add(method);
+            }
+        }
+
         private static bool UpdateMethodReferences(ModuleDefinition module, MethodReference old, MethodReference @new,
             [UsedImplicitly] List<DiagnosticMessage> messages)
         {
@@ -3826,9 +4060,11 @@ namespace PurrNet.Codegen
                     using var types = GetAllTypes(module);
                     profile?.AddCounter("visitedTypeCount", types.Count);
                     var usedTypes = new HashSet<TypeReference>(TypeReferenceEqualityComparer.Default);
+                    var methodReferences = new RpcMethodReferenceIndex(module);
 
                     for (var t = 0; t < types.Count; t++)
                     {
+                        methodReferences.Invalidate(types[t]);
                         using var discoveryScope = profile?.Measure(IlppProfile.Phase.TypeDiscovery);
                         profile?.AddCounter("methodsAtTypeVisit", types[t].Methods.Count);
                         if (types[t].FullName == typeof(ApplicationConstants).FullName)
@@ -4003,6 +4239,7 @@ namespace PurrNet.Codegen
 
                             try
                             {
+                                methodReferences.Invalidate(type);
                                 using var rpcScope = profile?.Measure(IlppProfile.Phase.RpcGeneration);
                                 var newMethod = HandleRPC(module, idOffset + index, _rpcMethods[index],
                                     inheritsFromNetworkClass, isServerBuild, settings, usedTypes, messages);
@@ -4012,7 +4249,7 @@ namespace PurrNet.Codegen
                                     type.Methods.Add(newMethod);
                                     using (profile?.Measure(IlppProfile.Phase.RpcReferenceRewrite))
                                     {
-                                        if (!UpdateMethodReferences(module, method, newMethod, messages))
+                                        if (!methodReferences.Update(method, newMethod, messages))
                                         {
                                             profile?.Complete(messages);
                                             return new ILPostProcessResult(compiledAssembly.InMemoryAssembly, messages);
@@ -4028,6 +4265,7 @@ namespace PurrNet.Codegen
 
                         try
                         {
+                            methodReferences.Invalidate(type);
                             using var receiverScope = profile?.Measure(IlppProfile.Phase.RpcGeneration);
                             if (_rpcMethods.Count > 0)
                                 HandleRPCReceiver(module, type, _rpcMethods, inheritsFromNetworkClass, idOffset);
@@ -5012,6 +5250,8 @@ namespace PurrNet.Codegen
             var playersManagerSubscribe = module.GetTypeDefinition<PlayersManager>();
             var broadcastModuleSubscribe = module.GetTypeDefinition<BroadcastModule>();
             var networkModule = module.GetTypeDefinition<NetworkModule>();
+            // This discovery pass does not modify methods or their RPC attributes.
+            var rpcMethods = new Dictionary<MethodReference, bool>();
 
             for (int i = 0; i < allTypes.Count; i++)
             {
@@ -5019,6 +5259,9 @@ namespace PurrNet.Codegen
 
                 foreach (var field in type.Fields)
                 {
+                    // Only constructed generic fields contribute types below.
+                    if (field.FieldType is not GenericInstanceType)
+                        continue;
                     var resolved = field.FieldType.Resolve();
                     if (resolved == null) continue;
 
@@ -5040,25 +5283,32 @@ namespace PurrNet.Codegen
                         if (instruction.OpCode != OpCodes.Call && instruction.OpCode != OpCodes.Callvirt)
                             continue;
 
-                        if (instruction.Operand is MethodReference normalMethod)
-                        {
-                            if (IsRpcMethod(normalMethod) && normalMethod.DeclaringType is GenericInstanceType genericInstanceType)
-                            {
-                                if (IsConcreteType(genericInstanceType, out var gconcreteType))
-                                    types.Add(gconcreteType);
+                        if (instruction.Operand is not MethodReference normalMethod)
+                            continue;
 
-                                for (var index = 0; index < genericInstanceType.GenericArguments.Count; index++)
-                                {
-                                    var ga = genericInstanceType.GenericArguments[index];
-                                    if (IsConcreteType(ga, out var concreteType))
-                                        types.Add(concreteType);
-                                }
+                        var genericInstanceType = normalMethod.DeclaringType as GenericInstanceType;
+                        var currentMethod = normalMethod as GenericInstanceMethod;
+                        // Ordinary calls cannot add generic RPC types or subscription types.
+                        if (genericInstanceType == null && currentMethod == null)
+                            continue;
+
+                        bool isRpc = IsRpcMethod(normalMethod, rpcMethods);
+                        if (isRpc && genericInstanceType != null)
+                        {
+                            if (IsConcreteType(genericInstanceType, out var gconcreteType))
+                                types.Add(gconcreteType);
+
+                            for (var index = 0; index < genericInstanceType.GenericArguments.Count; index++)
+                            {
+                                var ga = genericInstanceType.GenericArguments[index];
+                                if (IsConcreteType(ga, out var concreteType))
+                                    types.Add(concreteType);
                             }
                         }
 
-                        if (instruction.Operand is GenericInstanceMethod currentMethod)
+                        if (currentMethod != null)
                         {
-                            if (IsRpcMethod(currentMethod))
+                            if (isRpc)
                                 FindUsedGenericRpcTypes(types, currentMethod);
 
                             var isSubscribeMethod =
@@ -5171,10 +5421,15 @@ namespace PurrNet.Codegen
             }
         }
 
-        private static bool IsRpcMethod(MethodReference currentMethod)
+        private static bool IsRpcMethod(MethodReference currentMethod, Dictionary<MethodReference, bool> cache)
         {
             try
             {
+                // Generic instantiations share the same method definition and attributes.
+                currentMethod = currentMethod.GetElementMethod();
+                if (cache.TryGetValue(currentMethod, out bool cached))
+                    return cached;
+
                 var resolved = currentMethod.Resolve();
 
                 if (resolved == null)
@@ -5186,10 +5441,12 @@ namespace PurrNet.Codegen
                         attribute.AttributeType.FullName == typeof(TargetRpcAttribute).FullName ||
                         attribute.AttributeType.FullName == typeof(ObserversRpcAttribute).FullName)
                     {
+                        cache.Add(currentMethod, true);
                         return true;
                     }
                 }
 
+                cache.Add(currentMethod, false);
                 return false;
             }
             catch

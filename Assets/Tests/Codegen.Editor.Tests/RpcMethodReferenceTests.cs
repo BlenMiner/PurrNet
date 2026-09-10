@@ -9,8 +9,11 @@ using TypeAttributes = Mono.Cecil.TypeAttributes;
 
 namespace PurrNet.Codegen.Tests
 {
+    [TestFixture(false)]
+    [TestFixture(true)]
     public sealed class RpcMethodReferenceTests
     {
+        private readonly bool _useIndex;
         private ModuleDefinition _module;
         private TypeDefinition _rpcType;
         private MethodDefinition _original;
@@ -19,6 +22,11 @@ namespace PurrNet.Codegen.Tests
         private MethodDefinition _exitLocal;
         private MethodInfo _rewrite;
         private IList _messages;
+        private object _index;
+        private MethodInfo _indexedRewrite;
+        private MethodInfo _invalidate;
+
+        public RpcMethodReferenceTests(bool useIndex) => _useIndex = useIndex;
 
         [SetUp]
         public void SetUp()
@@ -38,6 +46,11 @@ namespace PurrNet.Codegen.Tests
             _rewrite = processor.GetMethod("UpdateMethodReferences", BindingFlags.NonPublic | BindingFlags.Static);
             Assert.That(_rewrite, Is.Not.Null);
             _messages = (IList)Activator.CreateInstance(_rewrite.GetParameters()[3].ParameterType);
+            var indexType = processor.GetNestedType("RpcMethodReferenceIndex", BindingFlags.NonPublic);
+            Assert.That(indexType, Is.Not.Null);
+            _index = Activator.CreateInstance(indexType, new object[] { _module });
+            _indexedRewrite = indexType.GetMethod("Update");
+            _invalidate = indexType.GetMethod("Invalidate");
         }
 
         [TearDown]
@@ -183,9 +196,227 @@ namespace PurrNet.Codegen.Tests
             Assert.That(call.Operand, Is.SameAs(_original));
         }
 
+        [Test]
+        public void LaterRpcRewritesCrossCallsInEarlierWrapperAndRetainsRenamedIdentity()
+        {
+            var laterOriginal = AddMethod(_rpcType, "Later");
+            var crossCall = Call(_wrapper, laterOriginal);
+            var ownCall = Call(_wrapper, _original);
+            var caller = AddMethod(_rpcType, "Caller");
+            var laterCall = Call(caller, laterOriginal);
+            AssertRewriteSucceeded();
+
+            Invalidate(_rpcType);
+            laterOriginal.Name = "Later_Original_1";
+            var laterWrapper = AddMethod(_rpcType, "Later");
+            var laterOwnCall = Call(laterWrapper, laterOriginal);
+
+            Assert.That(Rewrite(laterOriginal, laterWrapper), Is.True);
+
+            Assert.That(((MethodReference)crossCall.Operand).Resolve(), Is.SameAs(laterWrapper));
+            Assert.That(((MethodReference)laterCall.Operand).Resolve(), Is.SameAs(laterWrapper));
+            Assert.That(ownCall.Operand, Is.SameAs(_original));
+            Assert.That(laterOwnCall.Operand, Is.SameAs(laterOriginal));
+        }
+
+        [Test]
+        public void RefreshFindsGeneratedReceiverAndNestedCallerWithoutRewrappingEarlierOriginal()
+        {
+            var laterOriginal = AddMethod(_rpcType, "Later_Original_1");
+            AssertRewriteSucceeded();
+
+            Invalidate(_rpcType);
+            var receiver = AddMethod(_rpcType, "GeneratedReceiver");
+            var receivedOriginal = Call(receiver, _original);
+            var nested = new TypeDefinition("", "GeneratedCaller", TypeAttributes.NestedPrivate, _module.TypeSystem.Object);
+            _rpcType.NestedTypes.Add(nested);
+            var nestedCall = Call(AddMethod(nested, "InvokeLater"), laterOriginal);
+            var laterWrapper = AddMethod(_rpcType, "Later");
+
+            Assert.That(Rewrite(laterOriginal, laterWrapper), Is.True);
+
+            Assert.That(receivedOriginal.Operand, Is.SameAs(_original));
+            Assert.That(((MethodReference)nestedCall.Operand).Resolve(), Is.SameAs(laterWrapper));
+        }
+
+        [Test]
+        public void RefreshFindsNewModuleRootTypes()
+        {
+            var laterOriginal = AddMethod(_rpcType, "Later_Original_1");
+            AssertRewriteSucceeded();
+
+            var generatedRoot = AddType("Tests", "GeneratedRoot");
+            var call = Call(AddMethod(generatedRoot, "InvokeLater"), laterOriginal);
+            Invalidate(_rpcType);
+            var laterWrapper = AddMethod(_rpcType, "Later");
+
+            Assert.That(Rewrite(laterOriginal, laterWrapper), Is.True);
+
+            Assert.That(((MethodReference)call.Operand).Resolve(), Is.SameAs(laterWrapper));
+        }
+
+        [Test]
+        public void RefreshDoesNotRescanDetachedDirtyNestedTypes()
+        {
+            var laterOriginal = AddMethod(_rpcType, "Later_Original_1");
+            var nested = new TypeDefinition("", "RemovedNested", TypeAttributes.NestedPrivate, _module.TypeSystem.Object);
+            _rpcType.NestedTypes.Add(nested);
+            var detachedCall = Call(AddMethod(nested, "InvokeLater"), laterOriginal);
+            AssertRewriteSucceeded();
+
+            Invalidate(_rpcType);
+            Invalidate(nested);
+            _rpcType.NestedTypes.Remove(nested);
+            var laterWrapper = AddMethod(_rpcType, "Later");
+
+            Assert.That(Rewrite(laterOriginal, laterWrapper), Is.True);
+
+            Assert.That(detachedCall.Operand, Is.SameAs(laterOriginal));
+        }
+
+        [Test]
+        public void RefreshDropsReplacedBodyAndFindsNewInstructions()
+        {
+            var laterOriginal = AddMethod(_rpcType, "Later_Original_1");
+            var callerType = AddType("Tests", "ChangingCaller");
+            var caller = AddMethod(callerType, "InvokeLater");
+            var detachedCall = Call(caller, laterOriginal);
+            AssertRewriteSucceeded();
+
+            Invalidate(callerType);
+            caller.Body = new Mono.Cecil.Cil.MethodBody(caller);
+            caller.Body.Instructions.Add(Instruction.Create(OpCodes.Ret));
+            var newCall = Call(caller, laterOriginal);
+            Invalidate(_rpcType);
+            var laterWrapper = AddMethod(_rpcType, "Later");
+
+            Assert.That(Rewrite(laterOriginal, laterWrapper), Is.True);
+
+            Assert.That(detachedCall.Operand, Is.SameAs(laterOriginal));
+            Assert.That(((MethodReference)newCall.Operand).Resolve(), Is.SameAs(laterWrapper));
+        }
+
+        [Test]
+        public void RefreshDropsRemovedMethodsAndFindsChangedOperandsInExistingBodies()
+        {
+            var laterOriginal = AddMethod(_rpcType, "Later_Original_1");
+            var unrelated = AddMethod(_rpcType, "Unrelated");
+            var callerType = AddType("Tests", "ChangingCaller");
+            var removed = AddMethod(callerType, "Removed");
+            var removedCall = Call(removed, laterOriginal);
+            var changedCall = Call(AddMethod(callerType, "Changed"), unrelated);
+            AssertRewriteSucceeded();
+
+            Invalidate(callerType);
+            callerType.Methods.Remove(removed);
+            changedCall.Operand = laterOriginal;
+            Invalidate(_rpcType);
+            var laterWrapper = AddMethod(_rpcType, "Later");
+
+            Assert.That(Rewrite(laterOriginal, laterWrapper), Is.True);
+
+            Assert.That(removedCall.Operand, Is.SameAs(laterOriginal));
+            Assert.That(((MethodReference)changedCall.Operand).Resolve(), Is.SameAs(laterWrapper));
+        }
+
+        [Test]
+        public void RefreshSeesLocalModeAttributeMoveFromOriginalToWrapper()
+        {
+            var attribute = AddType(typeof(LocalModeAttribute).Namespace, nameof(LocalModeAttribute));
+            var constructor = AddMethod(attribute, ".ctor");
+            constructor.IsStatic = false;
+            var laterOriginal = AddMethod(_rpcType, "Later_Original_1");
+            var localMode = new CustomAttribute(constructor);
+            laterOriginal.CustomAttributes.Add(localMode);
+            var originalCall = Call(laterOriginal, laterOriginal);
+            AssertRewriteSucceeded();
+
+            Invalidate(_rpcType);
+            laterOriginal.CustomAttributes.Clear();
+            var laterWrapper = AddMethod(_rpcType, "Later");
+            laterWrapper.CustomAttributes.Add(localMode);
+            var wrapperCall = Call(laterWrapper, laterOriginal);
+
+            Assert.That(Rewrite(laterOriginal, laterWrapper), Is.True);
+
+            Assert.That(((MethodReference)originalCall.Operand).Resolve(), Is.SameAs(laterWrapper));
+            Assert.That(wrapperCall.Operand, Is.SameAs(laterOriginal));
+        }
+
+        [Test]
+        public void RefreshSeesLocalFlagsAddedWithoutReplacingBody()
+        {
+            var laterOriginal = AddMethod(_rpcType, "Later_Original_1");
+            var caller = AddMethod(_rpcType, "InvokeLater");
+            var localCall = Call(caller, laterOriginal);
+            AssertRewriteSucceeded();
+
+            Invalidate(_rpcType);
+            caller.Body.Instructions.Insert(0, Instruction.Create(OpCodes.Call, _enterLocal));
+            Call(caller, _exitLocal);
+            var normalCall = Call(caller, laterOriginal);
+            var laterWrapper = AddMethod(_rpcType, "Later");
+
+            Assert.That(Rewrite(laterOriginal, laterWrapper), Is.True);
+
+            Assert.That(localCall.Operand, Is.SameAs(laterOriginal));
+            Assert.That(((MethodReference)normalCall.Operand).Resolve(), Is.SameAs(laterWrapper));
+        }
+
+        [Test]
+        public void NewInvalidSectionKeepsPriorRewritesAndReportsTheFirstModuleOrderedError()
+        {
+            var laterOriginal = AddMethod(_rpcType, "Later_Original_1");
+            var caller = AddMethod(_rpcType, "Caller");
+            var earlierCall = Call(caller, _original);
+            var beforeError = Call(caller, laterOriginal);
+            AssertRewriteSucceeded();
+
+            Invalidate(_rpcType);
+            Call(caller, _exitLocal);
+            var secondInvalid = AddMethod(_rpcType, "AnotherInvalid");
+            Call(secondInvalid, _enterLocal);
+            var laterWrapper = AddMethod(_rpcType, "Later");
+
+            Assert.That(Rewrite(laterOriginal, laterWrapper), Is.False);
+
+            AssertWrapper(earlierCall);
+            Assert.That(((MethodReference)beforeError.Operand).Resolve(), Is.SameAs(laterWrapper));
+            Assert.That(_messages.Count, Is.EqualTo(1));
+            Assert.That((string)GetDiagnosticMember(_messages[0], "MessageData"), Does.Contain("Local mode flag was not set"));
+        }
+
+        [Test]
+        public void EquivalentMethodReferenceIsNotBroadenedToADefinitionMatch()
+        {
+            var reference = new MethodReference(_original.Name, _original.ReturnType, _rpcType)
+            {
+                HasThis = _original.HasThis,
+                CallingConvention = _original.CallingConvention
+            };
+            Assert.That(reference.Resolve(), Is.SameAs(_original));
+            var call = Call(AddMethod(_rpcType, "CallByMemberReference"), reference);
+
+            AssertRewriteSucceeded();
+
+            Assert.That(call.Operand, Is.SameAs(reference));
+        }
+
         private bool Rewrite()
         {
-            return (bool)_rewrite.Invoke(null, new object[] { _module, _original, _wrapper, _messages });
+            return Rewrite(_original, _wrapper);
+        }
+
+        private bool Rewrite(MethodDefinition original, MethodDefinition wrapper)
+        {
+            return _useIndex
+                ? (bool)_indexedRewrite.Invoke(_index, new object[] { original, wrapper, _messages })
+                : (bool)_rewrite.Invoke(null, new object[] { _module, original, wrapper, _messages });
+        }
+
+        private void Invalidate(TypeDefinition type)
+        {
+            _invalidate.Invoke(_index, new object[] { type });
         }
 
         private static object GetDiagnosticMember(object diagnostic, string name)

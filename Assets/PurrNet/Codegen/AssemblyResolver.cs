@@ -3,7 +3,6 @@ using Mono.Cecil;
 using System;
 using System.Collections.Generic;
 using System.IO;
-using System.Linq;
 using System.Threading;
 using Unity.CompilationPipeline.Common.ILPostProcessing;
 
@@ -11,18 +10,40 @@ namespace PurrNet.Codegen
 {
     public class AssemblyResolver : IAssemblyResolver
     {
-        private readonly string[] m_AssemblyReferences;
+        private readonly Dictionary<string, string> m_ReferencePathsByFileName =
+            new Dictionary<string, string>(StringComparer.Ordinal);
+        private readonly string[] m_SearchDirectories;
 
+        // One resolver belongs to one Process invocation. Its compiled inputs are a snapshot:
+        // after loading an assembly, keep that definition consistent for the entire invocation.
+        // A later invocation gets a new resolver and observes any changed reference files.
         private readonly Dictionary<string, AssemblyDefinition> m_AssemblyCache =
-            new Dictionary<string, AssemblyDefinition>();
+            new Dictionary<string, AssemblyDefinition>(StringComparer.Ordinal);
 
-        private readonly ICompiledAssembly m_CompiledAssembly;
+        private readonly string m_CompiledAssemblyName;
         private AssemblyDefinition m_SelfAssembly;
 
         public AssemblyResolver(ICompiledAssembly compiledAssembly)
+            : this(compiledAssembly.Name, compiledAssembly.References)
         {
-            m_CompiledAssembly = compiledAssembly;
-            m_AssemblyReferences = compiledAssembly.References;
+        }
+
+        internal AssemblyResolver(string compiledAssemblyName, string[] references)
+        {
+            m_CompiledAssemblyName = compiledAssemblyName;
+            var directories = new List<string>();
+            var seenDirectories = new HashSet<string>(StringComparer.Ordinal);
+            foreach (var reference in references)
+            {
+                var fileName = Path.GetFileName(reference);
+                if (fileName != null && !m_ReferencePathsByFileName.ContainsKey(fileName))
+                    m_ReferencePathsByFileName.Add(fileName, reference);
+
+                var directory = Path.GetDirectoryName(reference);
+                if (seenDirectories.Add(directory))
+                    directories.Add(directory);
+            }
+            m_SearchDirectories = directories.ToArray();
         }
 
         public void Dispose()
@@ -30,16 +51,19 @@ namespace PurrNet.Codegen
         }
 
         public AssemblyDefinition Resolve(AssemblyNameReference name) =>
-            Resolve(name, new ReaderParameters(ReadingMode.Deferred));
+            Resolve(name, null);
 
         public AssemblyDefinition Resolve(AssemblyNameReference name, ReaderParameters parameters)
         {
             lock (m_AssemblyCache)
             {
-                if (name.Name == m_CompiledAssembly.Name)
+                if (name.Name == m_CompiledAssemblyName)
                 {
                     return m_SelfAssembly;
                 }
+
+                if (m_AssemblyCache.TryGetValue(name.Name, out var result))
+                    return result;
 
                 var fileName = FindFile(name);
                 if (fileName == null)
@@ -47,13 +71,7 @@ namespace PurrNet.Codegen
                     return null;
                 }
 
-                var lastWriteTime = File.GetLastWriteTime(fileName);
-                var cacheKey = $"{fileName}{lastWriteTime}";
-                if (m_AssemblyCache.TryGetValue(cacheKey, out var result))
-                {
-                    return result;
-                }
-
+                parameters ??= new ReaderParameters(ReadingMode.Deferred);
                 parameters.AssemblyResolver = this;
 
                 var ms = MemoryStreamFor(fileName);
@@ -64,7 +82,7 @@ namespace PurrNet.Codegen
                 }
 
                 var assemblyDefinition = AssemblyDefinition.ReadAssembly(ms, parameters);
-                m_AssemblyCache.Add(cacheKey, assemblyDefinition);
+                m_AssemblyCache.Add(name.Name, assemblyDefinition);
 
                 return assemblyDefinition;
             }
@@ -72,24 +90,25 @@ namespace PurrNet.Codegen
 
         private string FindFile(AssemblyNameReference name)
         {
-            var fileName = m_AssemblyReferences.FirstOrDefault(r => Path.GetFileName(r) == $"{name.Name}.dll");
-            if (fileName != null)
+            if (m_ReferencePathsByFileName.TryGetValue($"{name.Name}.dll", out var fileName))
             {
                 return fileName;
             }
 
             // perhaps the type comes from an exe instead
-            fileName = m_AssemblyReferences.FirstOrDefault(r => Path.GetFileName(r) == $"{name.Name}.exe");
-            if (fileName != null)
+            if (m_ReferencePathsByFileName.TryGetValue($"{name.Name}.exe", out fileName))
             {
                 return fileName;
             }
 
-            return m_AssemblyReferences
-                .Select(Path.GetDirectoryName)
-                .Distinct()
-                .Select(parentDir => Path.Combine(parentDir, $"{name.Name}.dll"))
-                .FirstOrDefault(File.Exists);
+            // Do not cache misses: a dependency can become available before a later lookup.
+            foreach (var directory in m_SearchDirectories)
+            {
+                var candidate = Path.Combine(directory, $"{name.Name}.dll");
+                if (File.Exists(candidate))
+                    return candidate;
+            }
+            return null;
         }
 
         private static MemoryStream MemoryStreamFor(string fileName)
