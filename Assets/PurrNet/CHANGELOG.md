@@ -1,3 +1,15 @@
+# [1.23.0-beta.47](https://github.com/PurrNet/PurrNet/compare/v1.23.0-beta.46...v1.23.0-beta.47) (2026-09-10)
+
+
+### Bug Fixes
+
+* NetworkRigidbody origin-aware reworks ([a887b17](https://github.com/PurrNet/PurrNet/commit/a887b17645b21553cac01fd11229993978127bf7))
+
+
+### Performance Improvements
+
+* editor IL processing improvements ([21e89a9](https://github.com/PurrNet/PurrNet/commit/21e89a903dcdd41a08885d13e25b485a09faadd9))
+
 # [1.23.0-beta.46](https://github.com/PurrNet/PurrNet/compare/v1.23.0-beta.45...v1.23.0-beta.46) (2026-09-10)
 
 
