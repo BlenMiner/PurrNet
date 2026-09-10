@@ -1,3 +1,10 @@
+# [1.23.0-beta.46](https://github.com/PurrNet/PurrNet/compare/v1.23.0-beta.45...v1.23.0-beta.46) (2026-09-10)
+
+
+### Bug Fixes
+
+* Editor network prefabs/assets assets staying loaded forever in ([1fa89cb](https://github.com/PurrNet/PurrNet/commit/1fa89cb0b60da993648b0333b4343f4a64023f9b))
+
 # [1.23.0-beta.45](https://github.com/PurrNet/PurrNet/compare/v1.23.0-beta.44...v1.23.0-beta.45) (2026-09-09)
 
 
