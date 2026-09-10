@@ -1,3 +1,10 @@
+# [1.23.0-beta.48](https://github.com/PurrNet/PurrNet/compare/v1.23.0-beta.47...v1.23.0-beta.48) (2026-09-10)
+
+
+### Performance Improvements
+
+* improve editor compilation times further ([572fd0a](https://github.com/PurrNet/PurrNet/commit/572fd0a7e3f15b3d951a38a899d50a6e71b734c0))
+
 # [1.23.0-beta.47](https://github.com/PurrNet/PurrNet/compare/v1.23.0-beta.46...v1.23.0-beta.47) (2026-09-10)
 
 
