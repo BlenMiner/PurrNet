@@ -80,7 +80,7 @@ namespace PurrNet
                 if (folderPath == null)
                     continue;
 
-                _watchers.Add(new AssetWatcher(assetPath, folderPath, ".prefab", networkPrefabs.Generate));
+                _watchers.Add(new AssetWatcher(guids[i], assetPath, folderPath, ".prefab", RegistryType.NetworkPrefabs));
             }
         }
 
@@ -98,7 +98,7 @@ namespace PurrNet
                 if (folderPath == null)
                     continue;
 
-                _watchers.Add(new AssetWatcher(assetPath, folderPath, null, networkAssets.GenerateAssets));
+                _watchers.Add(new AssetWatcher(guids[i], assetPath, folderPath, null, RegistryType.NetworkAssets));
             }
         }
 
@@ -117,8 +117,8 @@ namespace PurrNet
                 if (folderPath == null)
                     continue;
 
-                _watchers.Add(new AssetWatcher(assetPath, folderPath, ".prefab",
-                    () => AddressableNetworkPrefabsEditor.Generate(addressable)));
+                _watchers.Add(new AssetWatcher(guids[i], assetPath, folderPath, ".prefab",
+                    RegistryType.AddressableNetworkPrefabs));
             }
         }
 #endif
@@ -209,24 +209,64 @@ namespace PurrNet
             return false;
         }
 
+        private enum RegistryType
+        {
+            NetworkPrefabs,
+            NetworkAssets,
+#if ADDRESSABLES_PURRNET_SUPPORT
+            AddressableNetworkPrefabs,
+#endif
+        }
+
         private readonly struct AssetWatcher
         {
             public readonly string AssetPath;
+            private readonly string _assetGuid;
             private readonly string _folderPath;
             private readonly string _extension;
-            private readonly Action _generate;
+            private readonly RegistryType _registryType;
 
-            public AssetWatcher(string assetPath, string folderPath, string extension, Action generate)
+            public AssetWatcher(string assetGuid, string assetPath, string folderPath, string extension,
+                RegistryType registryType)
             {
                 AssetPath = assetPath;
+                _assetGuid = assetGuid;
                 _folderPath = folderPath;
                 _extension = extension;
-                _generate = generate;
+                _registryType = registryType;
             }
 
             public void Generate()
             {
-                _generate?.Invoke();
+                if (EditorApplication.isPlayingOrWillChangePlaymode)
+                    return;
+
+                // Cache identifiers rather than instance delegates: a delegate would keep the
+                // registry and its referenced assets alive for the lifetime of this static cache.
+                string assetPath = AssetDatabase.GUIDToAssetPath(_assetGuid);
+                if (string.IsNullOrEmpty(assetPath))
+                    return;
+
+                switch (_registryType)
+                {
+                    case RegistryType.NetworkPrefabs:
+                        var networkPrefabs = AssetDatabase.LoadAssetAtPath<NetworkPrefabs>(assetPath);
+                        if (networkPrefabs && networkPrefabs.autoGenerate && networkPrefabs.folder)
+                            networkPrefabs.Generate();
+                        break;
+                    case RegistryType.NetworkAssets:
+                        var networkAssets = AssetDatabase.LoadAssetAtPath<NetworkAssets>(assetPath);
+                        if (networkAssets && networkAssets.autoGenerate && networkAssets.folder)
+                            networkAssets.GenerateAssets();
+                        break;
+#if ADDRESSABLES_PURRNET_SUPPORT
+                    case RegistryType.AddressableNetworkPrefabs:
+                        var addressable = AssetDatabase.LoadAssetAtPath<AddressableNetworkPrefabs>(assetPath);
+                        if (addressable && addressable.autoGenerate && addressable.folder)
+                            AddressableNetworkPrefabsEditor.Generate(addressable);
+                        break;
+#endif
+                }
             }
 
             public bool Matches(string path)
