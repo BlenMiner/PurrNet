@@ -117,7 +117,7 @@ Inheritance diagram for PurrNet.Transports.PurrTransport:</div>
 <tr class="heading"><td colspan="2"><h2 class="groupheader"><a id="pub-types" name="pub-types"></a>
 Public Types</h2></td></tr>
 <tr class="memitem:a9c1074a3457b1be31fbf09f912e17661"><td class="memItemLeft" align="right" valign="top"><a id="a9c1074a3457b1be31fbf09f912e17661" name="a9c1074a3457b1be31fbf09f912e17661"></a>enum &#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="classPurrNet_1_1Transports_1_1PurrTransport.html#a9c1074a3457b1be31fbf09f912e17661">SessionLink</a> </td></tr>
-<tr class="memdesc:a9c1074a3457b1be31fbf09f912e17661"><td class="mdescLeft">&#160;</td><td class="mdescRight">Which link a session is running over: the relay or a direct NAT-punched P2P link. <br /></td></tr>
+<tr class="memdesc:a9c1074a3457b1be31fbf09f912e17661"><td class="mdescLeft">&#160;</td><td class="mdescRight">Whether a session uses the relay or a direct P2P connection. <br /></td></tr>
 <tr class="separator:a9c1074a3457b1be31fbf09f912e17661"><td class="memSeparator" colspan="2">&#160;</td></tr>
 <tr class="memitem:a8c47a7f4552f65afe156ec8dbc6d0faa"><td class="memItemLeft" align="right" valign="top"><a id="a8c47a7f4552f65afe156ec8dbc6d0faa" name="a8c47a7f4552f65afe156ec8dbc6d0faa"></a>enum &#160;</td><td class="memItemRight" valign="bottom"><b>ConnectionProtocol</b> </td></tr>
 <tr class="separator:a8c47a7f4552f65afe156ec8dbc6d0faa"><td class="memSeparator" colspan="2">&#160;</td></tr>
@@ -126,7 +126,7 @@ Public Types</h2></td></tr>
 Public Member Functions</h2></td></tr>
 <tr class="memitem:a494876d88e0afc801b7a91f4a82cbed2"><td class="memItemLeft" align="right" valign="top"><a id="a494876d88e0afc801b7a91f4a82cbed2" name="a494876d88e0afc801b7a91f4a82cbed2"></a>
 string&#160;</td><td class="memItemRight" valign="bottom"><b>GetP2pEndpoint</b> (<a class="el" href="structPurrNet_1_1Transports_1_1Connection.html">Connection</a> conn)</td></tr>
-<tr class="memdesc:a494876d88e0afc801b7a91f4a82cbed2"><td class="mdescLeft">&#160;</td><td class="mdescRight">Remote endpoint of a host-side connection's direct P2P link, or null if it runs over the relay. <br /></td></tr>
+<tr class="memdesc:a494876d88e0afc801b7a91f4a82cbed2"><td class="mdescLeft">&#160;</td><td class="mdescRight">Remote endpoint of a host-side native UDP P2P link, or null for other routes. <br /></td></tr>
 <tr class="separator:a494876d88e0afc801b7a91f4a82cbed2"><td class="memSeparator" colspan="2">&#160;</td></tr>
 <tr class="memitem:a348d074b40b42bd5ccd5972ab5bff39b"><td class="memItemLeft" align="right" valign="top"><a id="a348d074b40b42bd5ccd5972ab5bff39b" name="a348d074b40b42bd5ccd5972ab5bff39b"></a>
 void&#160;</td><td class="memItemRight" valign="bottom"><b>SetServer</b> (<a class="el" href="structPurrNet_1_1Transports_1_1RelayServer.html">RelayServer</a> server)</td></tr>
@@ -186,6 +186,12 @@ void&#160;</td><td class="memItemRight" valign="bottom"><b>DisconnectPipe</b> ()
 <tr class="memitem:ab39527cd4fca47ccde3d57cc731e5a9c"><td class="memItemLeft" align="right" valign="top">bool&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="classPurrNet_1_1Transports_1_1PurrTransport.html#ab39527cd4fca47ccde3d57cc731e5a9c">FlushConnection</a> (<a class="el" href="structPurrNet_1_1Transports_1_1Connection.html">Connection</a> conn, bool asServer)</td></tr>
 <tr class="memdesc:ab39527cd4fca47ccde3d57cc731e5a9c"><td class="mdescLeft">&#160;</td><td class="mdescRight">Pushes data already queued for one connection onto the wire without a full send pass. Returns false when the transport cannot do this, in which case the caller falls back to SendMessages. On the client side the connection argument is ignored.   <a href="classPurrNet_1_1Transports_1_1PurrTransport.html#ab39527cd4fca47ccde3d57cc731e5a9c">More...</a><br /></td></tr>
 <tr class="separator:ab39527cd4fca47ccde3d57cc731e5a9c"><td class="memSeparator" colspan="2">&#160;</td></tr>
+<tr class="memitem:a5f449c2e26e317d967825f487ce5cde7"><td class="memItemLeft" align="right" valign="top"><a id="a5f449c2e26e317d967825f487ce5cde7" name="a5f449c2e26e317d967825f487ce5cde7"></a>
+<a class="el" href="classPurrNet_1_1Transports_1_1PurrTransport.html#a9c1074a3457b1be31fbf09f912e17661">SessionLink</a>&#160;</td><td class="memItemRight" valign="bottom"><b>GetSessionLink</b> (<a class="el" href="structPurrNet_1_1Transports_1_1Connection.html">Connection</a> connection)</td></tr>
+<tr class="separator:a5f449c2e26e317d967825f487ce5cde7"><td class="memSeparator" colspan="2">&#160;</td></tr>
+<tr class="memitem:a4e8408d178251d2d4103af8c1d6023ad"><td class="memItemLeft" align="right" valign="top"><a id="a4e8408d178251d2d4103af8c1d6023ad" name="a4e8408d178251d2d4103af8c1d6023ad"></a>
+ConnectionProtocol&#160;</td><td class="memItemRight" valign="bottom"><b>GetConnectionProtocol</b> (<a class="el" href="structPurrNet_1_1Transports_1_1Connection.html">Connection</a> connection)</td></tr>
+<tr class="separator:a4e8408d178251d2d4103af8c1d6023ad"><td class="memSeparator" colspan="2">&#160;</td></tr>
 <tr class="inherit_header pub_methods_classPurrNet_1_1Transports_1_1GenericTransport"><td colspan="2" onclick="javascript:toggleInherit('pub_methods_classPurrNet_1_1Transports_1_1GenericTransport')"><img src="closed.png" alt="-"/>&#160;Public Member Functions inherited from <a class="el" href="classPurrNet_1_1Transports_1_1GenericTransport.html">PurrNet.Transports.GenericTransport</a></td></tr>
 <tr class="memitem:abb3d0402cfa9ccdbf9cdc014edd2f36a inherit pub_methods_classPurrNet_1_1Transports_1_1GenericTransport"><td class="memItemLeft" align="right" valign="top"><a id="abb3d0402cfa9ccdbf9cdc014edd2f36a" name="abb3d0402cfa9ccdbf9cdc014edd2f36a"></a>
 void&#160;</td><td class="memItemRight" valign="bottom"><b>StartServer</b> ()</td></tr>
@@ -312,12 +318,17 @@ string&#160;</td><td class="memItemRight" valign="bottom"><b>masterServer</b><co
 <tr class="memitem:a26e7209d2dea3c2fc5d4c466d0d52af7"><td class="memItemLeft" align="right" valign="top"><a id="a26e7209d2dea3c2fc5d4c466d0d52af7" name="a26e7209d2dea3c2fc5d4c466d0d52af7"></a>
 string&#160;</td><td class="memItemRight" valign="bottom"><b>roomName</b><code> [get, set]</code></td></tr>
 <tr class="separator:a26e7209d2dea3c2fc5d4c466d0d52af7"><td class="memSeparator" colspan="2">&#160;</td></tr>
+<tr class="memitem:ad729d853134402a9c8eeddac0e6f7a08"><td class="memItemLeft" align="right" valign="top"><a id="ad729d853134402a9c8eeddac0e6f7a08" name="ad729d853134402a9c8eeddac0e6f7a08"></a>
+bool&#160;</td><td class="memItemRight" valign="bottom"><b>attemptDirectConnection</b><code> [get, set]</code></td></tr>
+<tr class="memdesc:ad729d853134402a9c8eeddac0e6f7a08"><td class="mdescLeft">&#160;</td><td class="mdescRight">Attempt a direct connection when both players enable it. Configure before connecting. <br /></td></tr>
+<tr class="separator:ad729d853134402a9c8eeddac0e6f7a08"><td class="memSeparator" colspan="2">&#160;</td></tr>
 <tr class="memitem:a14892dc32e17023db8badbb49b5fda3f"><td class="memItemLeft" align="right" valign="top"><a id="a14892dc32e17023db8badbb49b5fda3f" name="a14892dc32e17023db8badbb49b5fda3f"></a>
 bool&#160;</td><td class="memItemRight" valign="bottom"><b>useNat</b><code> [get, set]</code></td></tr>
+<tr class="memdesc:a14892dc32e17023db8badbb49b5fda3f"><td class="mdescLeft">&#160;</td><td class="mdescRight">Compatibility alias for <a class="el" href="classPurrNet_1_1Transports_1_1PurrTransport.html#ad729d853134402a9c8eeddac0e6f7a08" title="Attempt a direct connection when both players enable it. Configure before connecting.">attemptDirectConnection</a>. <br /></td></tr>
 <tr class="separator:a14892dc32e17023db8badbb49b5fda3f"><td class="memSeparator" colspan="2">&#160;</td></tr>
 <tr class="memitem:acfe8a7db402852b3687bb9930c289bfb"><td class="memItemLeft" align="right" valign="top"><a id="acfe8a7db402852b3687bb9930c289bfb" name="acfe8a7db402852b3687bb9930c289bfb"></a>
 ConnectionProtocol&#160;</td><td class="memItemRight" valign="bottom"><b>clientConnectionProtocol</b><code> [get]</code></td></tr>
-<tr class="memdesc:acfe8a7db402852b3687bb9930c289bfb"><td class="mdescLeft">&#160;</td><td class="mdescRight">Client protocol, or None unless connected. Direct P2P uses UDP. <br /></td></tr>
+<tr class="memdesc:acfe8a7db402852b3687bb9930c289bfb"><td class="mdescLeft">&#160;</td><td class="mdescRight">Client protocol, or None unless connected. <br /></td></tr>
 <tr class="separator:acfe8a7db402852b3687bb9930c289bfb"><td class="memSeparator" colspan="2">&#160;</td></tr>
 <tr class="memitem:a5309ed8104536227fd533d88e1313782"><td class="memItemLeft" align="right" valign="top"><a id="a5309ed8104536227fd533d88e1313782" name="a5309ed8104536227fd533d88e1313782"></a>
 ConnectionProtocol&#160;</td><td class="memItemRight" valign="bottom"><b>hostConnectionProtocol</b><code> [get]</code></td></tr>
@@ -333,7 +344,7 @@ int&#160;</td><td class="memItemRight" valign="bottom"><b>p2pConnectionCount</b>
 <tr class="separator:ab6765727ea69bff54704c3bd7c4e3233"><td class="memSeparator" colspan="2">&#160;</td></tr>
 <tr class="memitem:a6b359d220a83037363b8914f15949953"><td class="memItemLeft" align="right" valign="top"><a id="a6b359d220a83037363b8914f15949953" name="a6b359d220a83037363b8914f15949953"></a>
 string&#160;</td><td class="memItemRight" valign="bottom"><b>p2pHostEndpoint</b><code> [get]</code></td></tr>
-<tr class="memdesc:a6b359d220a83037363b8914f15949953"><td class="mdescLeft">&#160;</td><td class="mdescRight">Remote endpoint of the direct P2P link to the host, or null when not on a P2P session. <br /></td></tr>
+<tr class="memdesc:a6b359d220a83037363b8914f15949953"><td class="mdescLeft">&#160;</td><td class="mdescRight">Remote endpoint of a native UDP P2P link to the host, or null for other routes. <br /></td></tr>
 <tr class="separator:a6b359d220a83037363b8914f15949953"><td class="memSeparator" colspan="2">&#160;</td></tr>
 <tr class="memitem:a8c2e8caf9e42196d01011c3da71fb363"><td class="memItemLeft" align="right" valign="top"><a id="a8c2e8caf9e42196d01011c3da71fb363" name="a8c2e8caf9e42196d01011c3da71fb363"></a>
 bool&#160;</td><td class="memItemRight" valign="bottom"><b>hasRegionAndHost</b><code> [get]</code></td></tr>
@@ -391,6 +402,13 @@ bool&#160;</td><td class="memItemRight" valign="bottom"><b>hostUsesWebRtc</b><co
 bool&#160;</td><td class="memItemRight" valign="bottom"><b>clientUsesWebRtc</b><code> [get]</code></td></tr>
 <tr class="memdesc:a755807cd87236f10f56fe6554343f8b2"><td class="mdescLeft">&#160;</td><td class="mdescRight">Whether the local client's connection to the relay uses WebRTC. <br /></td></tr>
 <tr class="separator:a755807cd87236f10f56fe6554343f8b2"><td class="memSeparator" colspan="2">&#160;</td></tr>
+<tr class="memitem:a9fd61698e2d5ff7268b2b544464282d1"><td class="memItemLeft" align="right" valign="top"><a id="a9fd61698e2d5ff7268b2b544464282d1" name="a9fd61698e2d5ff7268b2b544464282d1"></a>
+bool&#160;</td><td class="memItemRight" valign="bottom"><b>useWebRtcP2P</b><code> [get, set]</code></td></tr>
+<tr class="memdesc:a9fd61698e2d5ff7268b2b544464282d1"><td class="mdescLeft">&#160;</td><td class="mdescRight">Compatibility alias for <a class="el" href="classPurrNet_1_1Transports_1_1PurrTransport.html#ad729d853134402a9c8eeddac0e6f7a08" title="Attempt a direct connection when both players enable it. Configure before connecting.">attemptDirectConnection</a>. <br /></td></tr>
+<tr class="separator:a9fd61698e2d5ff7268b2b544464282d1"><td class="memSeparator" colspan="2">&#160;</td></tr>
+<tr class="memitem:a67a69867c927e9c3d51d13928bbc96d5"><td class="memItemLeft" align="right" valign="top"><a id="a67a69867c927e9c3d51d13928bbc96d5" name="a67a69867c927e9c3d51d13928bbc96d5"></a>
+string&#160;</td><td class="memItemRight" valign="bottom"><b>webRtcStunServer</b><code> [get, set]</code></td></tr>
+<tr class="separator:a67a69867c927e9c3d51d13928bbc96d5"><td class="memSeparator" colspan="2">&#160;</td></tr>
 <tr class="inherit_header properties_classPurrNet_1_1Transports_1_1GenericTransport"><td colspan="2" onclick="javascript:toggleInherit('properties_classPurrNet_1_1Transports_1_1GenericTransport')"><img src="closed.png" alt="-"/>&#160;Properties inherited from <a class="el" href="classPurrNet_1_1Transports_1_1GenericTransport.html">PurrNet.Transports.GenericTransport</a></td></tr>
 <tr class="memitem:ade0bd9e4af51211e8ff1e801c28f9cbf inherit properties_classPurrNet_1_1Transports_1_1GenericTransport"><td class="memItemLeft" align="right" valign="top"><a id="ade0bd9e4af51211e8ff1e801c28f9cbf" name="ade0bd9e4af51211e8ff1e801c28f9cbf"></a>
 virtual bool&#160;</td><td class="memItemRight" valign="bottom"><b>isPinging</b><code> [get]</code></td></tr>
@@ -1205,8 +1223,9 @@ const float&#160;</td><td class="memItemRight" valign="bottom"><b>DEFAULT_PING_T
 
 </div>
 </div>
-<hr/>The documentation for this class was generated from the following file:<ul>
+<hr/>The documentation for this class was generated from the following files:<ul>
 <li>Assets/PurrNet/Runtime/Transports/PurrTransport.cs</li>
+<li>Assets/PurrNet/Runtime/Transports/WebRtc/PurrTransport.WebRtc.cs</li>
 </ul>
 </div><!-- contents -->
 </div><!-- doc-content -->

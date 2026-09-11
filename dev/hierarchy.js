@@ -364,6 +364,9 @@ var hierarchy =
         [ "PurrNet.PlayerSpawner", "classPurrNet_1_1PlayerSpawner.html", null ]
       ] ]
     ] ],
+    [ "PurrNet.Transports.IPurrWebRtcPeer", "interfacePurrNet_1_1Transports_1_1IPurrWebRtcPeer.html", [
+      [ "PurrNet.Transports.PurrWebClient", "classPurrNet_1_1Transports_1_1PurrWebClient.html", null ]
+    ] ],
     [ "IReadOnlyCollection", null, [
       [ "PurrNet.Collections.IReadonlyHashSet< T >", "interfacePurrNet_1_1Collections_1_1IReadonlyHashSet.html", [
         [ "PurrNet.Collections.PurrHashSet< T >", "classPurrNet_1_1Collections_1_1PurrHashSet.html", null ]
@@ -393,7 +396,8 @@ var hierarchy =
       [ "PurrNet.SyncDictionary< TKey, TValue >", "classPurrNet_1_1SyncDictionary.html", null ],
       [ "PurrNet.SyncInput< T >", "classPurrNet_1_1SyncInput.html", null ],
       [ "PurrNet.SyncList< T >", "classPurrNet_1_1SyncList.html", null ],
-      [ "PurrNet.SyncVar< T >", "classPurrNet_1_1SyncVar.html", null ]
+      [ "PurrNet.SyncVar< T >", "classPurrNet_1_1SyncVar.html", null ],
+      [ "PurrNet.Transports.PurrTransport", "classPurrNet_1_1Transports_1_1PurrTransport.html", null ]
     ] ],
     [ "PurrNet.IServerSceneEvents", "interfacePurrNet_1_1IServerSceneEvents.html", null ],
     [ "ISet", null, [
@@ -537,7 +541,6 @@ var hierarchy =
     [ "PurrNet.Utils.PurrAction< PurrNet.NetworkIdentity >", "classPurrNet_1_1Utils_1_1PurrAction.html", null ],
     [ "PurrNet.Collections.PurrHashSet< PurrNet.PlayerID >", "classPurrNet_1_1Collections_1_1PurrHashSet.html", null ],
     [ "PurrNet.Modules.PurrSceneSettings", "structPurrNet_1_1Modules_1_1PurrSceneSettings.html", null ],
-    [ "PurrNet.Transports.PurrWebClient", "classPurrNet_1_1Transports_1_1PurrWebClient.html", null ],
     [ "PurrNet.QuaternionWithParent", "structPurrNet_1_1QuaternionWithParent.html", null ],
     [ "PurrNet.ReflectionData", "structPurrNet_1_1ReflectionData.html", null ],
     [ "PurrNet.ReflectionMethodData", "structPurrNet_1_1ReflectionMethodData.html", null ],

@@ -9,6 +9,7 @@ var classPurrNet_1_1Transports_1_1PurrTransport =
     [ "GetRoundTripTime", "classPurrNet_1_1Transports_1_1PurrTransport.html#aab98e7f9322ba813c454a1e468adec2c", null ],
     [ "PingInternal", "classPurrNet_1_1Transports_1_1PurrTransport.html#a7d3471c46b45ed73ba31bfc43e427b94", null ],
     [ "SendPipeData", "classPurrNet_1_1Transports_1_1PurrTransport.html#a2b38a6a955020047616a1108a3818058", null ],
+    [ "attemptDirectConnection", "classPurrNet_1_1Transports_1_1PurrTransport.html#ad729d853134402a9c8eeddac0e6f7a08", null ],
     [ "clientConnectionProtocol", "classPurrNet_1_1Transports_1_1PurrTransport.html#acfe8a7db402852b3687bb9930c289bfb", null ],
     [ "clientLinkDescription", "classPurrNet_1_1Transports_1_1PurrTransport.html#aa0fbb400e927e0d486e009b8cca6b5f2", null ],
     [ "clientRelayRoundTripTime", "classPurrNet_1_1Transports_1_1PurrTransport.html#a12b0015ef7b13d01e9bd6c067eb1c7d7", null ],
@@ -23,5 +24,7 @@ var classPurrNet_1_1Transports_1_1PurrTransport =
     [ "p2pConnectionCount", "classPurrNet_1_1Transports_1_1PurrTransport.html#ab6765727ea69bff54704c3bd7c4e3233", null ],
     [ "p2pHostEndpoint", "classPurrNet_1_1Transports_1_1PurrTransport.html#a6b359d220a83037363b8914f15949953", null ],
     [ "pipeConnId", "classPurrNet_1_1Transports_1_1PurrTransport.html#a0c47cd871f2e618c438dbc0579685093", null ],
+    [ "useNat", "classPurrNet_1_1Transports_1_1PurrTransport.html#a14892dc32e17023db8badbb49b5fda3f", null ],
+    [ "useWebRtcP2P", "classPurrNet_1_1Transports_1_1PurrTransport.html#a9fd61698e2d5ff7268b2b544464282d1", null ],
     [ "onPipeDataReceived", "classPurrNet_1_1Transports_1_1PurrTransport.html#adb6bca90a8777ce2400c79305c628e22", null ]
 ];

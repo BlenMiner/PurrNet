@@ -11,6 +11,7 @@ var namespacePurrNet_1_1Transports =
     [ "HostJoinInfo", "structPurrNet_1_1Transports_1_1HostJoinInfo.html", "structPurrNet_1_1Transports_1_1HostJoinInfo" ],
     [ "IConnectable", "interfacePurrNet_1_1Transports_1_1IConnectable.html", null ],
     [ "IListener", "interfacePurrNet_1_1Transports_1_1IListener.html", null ],
+    [ "IPurrWebRtcPeer", "interfacePurrNet_1_1Transports_1_1IPurrWebRtcPeer.html", null ],
     [ "ITransport", "interfacePurrNet_1_1Transports_1_1ITransport.html", "interfacePurrNet_1_1Transports_1_1ITransport" ],
     [ "LocalTransport", "classPurrNet_1_1Transports_1_1LocalTransport.html", null ],
     [ "NetworkSimulation", "structPurrNet_1_1Transports_1_1NetworkSimulation.html", null ],
