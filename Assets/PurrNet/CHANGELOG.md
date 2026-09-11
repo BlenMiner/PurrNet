@@ -1,3 +1,10 @@
+# [1.23.0-beta.49](https://github.com/PurrNet/PurrNet/compare/v1.23.0-beta.48...v1.23.0-beta.49) (2026-09-11)
+
+
+### Bug Fixes
+
+* purrequality GC boxing ([4a97291](https://github.com/PurrNet/PurrNet/commit/4a972912e42c226f4fc424ad898e2f8476294af6))
+
 # [1.23.0-beta.48](https://github.com/PurrNet/PurrNet/compare/v1.23.0-beta.47...v1.23.0-beta.48) (2026-09-10)
 
 
