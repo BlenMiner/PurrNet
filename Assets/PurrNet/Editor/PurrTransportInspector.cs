@@ -8,6 +8,8 @@ namespace PurrNet.Editor
     [CustomEditor(typeof(PurrTransport), true)]
     public class PurrTransportInspector : UnityEditor.Editor
     {
+        private static readonly GUIContent _hostRelayLabel = new("Host relay", "This host's connection to the relay.");
+
         private SerializedProperty _masterServer;
         private SerializedProperty _roomName;
         private SerializedProperty _region;
@@ -217,27 +219,24 @@ namespace PurrNet.Editor
             if (!Application.isPlaying)
                 return;
 
-            var link = transport.clientSessionLink;
-            string clientLine = link switch
-            {
-                PurrTransport.SessionLink.P2P => "Direct P2P (NAT)",
-                PurrTransport.SessionLink.Relay => "Relay",
-                PurrTransport.SessionLink.Resolving => "resolving NAT punch…",
-                _ => null
-            };
+            var clientLine = transport.clientLinkDescription;
+            var hostLine = transport.hostLinkDescription;
 
             int total = transport.connections.Count;
-            bool hasHost = total > 0;
 
-            if (clientLine == null && !hasHost)
+            if (clientLine == null && hostLine == null && total == 0)
                 return;
 
             EditorGUILayout.Space(4);
 
             if (clientLine != null)
-                EditorGUILayout.LabelField("Client session", clientLine);
+                EditorGUILayout.LabelField("Client session", clientLine, EditorStyles.wordWrappedLabel);
 
-            if (hasHost)
+            if (hostLine != null)
+                EditorGUILayout.LabelField(_hostRelayLabel,
+                    new GUIContent(hostLine), EditorStyles.wordWrappedLabel);
+
+            if (total > 0)
             {
                 EditorGUILayout.LabelField("Host links",
                     $"{transport.p2pConnectionCount} P2P / {total - transport.p2pConnectionCount} relay");
@@ -245,7 +244,7 @@ namespace PurrNet.Editor
                 foreach (var conn in transport.connections)
                 {
                     var isP2p = transport.GetP2pEndpoint(conn) != null;
-                    EditorGUILayout.LabelField($"    conn {conn.connectionId}", isP2p ? "P2P" : "Relay");
+                    EditorGUILayout.LabelField($"    conn {conn.connectionId}", isP2p ? "P2P (UDP)" : "Relay");
                 }
             }
         }

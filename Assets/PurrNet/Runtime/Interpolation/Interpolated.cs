@@ -11,7 +11,6 @@ namespace PurrNet
         private LerpFunction<T> _lerp;
         private readonly List<T> _buffer;
         private T _lastValue;
-        private T _currentStateRaw;
         private float _timer;
         private float _tickDelta;
         private float _idleTime;
@@ -67,7 +66,6 @@ namespace PurrNet
 
             _tickDelta = tickDelta;
             _lastValue = initialValue;
-            _currentStateRaw = default;
             _timer = 0f;
             _idleTime = 0f;
             _waitForMinBufferSize = true;

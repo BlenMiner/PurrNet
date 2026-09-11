@@ -39,6 +39,8 @@ namespace PurrNet.Transports
         public bool ssl;
         public string secret;
         public int port;
+        /// <summary>Optional WebRTC signaling endpoint. Older relays leave this empty.</summary>
+        public string webRtcUrl;
         [Obsolete]
         public int udpPort;
         public int udpPortV2;
@@ -52,6 +54,8 @@ namespace PurrNet.Transports
         public string secret;
         public string host;
         public int port;
+        /// <summary>Optional WebRTC signaling endpoint. Older relays leave this empty.</summary>
+        public string webRtcUrl;
         [Obsolete]
         public int udpPort;
         public int udpPortV2;

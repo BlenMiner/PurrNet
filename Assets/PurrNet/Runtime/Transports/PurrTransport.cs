@@ -108,6 +108,34 @@ namespace PurrNet.Transports
             P2P
         }
 
+        public enum ConnectionProtocol
+        {
+            None,
+            UDP,
+            WebSocket,
+            WebRTC
+        }
+
+        /// <summary>Client protocol, or None unless connected. Direct P2P uses UDP.</summary>
+        public ConnectionProtocol clientConnectionProtocol => _clientState == ConnectionState.Connected
+            ? GetConnectionProtocol(_clientP2pSession ? _p2pHostPeer : _relayClientPeer, _client)
+            : ConnectionProtocol.None;
+
+        /// <summary>Protocol of the local host-to-relay link, or None unless connected.</summary>
+        public ConnectionProtocol hostConnectionProtocol => _listenerState == ConnectionState.Connected
+            ? GetConnectionProtocol(_relayServerPeer, _server)
+            : ConnectionProtocol.None;
+
+        private ConnectionProtocol GetConnectionProtocol(NetPeer udpPeer, PurrWebClient webClient)
+        {
+            if (_isUsingUDP)
+                return udpPeer?.ConnectionState == LiteNetLib.ConnectionState.Connected
+                    ? ConnectionProtocol.UDP : ConnectionProtocol.None;
+            if (webClient?.ConnectionState != ClientState.Connected)
+                return ConnectionProtocol.None;
+            return webClient.isWebRtc ? ConnectionProtocol.WebRTC : ConnectionProtocol.WebSocket;
+        }
+
         /// <summary>Which link the local client's session is running over (relay vs direct P2P).</summary>
         public SessionLink clientSessionLink
         {
@@ -236,6 +264,9 @@ namespace PurrNet.Transports
 
         public int GetMTU(Connection target, Channel channel, bool asServer)
         {
+            if (asServer ? hostUsesWebRtc : clientUsesWebRtc)
+                return channel == Channel.ReliableOrdered ? 8192 * 2 : 1024;
+
             if (_isUsingUDP)
             {
                 try
@@ -340,15 +371,37 @@ namespace PurrNet.Transports
             return (true, await task);
         }
 
+        /// <summary>Client route and protocol, Connecting while pending, or null when inactive.</summary>
         public string clientLinkDescription
         {
             get
             {
-                if (_clientState != ConnectionState.Connected)
+                if (_clientState == ConnectionState.Connecting)
+                    return _clientConnPending ? "Resolving NAT punch (UDP)" : "Connecting";
+                var protocol = clientConnectionProtocol;
+                if (protocol == ConnectionProtocol.None)
                     return null;
                 if (_clientP2pSession && _p2pHostPeer != null)
-                    return $"P2P {_p2pHostPeer}";
-                return string.IsNullOrEmpty(_region) ? "Relay" : $"Relay {_region}";
+                    return $"P2P {_p2pHostPeer} (UDP)";
+                if (_isPipeMode)
+                    return $"Pipe relay ({protocol})";
+                var relay = string.IsNullOrEmpty(_region) ? "Relay" : $"Relay {_region}";
+                return $"{relay} ({protocol})";
+            }
+        }
+
+        /// <summary>Local host-to-relay route and protocol, Connecting while pending, or null when inactive.</summary>
+        public string hostLinkDescription
+        {
+            get
+            {
+                if (_listenerState == ConnectionState.Connecting)
+                    return "Connecting";
+                var protocol = hostConnectionProtocol;
+                if (protocol == ConnectionProtocol.None)
+                    return null;
+                var relay = string.IsNullOrEmpty(_region) ? "Relay" : $"Relay {_region}";
+                return $"{relay} ({protocol})";
             }
         }
 
@@ -597,8 +650,15 @@ namespace PurrNet.Transports
             _udpServer?.Stop();
         }
 
-        private SimpleWebClient _server;
-        private SimpleWebClient _client;
+        private PurrWebClient _server;
+        private PurrWebClient _client;
+        private readonly WebRtcHostInbox _webRtcHostInbox = new();
+
+        /// <summary>Whether the local host's connection to the relay uses WebRTC.</summary>
+        public bool hostUsesWebRtc => _server?.isWebRtc == true;
+
+        /// <summary>Whether the local client's connection to the relay uses WebRTC.</summary>
+        public bool clientUsesWebRtc => _client?.isWebRtc == true;
         private HostJoinInfo _hostJoinInfo;
         readonly TcpConfig _tcpConfig = new(noDelay: true, sendTimeout: 0, receiveTimeout: 0);
 
@@ -676,8 +736,18 @@ namespace PurrNet.Transports
                         else
                         {
                             var conn = new Connection(clientId);
+                            var pending = hostUsesWebRtc ? _webRtcHostInbox.MarkConnected(clientId) : null;
                             _connections.Add(conn);
                             onConnected?.Invoke(conn, true);
+                            if (pending != null)
+                            {
+                                foreach (var packet in pending)
+                                {
+                                    if (!_connections.Contains(conn))
+                                        break;
+                                    RaiseDataReceived(conn, new ByteData(packet), true);
+                                }
+                            }
                         }
                     }
 
@@ -695,6 +765,9 @@ namespace PurrNet.Transports
                     Packer<int>.Read(_packer, ref clientId);
 
                     var conn = new Connection(clientId);
+
+                    if (hostUsesWebRtc)
+                        _webRtcHostInbox.MarkDisconnected(clientId);
 
                     if (_connections.Remove(conn))
                         onDisconnected?.Invoke(conn, DisconnectReason.ClientRequest, true);
@@ -714,11 +787,24 @@ namespace PurrNet.Transports
                                  data.Array[data.Offset + 3] << 16 |
                                  data.Array[data.Offset + 4] << 24;
 
+                    var conn = new Connection(connId);
+                    var payload = new ArraySegment<byte>(data.Array, data.Offset + 5, data.Count - 5);
+                    if (hostUsesWebRtc && !_connections.Contains(conn))
+                    {
+                        // Data channels can overtake join notifications; buffer reliable data until onConnected.
+                        if (_webRtcHostInbox.TryQueue(connId, payload, _server.receivedDeliveryMethod) ==
+                            WebRtcHostInbox.QueueResult.Overflow)
+                        {
+                            PurrLogger.LogError("WebRTC received too much reliable data before client join notifications.");
+                            StopListening();
+                        }
+                        return;
+                    }
+
                     if (natEnabled && _pendingHostConns.ContainsKey(connId))
                         ResolveHostConnAsRelay(connId);
 
-                    RaiseDataReceived(new Connection(connId), new ByteData(data.Array, data.Offset + 5, data.Count - 5),
-                        true);
+                    RaiseDataReceived(conn, new ByteData(payload), true);
                     break;
                 }
                 case SERVER_PACKET_TYPE.SERVER_NAT_INTRODUCE:
@@ -999,7 +1085,7 @@ namespace PurrNet.Transports
 
                 listenerState = ConnectionState.Connecting;
 
-                _server = SimpleWebClient.Create(ushort.MaxValue, 5000, _tcpConfig);
+                _server = PurrWebClient.Create(ushort.MaxValue, 5000, _tcpConfig);
 
                 _server.onConnect += OnHostConnected;
                 _server.onData += OnHostData;
@@ -1060,7 +1146,7 @@ namespace PurrNet.Transports
                             Path = string.Empty
                         };
 
-                        _server.Connect(builder.Uri);
+                        _server.Connect(builder.Uri, _hostJoinInfo.webRtcUrl);
                     }
                 }
                 catch (OperationCanceledException)
@@ -1087,6 +1173,7 @@ namespace PurrNet.Transports
         public void StopListening()
         {
             _connections.Clear();
+            _webRtcHostInbox.Clear();
             CancelAll(true);
 
             if (_server != null)
@@ -1163,7 +1250,7 @@ namespace PurrNet.Transports
                 if (token.IsCancellationRequested)
                     return;
 
-                _client = SimpleWebClient.Create(ushort.MaxValue, 5000, _tcpConfig);
+                _client = PurrWebClient.Create(ushort.MaxValue, 5000, _tcpConfig);
                 _client.onConnect += OnClientConnected;
                 _client.onData += OnClientData;
                 _client.onDisconnect += OnClientDisconnected;
@@ -1190,6 +1277,7 @@ namespace PurrNet.Transports
                 }
                 else
                 {
+                    _isUsingUDP = false;
                     var builder = new UriBuilder
                     {
                         Scheme = _clientJoinInfo.ssl ? "wss" : "ws",
@@ -1197,7 +1285,7 @@ namespace PurrNet.Transports
                         Port = _clientJoinInfo.port
                     };
 
-                    _client.Connect(builder.Uri);
+                    _client.Connect(builder.Uri, _clientJoinInfo.webRtcUrl);
                 }
             }
             catch (OperationCanceledException)
@@ -1255,7 +1343,7 @@ namespace PurrNet.Transports
             Packer<byte>.Write(_packer, (byte)HOST_PACKET_TYPE.SEND_ONE);
             Packer<int>.Write(_packer, target.connectionId);
 
-            if (_isUsingUDP)
+            if (_isUsingUDP || hostUsesWebRtc)
                 Packer<byte>.Write(_packer, (byte)UDPTransport.ToDeliveryMethod(method));
 
             _packer.WriteBytes(odata);
@@ -1267,7 +1355,7 @@ namespace PurrNet.Transports
                 var deliveryMethod = UDPTransport.ToDeliveryMethod(method);
                 _relayServerPeer.Send(data.data, data.offset, data.length, deliveryMethod);
             }
-            else _server.Send(new ArraySegment<byte>(data.data, data.offset, data.length));
+            else _server.Send(data.segment, (byte)UDPTransport.ToDeliveryMethod(method));
             RaiseDataSent(target, data, true);
         }
 
@@ -1276,7 +1364,7 @@ namespace PurrNet.Transports
             if (clientState != ConnectionState.Connected)
                 return;
 
-            if (_isUsingUDP)
+            if (_isUsingUDP || clientUsesWebRtc)
             {
                 var deliveryMethod = UDPTransport.ToDeliveryMethod(method);
 
@@ -1292,7 +1380,10 @@ namespace PurrNet.Transports
                 Packer<byte>.Write(_packer, (byte)deliveryMethod);
                 _packer.WriteBytes(data);
                 var byteData = _packer.ToByteData();
-                _relayClientPeer.Send(byteData.data, byteData.offset, byteData.length, deliveryMethod);
+                if (_isUsingUDP)
+                    _relayClientPeer.Send(byteData.data, byteData.offset, byteData.length, deliveryMethod);
+                else
+                    _client.Send(byteData.segment, (byte)deliveryMethod);
             }
             else
             {
@@ -1306,7 +1397,13 @@ namespace PurrNet.Transports
         /// Connect to a relay server in pipe mode. No rooms, no host — just
         /// connId-based forwarding. Use SendPipeData to send to specific peers.
         /// </summary>
-        public async void ConnectAsPipe(string relayHost, int udpPort, int wsPort)
+        public void ConnectAsPipe(string relayHost, int udpPort, int wsPort)
+        {
+            ConnectAsPipe(relayHost, udpPort, wsPort, null);
+        }
+
+        /// <summary>Connect in pipe mode with optional WebRTC and WebSocket fallback for browsers.</summary>
+        public async void ConnectAsPipe(string relayHost, int udpPort, int wsPort, string webRtcUrl)
         {
             try
             {
@@ -1319,7 +1416,7 @@ namespace PurrNet.Transports
                 var token = new CancellationTokenSource();
                 AddCancellation(token, false);
 
-                _client = SimpleWebClient.Create(ushort.MaxValue, 5000, _tcpConfig);
+                _client = PurrWebClient.Create(ushort.MaxValue, 5000, _tcpConfig);
                 _client.onConnect += OnPipeConnected;
                 _client.onData += OnPipeData;
                 _client.onDisconnect += OnPipeDisconnected;
@@ -1345,11 +1442,12 @@ namespace PurrNet.Transports
                     _isUsingUDP = false;
                     var builder = new UriBuilder
                     {
-                        Scheme = "ws",
+                        Scheme = Uri.TryCreate(webRtcUrl, UriKind.Absolute, out var rtcUri) &&
+                                 rtcUri.Scheme == Uri.UriSchemeHttps ? "wss" : "ws",
                         Host = relayHost,
                         Port = wsPort
                     };
-                    _client.Connect(builder.Uri);
+                    _client.Connect(builder.Uri, webRtcUrl);
                 }
             }
             catch (Exception e)
@@ -1433,7 +1531,7 @@ namespace PurrNet.Transports
 
             _packer.ResetPositionAndMode(false);
 
-            if (_isUsingUDP)
+            if (_isUsingUDP || clientUsesWebRtc)
                 Packer<byte>.Write(_packer, (byte)UDPTransport.ToDeliveryMethod(channel));
 
             Packer<int>.Write(_packer, targetConnId);
@@ -1448,7 +1546,7 @@ namespace PurrNet.Transports
             }
             else
             {
-                _client.Send(new ArraySegment<byte>(byteData.data, byteData.offset, byteData.length));
+                _client.Send(byteData.segment, (byte)UDPTransport.ToDeliveryMethod(channel));
             }
         }
 

@@ -128,6 +128,15 @@ namespace PurrNet.Editor
 
         private void RenderStatistics(StatisticsManager statisticsManager)
         {
+            if (Application.isPlaying)
+            {
+                EditorGUILayout.LabelField("Client connection", statisticsManager.clientConnectionDescription,
+                    EditorStyles.wordWrappedLabel);
+                EditorGUILayout.LabelField("Server connection", statisticsManager.serverConnectionDescription,
+                    EditorStyles.wordWrappedLabel);
+                GUILayout.Space(4);
+            }
+
             if (!statisticsManager.connectedServer && !statisticsManager.connectedClient)
             {
                 EditorGUILayout.LabelField("Awaiting connection");
