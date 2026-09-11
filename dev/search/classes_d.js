@@ -45,5 +45,6 @@ var searchData=
   ['purrsceneattribute_42',['PurrSceneAttribute',['../classPurrNet_1_1PurrSceneAttribute.html',1,'PurrNet']]],
   ['purrsceneinfo_43',['PurrSceneInfo',['../classPurrNet_1_1PurrSceneInfo.html',1,'PurrNet']]],
   ['purrscenesettings_44',['PurrSceneSettings',['../structPurrNet_1_1Modules_1_1PurrSceneSettings.html',1,'PurrNet::Modules']]],
-  ['purrtransport_45',['PurrTransport',['../classPurrNet_1_1Transports_1_1PurrTransport.html',1,'PurrNet::Transports']]]
+  ['purrtransport_45',['PurrTransport',['../classPurrNet_1_1Transports_1_1PurrTransport.html',1,'PurrNet::Transports']]],
+  ['purrwebclient_46',['PurrWebClient',['../classPurrNet_1_1Transports_1_1PurrWebClient.html',1,'PurrNet::Transports']]]
 ];

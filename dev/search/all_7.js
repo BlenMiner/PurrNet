@@ -5,7 +5,7 @@ var searchData=
   ['halfvector2_2',['HalfVector2',['../structPurrNet_1_1Packing_1_1HalfVector2.html',1,'PurrNet::Packing']]],
   ['halfvector3_3',['HalfVector3',['../structPurrNet_1_1Packing_1_1HalfVector3.html',1,'PurrNet::Packing']]],
   ['halfvector4_4',['HalfVector4',['../structPurrNet_1_1Packing_1_1HalfVector4.html',1,'PurrNet::Packing']]],
-  ['haschanges_5',['HasChanges',['../interfacePurrNet_1_1INetworkTransform.html#ad60d5ec0a5976e999847bfcdce90596d',1,'PurrNet.INetworkTransform.HasChanges()'],['../classPurrNet_1_1NetworkTransform.html#a822877f09ea5532e7325c78a9deca7e1',1,'PurrNet.NetworkTransform.HasChanges()']]],
+  ['haschanges_5',['HasChanges',['../classPurrNet_1_1NetworkTransform.html#a822877f09ea5532e7325c78a9deca7e1',1,'PurrNet.NetworkTransform.HasChanges()'],['../interfacePurrNet_1_1INetworkTransform.html#ad60d5ec0a5976e999847bfcdce90596d',1,'PurrNet.INetworkTransform.HasChanges()']]],
   ['hasconnectedowner_6',['hasConnectedOwner',['../classPurrNet_1_1NetworkIdentity.html#a844e2d660b4b912092a2b73c0803e8b2',1,'PurrNet::NetworkIdentity']]],
   ['hasfirstword_7',['hasFirstWord',['../structPurrNet_1_1Transports_1_1FragmentDropInfo.html#a0d627459013e64d8c000e212507d40a4',1,'PurrNet::Transports::FragmentDropInfo']]],
   ['hashsetpool_8',['HashSetPool',['../classPurrNet_1_1Pooling_1_1HashSetPool.html',1,'PurrNet::Pooling']]],
@@ -16,7 +16,10 @@ var searchData=
   ['hierarchyhistory_13',['HierarchyHistory',['../classPurrNet_1_1Modules_1_1HierarchyHistory.html',1,'PurrNet::Modules']]],
   ['hierarchypool_14',['HierarchyPool',['../classPurrNet_1_1Modules_1_1HierarchyPool.html',1,'PurrNet::Modules']]],
   ['hierarchyv2_15',['HierarchyV2',['../classPurrNet_1_1Modules_1_1HierarchyV2.html',1,'PurrNet::Modules']]],
-  ['hostjoininfo_16',['HostJoinInfo',['../structPurrNet_1_1Transports_1_1HostJoinInfo.html',1,'PurrNet::Transports']]],
-  ['hostmigrationrules_17',['HostMigrationRules',['../structPurrNet_1_1HostMigrationRules.html',1,'PurrNet']]],
-  ['hostrelayroundtriptime_18',['hostRelayRoundTripTime',['../classPurrNet_1_1Transports_1_1PurrTransport.html#a83744f36d9067b63a463048692a16994',1,'PurrNet::Transports::PurrTransport']]]
+  ['hostconnectionprotocol_16',['hostConnectionProtocol',['../classPurrNet_1_1Transports_1_1PurrTransport.html#a5309ed8104536227fd533d88e1313782',1,'PurrNet::Transports::PurrTransport']]],
+  ['hostjoininfo_17',['HostJoinInfo',['../structPurrNet_1_1Transports_1_1HostJoinInfo.html',1,'PurrNet::Transports']]],
+  ['hostlinkdescription_18',['hostLinkDescription',['../classPurrNet_1_1Transports_1_1PurrTransport.html#ac028086c22f5dd8adaed9c8bb9f3b3c8',1,'PurrNet::Transports::PurrTransport']]],
+  ['hostmigrationrules_19',['HostMigrationRules',['../structPurrNet_1_1HostMigrationRules.html',1,'PurrNet']]],
+  ['hostrelayroundtriptime_20',['hostRelayRoundTripTime',['../classPurrNet_1_1Transports_1_1PurrTransport.html#a83744f36d9067b63a463048692a16994',1,'PurrNet::Transports::PurrTransport']]],
+  ['hostuseswebrtc_21',['hostUsesWebRtc',['../classPurrNet_1_1Transports_1_1PurrTransport.html#a0e02385dd506d2bd419bb8c1d065f4b8',1,'PurrNet::Transports::PurrTransport']]]
 ];

@@ -537,6 +537,7 @@ var hierarchy =
     [ "PurrNet.Utils.PurrAction< PurrNet.NetworkIdentity >", "classPurrNet_1_1Utils_1_1PurrAction.html", null ],
     [ "PurrNet.Collections.PurrHashSet< PurrNet.PlayerID >", "classPurrNet_1_1Collections_1_1PurrHashSet.html", null ],
     [ "PurrNet.Modules.PurrSceneSettings", "structPurrNet_1_1Modules_1_1PurrSceneSettings.html", null ],
+    [ "PurrNet.Transports.PurrWebClient", "classPurrNet_1_1Transports_1_1PurrWebClient.html", null ],
     [ "PurrNet.QuaternionWithParent", "structPurrNet_1_1QuaternionWithParent.html", null ],
     [ "PurrNet.ReflectionData", "structPurrNet_1_1ReflectionData.html", null ],
     [ "PurrNet.ReflectionMethodData", "structPurrNet_1_1ReflectionMethodData.html", null ],

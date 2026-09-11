@@ -55,10 +55,10 @@ var NAVTREEINDEX =
 "classPurrNet_1_1NetworkIdentity.html#ab2ecb22de5c175f5a774fb8e8dfa1ab7",
 "classPurrNet_1_1NetworkModule.html#a1370d458228d460a3bc2ce33610555ed",
 "classPurrNet_1_1Packing_1_1BitPacker.html#ab088f1c670d645c52918774d636665d6",
-"classPurrNet_1_1SyncDictionary.html#a7b32d24a06e99806e5a706d13683e20e",
-"classPurrNet_1_1Transports_1_1UDPTransport.html#aa0972dce8a179c0f2d22fa68eb0ce1ba",
-"structPurrNet_1_1Authentication_1_1AuthenticationDenialAck.html",
-"structPurrNet_1_1Packing_1_1Size.html"
+"classPurrNet_1_1SyncDictionary.html#a62c5378b073c7ff719475aa70164a422",
+"classPurrNet_1_1Transports_1_1PurrTransport.html#acfe8a7db402852b3687bb9930c289bfb",
+"namespacePurrNet_1_1Transports.html#aea2a3e5dce25f82108029db663db2216",
+"structPurrNet_1_1Packing_1_1PackedInt.html"
 ];
 
 var SYNCONMSG = 'click to disable panel synchronisation';
