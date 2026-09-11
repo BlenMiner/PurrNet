@@ -1,7 +1,6 @@
 using System;
 using System.Collections.Generic;
 using PurrNet.Logging;
-using PurrNet.Packing;
 using PurrNet.Transports;
 using PurrNet.Utils;
 using UnityEngine;
@@ -12,8 +11,8 @@ namespace PurrNet
     /// Will automatically sync a value from client to server, so the server can utilize it. Automatically filters away multiple entries of the same value.
     /// </summary>
     /// <typeparam name="T">Type to sync to the server</typeparam>
-    [System.Serializable]
-    public class SyncInput<T> : NetworkModule, ITick, ISerializationCallbackReceiver where T : unmanaged, System.IEquatable<T>
+    [Serializable]
+    public class SyncInput<T> : NetworkModule, ITick, ISerializationCallbackReceiver where T : unmanaged, IEquatable<T>
     {
         public SyncInput(T defaultValue = default, float hostPing = 0f)
         {
@@ -28,7 +27,7 @@ namespace PurrNet
 
         [Tooltip("Simulated ping in ms. This is only for the host to simulate a ping delay.")]
         [SerializeField, PurrLock] private float _simulatedHostPing;
-        
+
         private T _lastValue;
         private int _currentId;
         private int _lastAckId;
@@ -39,7 +38,7 @@ namespace PurrNet
         private readonly Queue<PendingInput> _pendingHostInputs = new();
 
         public delegate void OnChangedDelegate(T newInput);
-        
+
         /// <summary>
         /// Called back every time the server receives a value change
         /// </summary>
@@ -51,7 +50,7 @@ namespace PurrNet
         public event Action onSentData;
 
         /// <summary>
-        /// The current value of the SyncInput. 
+        /// The current value of the SyncInput.
         /// </summary>
         public T value
         {
@@ -89,7 +88,7 @@ namespace PurrNet
                     PurrLogger.LogWarning($"Only the server can set the simulated host ping. | IsSpawned: {isSpawned} | IsServer: {isServer}", parent);
                     return;
                 }
-                
+
                 if (value < 0)
                     value = 0;
                 _simulatedHostPing = value;
@@ -157,11 +156,11 @@ namespace PurrNet
                 else
                     SendInput(current, _currentId);
             }
-            
+
             if (isHost)
                 ProcessPendingHostInputs();
         }
-        
+
         private void QueueOrApplyHostInput(T value)
         {
             if (_simulatedHostPing <= 0f)
@@ -221,7 +220,7 @@ namespace PurrNet
             if (id > _lastAckId)
                 _lastAckId = id;
         }
-        
+
         private struct PendingInput
         {
             public T value;
