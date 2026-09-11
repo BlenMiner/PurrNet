@@ -1,3 +1,10 @@
+# [1.23.0-beta.50](https://github.com/PurrNet/PurrNet/compare/v1.23.0-beta.49...v1.23.0-beta.50) (2026-09-11)
+
+
+### Features
+
+* WebRTC for PurrTransport ([a7da514](https://github.com/PurrNet/PurrNet/commit/a7da514b776622af3b6a8b56c45899c4f32ad7da))
+
 # [1.23.0-beta.49](https://github.com/PurrNet/PurrNet/compare/v1.23.0-beta.48...v1.23.0-beta.49) (2026-09-11)
 
 
