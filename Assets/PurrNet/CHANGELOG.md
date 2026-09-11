@@ -1,3 +1,10 @@
+# [1.23.0-beta.51](https://github.com/PurrNet/PurrNet/compare/v1.23.0-beta.50...v1.23.0-beta.51) (2026-09-11)
+
+
+### Features
+
+* purrtransport webrtc direct P2P ([1ece06d](https://github.com/PurrNet/PurrNet/commit/1ece06d42edbb0be76e8b1704ec80d631843fb14))
+
 # [1.23.0-beta.50](https://github.com/PurrNet/PurrNet/compare/v1.23.0-beta.49...v1.23.0-beta.50) (2026-09-11)
 
 
