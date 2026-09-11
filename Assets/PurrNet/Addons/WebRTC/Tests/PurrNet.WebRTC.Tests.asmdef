@@ -1,0 +1,15 @@
+{
+    "name": "PurrNet.WebRTC.Tests",
+    "references": ["PurrNet.Runtime", "PurrNet.WebRTC.Runtime", "Unity.WebRTC", "UnityEngine.TestRunner", "UnityEditor.TestRunner"],
+    "includePlatforms": ["Android", "Editor", "iOS", "LinuxStandalone64", "macOSStandalone", "WindowsStandalone64"],
+    "excludePlatforms": [],
+    "allowUnsafeCode": false,
+    "overrideReferences": true,
+    "precompiledReferences": ["nunit.framework.dll"],
+    "autoReferenced": false,
+    "defineConstraints": ["UNITY_INCLUDE_TESTS", "PURRNET_UNITY_WEBRTC"],
+    "versionDefines": [
+        { "name": "com.unity.webrtc", "expression": "[3.0.0,4.0.0)", "define": "PURRNET_UNITY_WEBRTC" }
+    ],
+    "noEngineReferences": false
+}

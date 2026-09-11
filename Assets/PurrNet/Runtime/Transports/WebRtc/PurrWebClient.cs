@@ -13,16 +13,30 @@ namespace PurrNet.Transports
     /// Uses browser data channels when a relay advertises WebRTC, falling back to
     /// the existing WebSocket client if negotiation fails before connecting.
     /// </summary>
-    public sealed class PurrWebClient
+    public sealed class PurrWebClient : IPurrWebRtcPeer
     {
         public event Action onConnect;
         public event Action onDisconnect;
         public event Action<ArraySegment<byte>> onData;
         public event Action<Exception> onError;
+        public event Action<string> onSignal;
+
+        internal static bool supportsPeerConnections
+        {
+            get
+            {
+#if UNITY_WEBGL && !UNITY_EDITOR
+                return true;
+#else
+                return false;
+#endif
+            }
+        }
 
         public bool isWebRtc { get; private set; }
-        internal byte receivedDeliveryMethod { get; private set; } = 2;
+        public byte receivedDeliveryMethod { get; private set; } = 2;
         public ClientState ConnectionState { get; private set; } = ClientState.NotConnected;
+        public bool isConnected => ConnectionState == ClientState.Connected;
 
         private readonly int _maxMessageSize;
         private readonly int _maxMessagesPerTick;
@@ -34,7 +48,7 @@ namespace PurrNet.Transports
         private bool _active;
         private bool _discardQueuedData;
 
-        private enum EventKind { Connected, Disconnected, Data, Error, Fallback }
+        private enum EventKind { Connected, Disconnected, Data, Error, Fallback, Signal }
 
         private struct PendingEvent
         {
@@ -43,6 +57,7 @@ namespace PurrNet.Transports
             public byte[] data;
             public byte deliveryMethod;
             public Exception error;
+            public string signal;
         }
 
         private PurrWebClient(int maxMessageSize, int maxMessagesPerTick, TcpConfig tcpConfig)
@@ -59,6 +74,40 @@ namespace PurrNet.Transports
         public static PurrWebClient Create(int maxMessageSize, int maxMessagesPerTick, TcpConfig tcpConfig)
         {
             return new PurrWebClient(maxMessageSize, maxMessagesPerTick, tcpConfig);
+        }
+
+        public void ConnectPeer(bool initiator, string iceServersJson)
+        {
+            Stop();
+            ++_generation;
+            _events.Clear();
+            _discardQueuedData = false;
+            _active = true;
+            isWebRtc = false;
+            ConnectionState = ClientState.Connecting;
+#if UNITY_WEBGL && !UNITY_EDITOR
+            _queuedDataBytes = _queuedDataMessages = 0;
+            try
+            {
+                _rtcId = PurrRtc_CreatePeer(initiator ? 1 : 0, iceServersJson, _maxMessageSize,
+                    OpenCallback, CloseCallback, DataCallback, ErrorCallback, SignalCallback);
+                Instances.Add(_rtcId, this);
+            }
+            catch (Exception)
+            {
+                Disconnect();
+            }
+#else
+            Disconnect();
+#endif
+        }
+
+        public void ReceiveSignal(string signal)
+        {
+#if UNITY_WEBGL && !UNITY_EDITOR
+            if (_active && _rtcId != 0)
+                PurrRtc_ReceiveSignal(_rtcId, signal);
+#endif
         }
 
         public void Connect(Uri websocketAddress, string webRtcUrl = null)
@@ -237,11 +286,16 @@ namespace PurrNet.Transports
                     case EventKind.Fallback:
                         StartWebSocket();
                         break;
+                    case EventKind.Signal:
+                        if (!_discardQueuedData)
+                            onSignal?.Invoke(next.signal);
+                        break;
                 }
             }
         }
 
-        private void Enqueue(EventKind kind, byte[] data = null, Exception error = null, byte deliveryMethod = 2)
+        private void Enqueue(EventKind kind, byte[] data = null, Exception error = null, byte deliveryMethod = 2,
+            string signal = null)
         {
 #if UNITY_WEBGL && !UNITY_EDITOR
             if (kind == EventKind.Data)
@@ -252,7 +306,8 @@ namespace PurrNet.Transports
 #endif
             _events.Enqueue(new PendingEvent
             {
-                generation = _generation, kind = kind, data = data, error = error, deliveryMethod = deliveryMethod
+                generation = _generation, kind = kind, data = data, error = error,
+                deliveryMethod = deliveryMethod, signal = signal
             });
         }
 
@@ -274,6 +329,14 @@ namespace PurrNet.Transports
 
         [DllImport("__Internal")]
         private static extern void PurrRtc_Send(int id, byte[] data, int offset, int count, int deliveryMethod);
+
+        [DllImport("__Internal")]
+        private static extern int PurrRtc_CreatePeer(int initiator, string iceServersJson, int maxMessageSize,
+            Action<int> opened, Action<int> closed, Action<int, IntPtr, int, int> data,
+            Action<int, IntPtr> error, Action<int, IntPtr> signal);
+
+        [DllImport("__Internal")]
+        private static extern void PurrRtc_ReceiveSignal(int id, string signal);
 
         private void Connected()
         {
@@ -341,6 +404,13 @@ namespace PurrNet.Transports
         {
             if (Instances.TryGetValue(id, out var client) && client._active)
                 client.Enqueue(EventKind.Error, error: new InvalidOperationException(Marshal.PtrToStringAnsi(pointer)));
+        }
+
+        [MonoPInvokeCallback(typeof(Action<int, IntPtr>))]
+        private static void SignalCallback(int id, IntPtr pointer)
+        {
+            if (Instances.TryGetValue(id, out var client) && client._active)
+                client.Enqueue(EventKind.Signal, signal: Marshal.PtrToStringAnsi(pointer));
         }
 
         [MonoPInvokeCallback(typeof(Action<int>))]

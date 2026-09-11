@@ -23,6 +23,8 @@ var PurrRtcLibrary = {
                 try { channel.close(); } catch (_) { }
             });
             if (session.pc) {
+                session.pc.ondatachannel = null;
+                session.pc.onicecandidate = null;
                 session.pc.onconnectionstatechange = null;
                 session.pc.oniceconnectionstatechange = null;
                 session.pc.onicegatheringstatechange = null;
@@ -35,6 +37,11 @@ var PurrRtcLibrary = {
             if (!PurrRtc.live(session)) return;
             var connected = session.connected;
             PurrRtc.dispose(session);
+            if (session.peer) {
+                session.error(message || 'WebRTC peer connection closed.');
+                session.closed();
+                return;
+            }
             // Switching protocols after connecting would replay room authentication.
             if (connected) {
                 session.error(message || 'WebRTC connection closed.');
@@ -96,6 +103,10 @@ var PurrRtcLibrary = {
 
         createChannel: function (session, method, options) {
             var channel = session.pc.createDataChannel('purr-' + method, options);
+            PurrRtc.bindChannel(session, method, channel);
+        },
+
+        bindChannel: function (session, method, channel) {
             session.channels[method] = channel;
             channel.binaryType = 'arraybuffer';
             channel.onopen = function () {

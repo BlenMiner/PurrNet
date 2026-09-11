@@ -1,0 +1,19 @@
+{
+    "name": "PurrNet.WebRTC.Runtime",
+    "rootNamespace": "PurrNet.WebRTC",
+    "references": [
+        "GUID:6e20f757a1bae164fa42750dd2b27dcb",
+        "GUID:f12aafacab75a87499e7e45c873ffab8"
+    ],
+    "includePlatforms": ["Android", "Editor", "iOS", "LinuxStandalone64", "macOSStandalone", "WindowsStandalone64"],
+    "excludePlatforms": [],
+    "allowUnsafeCode": false,
+    "overrideReferences": true,
+    "precompiledReferences": ["Newtonsoft.Json.dll"],
+    "autoReferenced": true,
+    "defineConstraints": ["PURRNET_UNITY_WEBRTC"],
+    "versionDefines": [
+        { "name": "com.unity.webrtc", "expression": "[3.0.0,4.0.0)", "define": "PURRNET_UNITY_WEBRTC" }
+    ],
+    "noEngineReferences": false
+}

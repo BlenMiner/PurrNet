@@ -84,7 +84,7 @@ Coming from another solution? We have [migration guides](https://purrnet.dev/doc
 - Unity Transport (UTP)
 - Nakama
 - Local (no socket)
-- PurrTransport (our relay: free for development, and self-hostable for free if you'd rather run it yourself)
+- PurrTransport (our relay: free for development, and self-hostable for free if you'd rather run it yourself), with optional direct WebRTC P2P
 - Composite (allows multiple transports at once)
 
 There's also an Edgegap addon if you want managed server deployment.

@@ -48,7 +48,12 @@ namespace PurrNet
             switch (transport)
             {
                 case PurrTransport purr:
-                    return purr.hostLinkDescription ?? "Disconnected";
+                {
+                    var description = purr.hostLinkDescription ?? "Disconnected";
+                    int total = purr.connections.Count;
+                    return total == 0 ? description
+                        : $"{description}; clients: {purr.p2pConnectionCount} P2P / {total - purr.p2pConnectionCount} relay";
+                }
                 case CompositeTransport composite:
                 {
                     string description = null;
