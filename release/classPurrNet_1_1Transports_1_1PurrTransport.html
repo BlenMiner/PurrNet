@@ -117,14 +117,16 @@ Inheritance diagram for PurrNet.Transports.PurrTransport:</div>
 <tr class="heading"><td colspan="2"><h2 class="groupheader"><a id="pub-types" name="pub-types"></a>
 Public Types</h2></td></tr>
 <tr class="memitem:a9c1074a3457b1be31fbf09f912e17661"><td class="memItemLeft" align="right" valign="top"><a id="a9c1074a3457b1be31fbf09f912e17661" name="a9c1074a3457b1be31fbf09f912e17661"></a>enum &#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="classPurrNet_1_1Transports_1_1PurrTransport.html#a9c1074a3457b1be31fbf09f912e17661">SessionLink</a> </td></tr>
-<tr class="memdesc:a9c1074a3457b1be31fbf09f912e17661"><td class="mdescLeft">&#160;</td><td class="mdescRight">Which link a session is running over: the relay or a direct NAT-punched P2P link. <br /></td></tr>
+<tr class="memdesc:a9c1074a3457b1be31fbf09f912e17661"><td class="mdescLeft">&#160;</td><td class="mdescRight">Whether a session uses the relay or a direct P2P connection. <br /></td></tr>
 <tr class="separator:a9c1074a3457b1be31fbf09f912e17661"><td class="memSeparator" colspan="2">&#160;</td></tr>
+<tr class="memitem:a8c47a7f4552f65afe156ec8dbc6d0faa"><td class="memItemLeft" align="right" valign="top"><a id="a8c47a7f4552f65afe156ec8dbc6d0faa" name="a8c47a7f4552f65afe156ec8dbc6d0faa"></a>enum &#160;</td><td class="memItemRight" valign="bottom"><b>ConnectionProtocol</b> </td></tr>
+<tr class="separator:a8c47a7f4552f65afe156ec8dbc6d0faa"><td class="memSeparator" colspan="2">&#160;</td></tr>
 </table><table class="memberdecls">
 <tr class="heading"><td colspan="2"><h2 class="groupheader"><a id="pub-methods" name="pub-methods"></a>
 Public Member Functions</h2></td></tr>
 <tr class="memitem:a494876d88e0afc801b7a91f4a82cbed2"><td class="memItemLeft" align="right" valign="top"><a id="a494876d88e0afc801b7a91f4a82cbed2" name="a494876d88e0afc801b7a91f4a82cbed2"></a>
 string&#160;</td><td class="memItemRight" valign="bottom"><b>GetP2pEndpoint</b> (<a class="el" href="structPurrNet_1_1Transports_1_1Connection.html">Connection</a> conn)</td></tr>
-<tr class="memdesc:a494876d88e0afc801b7a91f4a82cbed2"><td class="mdescLeft">&#160;</td><td class="mdescRight">Remote endpoint of a host-side connection's direct P2P link, or null if it runs over the relay. <br /></td></tr>
+<tr class="memdesc:a494876d88e0afc801b7a91f4a82cbed2"><td class="mdescLeft">&#160;</td><td class="mdescRight">Remote endpoint of a host-side native UDP P2P link, or null for other routes. <br /></td></tr>
 <tr class="separator:a494876d88e0afc801b7a91f4a82cbed2"><td class="memSeparator" colspan="2">&#160;</td></tr>
 <tr class="memitem:a348d074b40b42bd5ccd5972ab5bff39b"><td class="memItemLeft" align="right" valign="top"><a id="a348d074b40b42bd5ccd5972ab5bff39b" name="a348d074b40b42bd5ccd5972ab5bff39b"></a>
 void&#160;</td><td class="memItemRight" valign="bottom"><b>SetServer</b> (<a class="el" href="structPurrNet_1_1Transports_1_1RelayServer.html">RelayServer</a> server)</td></tr>
@@ -136,6 +138,9 @@ void&#160;</td><td class="memItemRight" valign="bottom"><b>PrepareHostMigration<
 <tr class="separator:abf7ac230ca71787d2ceb59b89d4f165a"><td class="memSeparator" colspan="2">&#160;</td></tr>
 <tr class="memitem:aec42f838e005770b2a25ba87674350ad"><td class="memItemLeft" align="right" valign="top">int&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="classPurrNet_1_1Transports_1_1PurrTransport.html#aec42f838e005770b2a25ba87674350ad">GetMTU</a> (<a class="el" href="structPurrNet_1_1Transports_1_1Connection.html">Connection</a> target, Channel channel, bool asServer)</td></tr>
 <tr class="separator:aec42f838e005770b2a25ba87674350ad"><td class="memSeparator" colspan="2">&#160;</td></tr>
+<tr class="memitem:aab98e7f9322ba813c454a1e468adec2c"><td class="memItemLeft" align="right" valign="top">int&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="classPurrNet_1_1Transports_1_1PurrTransport.html#aab98e7f9322ba813c454a1e468adec2c">GetRoundTripTime</a> (<a class="el" href="structPurrNet_1_1Transports_1_1Connection.html">Connection</a> conn, bool asServer)</td></tr>
+<tr class="memdesc:aab98e7f9322ba813c454a1e468adec2c"><td class="mdescLeft">&#160;</td><td class="mdescRight">Round trip time in milliseconds for a connection, or -1 when the transport has not measured it yet or does not support it. On the client side the connection argument is ignored.   <a href="classPurrNet_1_1Transports_1_1PurrTransport.html#aab98e7f9322ba813c454a1e468adec2c">More...</a><br /></td></tr>
+<tr class="separator:aab98e7f9322ba813c454a1e468adec2c"><td class="memSeparator" colspan="2">&#160;</td></tr>
 <tr class="memitem:af02665fbf9f1ad67f286a26b2a5d82e6"><td class="memItemLeft" align="right" valign="top">async void&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="classPurrNet_1_1Transports_1_1PurrTransport.html#af02665fbf9f1ad67f286a26b2a5d82e6">Listen</a> (ushort port)</td></tr>
 <tr class="separator:af02665fbf9f1ad67f286a26b2a5d82e6"><td class="memSeparator" colspan="2">&#160;</td></tr>
 <tr class="memitem:a91d464d84a2f3bec857c2fab94789e41"><td class="memItemLeft" align="right" valign="top">void&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="classPurrNet_1_1Transports_1_1PurrTransport.html#a91d464d84a2f3bec857c2fab94789e41">StopListening</a> ()</td></tr>
@@ -154,10 +159,14 @@ void&#160;</td><td class="memItemRight" valign="bottom"><b>PrepareHostMigration<
 <tr class="separator:af526aac8e57b7e4beb90acceb3143770"><td class="memSeparator" colspan="2">&#160;</td></tr>
 <tr class="memitem:a2f9ddfb5a315cc4e40da21c77b2dc9be"><td class="memItemLeft" align="right" valign="top">void&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="classPurrNet_1_1Transports_1_1PurrTransport.html#a2f9ddfb5a315cc4e40da21c77b2dc9be">SendToServer</a> (<a class="el" href="structPurrNet_1_1Transports_1_1ByteData.html">ByteData</a> data, Channel method=Channel.ReliableOrdered)</td></tr>
 <tr class="separator:a2f9ddfb5a315cc4e40da21c77b2dc9be"><td class="memSeparator" colspan="2">&#160;</td></tr>
-<tr class="memitem:a3042976559865d9b8b8a9cc7deb57977"><td class="memItemLeft" align="right" valign="top"><a id="a3042976559865d9b8b8a9cc7deb57977" name="a3042976559865d9b8b8a9cc7deb57977"></a>
-async void&#160;</td><td class="memItemRight" valign="bottom"><b>ConnectAsPipe</b> (string relayHost, int udpPort, int wsPort)</td></tr>
-<tr class="memdesc:a3042976559865d9b8b8a9cc7deb57977"><td class="mdescLeft">&#160;</td><td class="mdescRight">Connect to a relay server in pipe mode. No rooms, no host — just connId-based forwarding. Use SendPipeData to send to specific peers.  <br /></td></tr>
-<tr class="separator:a3042976559865d9b8b8a9cc7deb57977"><td class="memSeparator" colspan="2">&#160;</td></tr>
+<tr class="memitem:af91cb81d1a9177485703c595338ceede"><td class="memItemLeft" align="right" valign="top"><a id="af91cb81d1a9177485703c595338ceede" name="af91cb81d1a9177485703c595338ceede"></a>
+void&#160;</td><td class="memItemRight" valign="bottom"><b>ConnectAsPipe</b> (string relayHost, int udpPort, int wsPort)</td></tr>
+<tr class="memdesc:af91cb81d1a9177485703c595338ceede"><td class="mdescLeft">&#160;</td><td class="mdescRight">Connect to a relay server in pipe mode. No rooms, no host — just connId-based forwarding. Use SendPipeData to send to specific peers.  <br /></td></tr>
+<tr class="separator:af91cb81d1a9177485703c595338ceede"><td class="memSeparator" colspan="2">&#160;</td></tr>
+<tr class="memitem:a4fcdfdf7454dc10ba2e7663d5e7ba06d"><td class="memItemLeft" align="right" valign="top"><a id="a4fcdfdf7454dc10ba2e7663d5e7ba06d" name="a4fcdfdf7454dc10ba2e7663d5e7ba06d"></a>
+async void&#160;</td><td class="memItemRight" valign="bottom"><b>ConnectAsPipe</b> (string relayHost, int udpPort, int wsPort, string webRtcUrl)</td></tr>
+<tr class="memdesc:a4fcdfdf7454dc10ba2e7663d5e7ba06d"><td class="mdescLeft">&#160;</td><td class="mdescRight">Connect in pipe mode with optional WebRTC and WebSocket fallback for browsers. <br /></td></tr>
+<tr class="separator:a4fcdfdf7454dc10ba2e7663d5e7ba06d"><td class="memSeparator" colspan="2">&#160;</td></tr>
 <tr class="memitem:a2b38a6a955020047616a1108a3818058"><td class="memItemLeft" align="right" valign="top"><a id="a2b38a6a955020047616a1108a3818058" name="a2b38a6a955020047616a1108a3818058"></a>
 void&#160;</td><td class="memItemRight" valign="bottom"><b>SendPipeData</b> (int targetConnId, <a class="el" href="structPurrNet_1_1Transports_1_1ByteData.html">ByteData</a> data, Channel channel=Channel.ReliableOrdered)</td></tr>
 <tr class="memdesc:a2b38a6a955020047616a1108a3818058"><td class="mdescLeft">&#160;</td><td class="mdescRight">Send data to a specific peer via the relay (pipe mode only).  <br /></td></tr>
@@ -174,6 +183,15 @@ void&#160;</td><td class="memItemRight" valign="bottom"><b>DisconnectPipe</b> ()
 <tr class="separator:a5d7c1850f3b39ab58dcbadae64c3925d"><td class="memSeparator" colspan="2">&#160;</td></tr>
 <tr class="memitem:a07d3bcb5b7607bc98e9084b1e90e1d8b"><td class="memItemLeft" align="right" valign="top">void&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="classPurrNet_1_1Transports_1_1PurrTransport.html#a07d3bcb5b7607bc98e9084b1e90e1d8b">SendMessages</a> (float delta)</td></tr>
 <tr class="separator:a07d3bcb5b7607bc98e9084b1e90e1d8b"><td class="memSeparator" colspan="2">&#160;</td></tr>
+<tr class="memitem:ab39527cd4fca47ccde3d57cc731e5a9c"><td class="memItemLeft" align="right" valign="top">bool&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="classPurrNet_1_1Transports_1_1PurrTransport.html#ab39527cd4fca47ccde3d57cc731e5a9c">FlushConnection</a> (<a class="el" href="structPurrNet_1_1Transports_1_1Connection.html">Connection</a> conn, bool asServer)</td></tr>
+<tr class="memdesc:ab39527cd4fca47ccde3d57cc731e5a9c"><td class="mdescLeft">&#160;</td><td class="mdescRight">Pushes data already queued for one connection onto the wire without a full send pass. Returns false when the transport cannot do this, in which case the caller falls back to SendMessages. On the client side the connection argument is ignored.   <a href="classPurrNet_1_1Transports_1_1PurrTransport.html#ab39527cd4fca47ccde3d57cc731e5a9c">More...</a><br /></td></tr>
+<tr class="separator:ab39527cd4fca47ccde3d57cc731e5a9c"><td class="memSeparator" colspan="2">&#160;</td></tr>
+<tr class="memitem:a5f449c2e26e317d967825f487ce5cde7"><td class="memItemLeft" align="right" valign="top"><a id="a5f449c2e26e317d967825f487ce5cde7" name="a5f449c2e26e317d967825f487ce5cde7"></a>
+<a class="el" href="classPurrNet_1_1Transports_1_1PurrTransport.html#a9c1074a3457b1be31fbf09f912e17661">SessionLink</a>&#160;</td><td class="memItemRight" valign="bottom"><b>GetSessionLink</b> (<a class="el" href="structPurrNet_1_1Transports_1_1Connection.html">Connection</a> connection)</td></tr>
+<tr class="separator:a5f449c2e26e317d967825f487ce5cde7"><td class="memSeparator" colspan="2">&#160;</td></tr>
+<tr class="memitem:a4e8408d178251d2d4103af8c1d6023ad"><td class="memItemLeft" align="right" valign="top"><a id="a4e8408d178251d2d4103af8c1d6023ad" name="a4e8408d178251d2d4103af8c1d6023ad"></a>
+ConnectionProtocol&#160;</td><td class="memItemRight" valign="bottom"><b>GetConnectionProtocol</b> (<a class="el" href="structPurrNet_1_1Transports_1_1Connection.html">Connection</a> connection)</td></tr>
+<tr class="separator:a4e8408d178251d2d4103af8c1d6023ad"><td class="memSeparator" colspan="2">&#160;</td></tr>
 <tr class="inherit_header pub_methods_classPurrNet_1_1Transports_1_1GenericTransport"><td colspan="2" onclick="javascript:toggleInherit('pub_methods_classPurrNet_1_1Transports_1_1GenericTransport')"><img src="closed.png" alt="-"/>&#160;Public Member Functions inherited from <a class="el" href="classPurrNet_1_1Transports_1_1GenericTransport.html">PurrNet.Transports.GenericTransport</a></td></tr>
 <tr class="memitem:abb3d0402cfa9ccdbf9cdc014edd2f36a inherit pub_methods_classPurrNet_1_1Transports_1_1GenericTransport"><td class="memItemLeft" align="right" valign="top"><a id="abb3d0402cfa9ccdbf9cdc014edd2f36a" name="abb3d0402cfa9ccdbf9cdc014edd2f36a"></a>
 void&#160;</td><td class="memItemRight" valign="bottom"><b>StartServer</b> ()</td></tr>
@@ -191,12 +209,32 @@ void&#160;</td><td class="memItemRight" valign="bottom"><b>StartClient</b> ()</t
 void&#160;</td><td class="memItemRight" valign="bottom"><b>StopClient</b> ()</td></tr>
 <tr class="memdesc:afcc3e6a38f346833675235496a200563 inherit pub_methods_classPurrNet_1_1Transports_1_1GenericTransport"><td class="mdescLeft">&#160;</td><td class="mdescRight">Stops the client. This will disconnect from the server. Optionally, you can pass a <a class="el" href="classPurrNet_1_1NetworkManager.html">NetworkManager</a> to register client modules. If you do not pass a <a class="el" href="classPurrNet_1_1NetworkManager.html">NetworkManager</a>, it will try to find one in the hierarchy.  <br /></td></tr>
 <tr class="separator:afcc3e6a38f346833675235496a200563 inherit pub_methods_classPurrNet_1_1Transports_1_1GenericTransport"><td class="memSeparator" colspan="2">&#160;</td></tr>
+<tr class="memitem:a913bb87eb425b32192663ba43260508b inherit pub_methods_classPurrNet_1_1Transports_1_1GenericTransport"><td class="memItemLeft" align="right" valign="top"><a id="a913bb87eb425b32192663ba43260508b" name="a913bb87eb425b32192663ba43260508b"></a>
+Task&lt; <a class="el" href="structPurrNet_1_1Transports_1_1PingResult.html">PingResult</a> &gt;&#160;</td><td class="memItemRight" valign="bottom"><b>Ping</b> (CancellationToken token=default)</td></tr>
+<tr class="memdesc:a913bb87eb425b32192663ba43260508b inherit pub_methods_classPurrNet_1_1Transports_1_1GenericTransport"><td class="mdescLeft">&#160;</td><td class="mdescRight">Measures latency to the server this transport is configured to connect to. Opens a transport level connection, reads the round trip time, then disconnects. The probe never registers with the <a class="el" href="classPurrNet_1_1NetworkManager.html">NetworkManager</a> or authenticates, so it never becomes a player.  <br /></td></tr>
+<tr class="separator:a913bb87eb425b32192663ba43260508b inherit pub_methods_classPurrNet_1_1Transports_1_1GenericTransport"><td class="memSeparator" colspan="2">&#160;</td></tr>
+<tr class="memitem:a653f5fddf060c27c21658a2307f78fd7 inherit pub_methods_classPurrNet_1_1Transports_1_1GenericTransport"><td class="memItemLeft" align="right" valign="top"><a id="a653f5fddf060c27c21658a2307f78fd7" name="a653f5fddf060c27c21658a2307f78fd7"></a>
+Task&lt; <a class="el" href="structPurrNet_1_1Transports_1_1PingResult.html">PingResult</a> &gt;&#160;</td><td class="memItemRight" valign="bottom"><b>Ping</b> (float timeoutSeconds, CancellationToken token=default)</td></tr>
+<tr class="separator:a653f5fddf060c27c21658a2307f78fd7 inherit pub_methods_classPurrNet_1_1Transports_1_1GenericTransport"><td class="memSeparator" colspan="2">&#160;</td></tr>
+<tr class="memitem:ac3f5a835d1615ff0d7dce56469e9cdc3 inherit pub_methods_classPurrNet_1_1Transports_1_1GenericTransport"><td class="memItemLeft" align="right" valign="top"><a id="ac3f5a835d1615ff0d7dce56469e9cdc3" name="ac3f5a835d1615ff0d7dce56469e9cdc3"></a>
+Task&lt; <a class="el" href="structPurrNet_1_1Transports_1_1PingResult.html">PingResult</a> &gt;&#160;</td><td class="memItemRight" valign="bottom"><b>Ping</b> (string address, ushort port, CancellationToken token=default)</td></tr>
+<tr class="memdesc:ac3f5a835d1615ff0d7dce56469e9cdc3 inherit pub_methods_classPurrNet_1_1Transports_1_1GenericTransport"><td class="mdescLeft">&#160;</td><td class="mdescRight">Measures latency to a specific address, using the same address semantics as IConnectable.Connect.  <br /></td></tr>
+<tr class="separator:ac3f5a835d1615ff0d7dce56469e9cdc3 inherit pub_methods_classPurrNet_1_1Transports_1_1GenericTransport"><td class="memSeparator" colspan="2">&#160;</td></tr>
+<tr class="memitem:a0bde9bbf480674e977cf71421844491f inherit pub_methods_classPurrNet_1_1Transports_1_1GenericTransport"><td class="memItemLeft" align="right" valign="top"><a id="a0bde9bbf480674e977cf71421844491f" name="a0bde9bbf480674e977cf71421844491f"></a>
+Task&lt; <a class="el" href="structPurrNet_1_1Transports_1_1PingResult.html">PingResult</a> &gt;&#160;</td><td class="memItemRight" valign="bottom"><b>Ping</b> (string address, ushort port, float timeoutSeconds, CancellationToken token=default)</td></tr>
+<tr class="separator:a0bde9bbf480674e977cf71421844491f inherit pub_methods_classPurrNet_1_1Transports_1_1GenericTransport"><td class="memSeparator" colspan="2">&#160;</td></tr>
 <tr class="memitem:afa464cc871a335cfcfa01ed80c67e63c"><td class="memItemLeft" align="right" valign="top"><a id="afa464cc871a335cfcfa01ed80c67e63c" name="afa464cc871a335cfcfa01ed80c67e63c"></a>
 bool&#160;</td><td class="memItemRight" valign="bottom"><b>SupportsChannel</b> (Channel channel)</td></tr>
 <tr class="separator:afa464cc871a335cfcfa01ed80c67e63c"><td class="memSeparator" colspan="2">&#160;</td></tr>
 <tr class="memitem:a0ac3bb184fe2913de57666f3ff4b01f6"><td class="memItemLeft" align="right" valign="top"><a id="a0ac3bb184fe2913de57666f3ff4b01f6" name="a0ac3bb184fe2913de57666f3ff4b01f6"></a>
 int&#160;</td><td class="memItemRight" valign="bottom"><b>GetMTU</b> (<a class="el" href="structPurrNet_1_1Transports_1_1Connection.html">Connection</a> target, Channel channel, bool asServer)</td></tr>
 <tr class="separator:a0ac3bb184fe2913de57666f3ff4b01f6"><td class="memSeparator" colspan="2">&#160;</td></tr>
+<tr class="memitem:ae3e1f81560c564104469b5fc729ba137"><td class="memItemLeft" align="right" valign="top">int&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="interfacePurrNet_1_1Transports_1_1ITransport.html#ae3e1f81560c564104469b5fc729ba137">GetRoundTripTime</a> (<a class="el" href="structPurrNet_1_1Transports_1_1Connection.html">Connection</a> conn, bool asServer)</td></tr>
+<tr class="memdesc:ae3e1f81560c564104469b5fc729ba137"><td class="mdescLeft">&#160;</td><td class="mdescRight">Round trip time in milliseconds for a connection, or -1 when the transport has not measured it yet or does not support it. On the client side the connection argument is ignored.   <a href="interfacePurrNet_1_1Transports_1_1ITransport.html#ae3e1f81560c564104469b5fc729ba137">More...</a><br /></td></tr>
+<tr class="separator:ae3e1f81560c564104469b5fc729ba137"><td class="memSeparator" colspan="2">&#160;</td></tr>
+<tr class="memitem:a84d8be7b2d22babc84aec7313f41e66c"><td class="memItemLeft" align="right" valign="top">bool&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="interfacePurrNet_1_1Transports_1_1ITransport.html#a84d8be7b2d22babc84aec7313f41e66c">FlushConnection</a> (<a class="el" href="structPurrNet_1_1Transports_1_1Connection.html">Connection</a> conn, bool asServer)</td></tr>
+<tr class="memdesc:a84d8be7b2d22babc84aec7313f41e66c"><td class="mdescLeft">&#160;</td><td class="mdescRight">Pushes data already queued for one connection onto the wire without a full send pass. Returns false when the transport cannot do this, in which case the caller falls back to SendMessages. On the client side the connection argument is ignored.   <a href="interfacePurrNet_1_1Transports_1_1ITransport.html#a84d8be7b2d22babc84aec7313f41e66c">More...</a><br /></td></tr>
+<tr class="separator:a84d8be7b2d22babc84aec7313f41e66c"><td class="memSeparator" colspan="2">&#160;</td></tr>
 <tr class="memitem:af93c7e3cc31101e327f392839e24f9b1"><td class="memItemLeft" align="right" valign="top"><a id="af93c7e3cc31101e327f392839e24f9b1" name="af93c7e3cc31101e327f392839e24f9b1"></a>
 void&#160;</td><td class="memItemRight" valign="bottom"><b>SendServerKeepAlive</b> ()</td></tr>
 <tr class="separator:af93c7e3cc31101e327f392839e24f9b1"><td class="memSeparator" colspan="2">&#160;</td></tr>
@@ -238,11 +276,21 @@ void&#160;</td><td class="memItemRight" valign="bottom"><b>Disconnect</b> ()</td
 </table><table class="memberdecls">
 <tr class="heading"><td colspan="2"><h2 class="groupheader"><a id="pro-methods" name="pro-methods"></a>
 Protected Member Functions</h2></td></tr>
+<tr class="memitem:a7d3471c46b45ed73ba31bfc43e427b94"><td class="memItemLeft" align="right" valign="top">override async Task&lt; <a class="el" href="structPurrNet_1_1Transports_1_1PingResult.html">PingResult</a> &gt;&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="classPurrNet_1_1Transports_1_1PurrTransport.html#a7d3471c46b45ed73ba31bfc43e427b94">PingInternal</a> (string address, ushort port, bool useAddress, float timeoutSeconds, CancellationToken token)</td></tr>
+<tr class="memdesc:a7d3471c46b45ed73ba31bfc43e427b94"><td class="mdescLeft">&#160;</td><td class="mdescRight">Pinging a <a class="el" href="classPurrNet_1_1Transports_1_1PurrTransport.html">PurrTransport</a> joins the room as a throwaway client when a host is running it, which measures the real link (direct P2P or relay). Without a room it pings the relay of the configured region over HTTP.   <a href="classPurrNet_1_1Transports_1_1PurrTransport.html#a7d3471c46b45ed73ba31bfc43e427b94">More...</a><br /></td></tr>
+<tr class="separator:a7d3471c46b45ed73ba31bfc43e427b94"><td class="memSeparator" colspan="2">&#160;</td></tr>
 <tr class="memitem:a910f03c1a1982164c7a94b2ac109ec4d"><td class="memItemLeft" align="right" valign="top">override void&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="classPurrNet_1_1Transports_1_1PurrTransport.html#a910f03c1a1982164c7a94b2ac109ec4d">StartClientInternal</a> ()</td></tr>
 <tr class="separator:a910f03c1a1982164c7a94b2ac109ec4d"><td class="memSeparator" colspan="2">&#160;</td></tr>
 <tr class="memitem:a178476b630e823ba12bad975ab6cecd5"><td class="memItemLeft" align="right" valign="top">override void&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="classPurrNet_1_1Transports_1_1PurrTransport.html#a178476b630e823ba12bad975ab6cecd5">StartServerInternal</a> ()</td></tr>
 <tr class="separator:a178476b630e823ba12bad975ab6cecd5"><td class="memSeparator" colspan="2">&#160;</td></tr>
 <tr class="inherit_header pro_methods_classPurrNet_1_1Transports_1_1GenericTransport"><td colspan="2" onclick="javascript:toggleInherit('pro_methods_classPurrNet_1_1Transports_1_1GenericTransport')"><img src="closed.png" alt="-"/>&#160;Protected Member Functions inherited from <a class="el" href="classPurrNet_1_1Transports_1_1GenericTransport.html">PurrNet.Transports.GenericTransport</a></td></tr>
+<tr class="memitem:afd13e5b9fdb385641b9907676da37a29 inherit pro_methods_classPurrNet_1_1Transports_1_1GenericTransport"><td class="memItemLeft" align="right" valign="top">virtual Task&lt; <a class="el" href="structPurrNet_1_1Transports_1_1PingResult.html">PingResult</a> &gt;&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="classPurrNet_1_1Transports_1_1GenericTransport.html#afd13e5b9fdb385641b9907676da37a29">PingInternal</a> (string address, ushort port, bool useAddress, float timeoutSeconds, CancellationToken token)</td></tr>
+<tr class="memdesc:afd13e5b9fdb385641b9907676da37a29 inherit pro_methods_classPurrNet_1_1Transports_1_1GenericTransport"><td class="mdescLeft">&#160;</td><td class="mdescRight">Runs the ping. <a class="el" href="namespacePurrNet_1_1Transports.html">Transports</a> can override this when a plain probe connection is not the right way to measure latency, and call <a class="el" href="classPurrNet_1_1Transports_1_1GenericTransport.html#a40f47428234cfff40a56f1889aa47c26" title="Default ping: connect at the transport level, read the round trip time, then disconnect.">ProbeConnection</a> for the default behaviour.   <a href="classPurrNet_1_1Transports_1_1GenericTransport.html#afd13e5b9fdb385641b9907676da37a29">More...</a><br /></td></tr>
+<tr class="separator:afd13e5b9fdb385641b9907676da37a29 inherit pro_methods_classPurrNet_1_1Transports_1_1GenericTransport"><td class="memSeparator" colspan="2">&#160;</td></tr>
+<tr class="memitem:a40f47428234cfff40a56f1889aa47c26 inherit pro_methods_classPurrNet_1_1Transports_1_1GenericTransport"><td class="memItemLeft" align="right" valign="top"><a id="a40f47428234cfff40a56f1889aa47c26" name="a40f47428234cfff40a56f1889aa47c26"></a>
+async Task&lt; <a class="el" href="structPurrNet_1_1Transports_1_1PingResult.html">PingResult</a> &gt;&#160;</td><td class="memItemRight" valign="bottom"><b>ProbeConnection</b> (string address, ushort port, bool useAddress, float timeoutSeconds, CancellationToken token)</td></tr>
+<tr class="memdesc:a40f47428234cfff40a56f1889aa47c26 inherit pro_methods_classPurrNet_1_1Transports_1_1GenericTransport"><td class="mdescLeft">&#160;</td><td class="mdescRight">Default ping: connect at the transport level, read the round trip time, then disconnect.  <br /></td></tr>
+<tr class="separator:a40f47428234cfff40a56f1889aa47c26 inherit pro_methods_classPurrNet_1_1Transports_1_1GenericTransport"><td class="memSeparator" colspan="2">&#160;</td></tr>
 <tr class="memitem:ae3060eb86de7c625eb57deab6e938ee1 inherit pro_methods_classPurrNet_1_1Transports_1_1GenericTransport"><td class="memItemLeft" align="right" valign="top"><a id="ae3060eb86de7c625eb57deab6e938ee1" name="ae3060eb86de7c625eb57deab6e938ee1"></a>
 abstract void&#160;</td><td class="memItemRight" valign="bottom"><b>StartClientInternal</b> ()</td></tr>
 <tr class="separator:ae3060eb86de7c625eb57deab6e938ee1 inherit pro_methods_classPurrNet_1_1Transports_1_1GenericTransport"><td class="memSeparator" colspan="2">&#160;</td></tr>
@@ -270,9 +318,22 @@ string&#160;</td><td class="memItemRight" valign="bottom"><b>masterServer</b><co
 <tr class="memitem:a26e7209d2dea3c2fc5d4c466d0d52af7"><td class="memItemLeft" align="right" valign="top"><a id="a26e7209d2dea3c2fc5d4c466d0d52af7" name="a26e7209d2dea3c2fc5d4c466d0d52af7"></a>
 string&#160;</td><td class="memItemRight" valign="bottom"><b>roomName</b><code> [get, set]</code></td></tr>
 <tr class="separator:a26e7209d2dea3c2fc5d4c466d0d52af7"><td class="memSeparator" colspan="2">&#160;</td></tr>
+<tr class="memitem:ad729d853134402a9c8eeddac0e6f7a08"><td class="memItemLeft" align="right" valign="top"><a id="ad729d853134402a9c8eeddac0e6f7a08" name="ad729d853134402a9c8eeddac0e6f7a08"></a>
+bool&#160;</td><td class="memItemRight" valign="bottom"><b>attemptDirectConnection</b><code> [get, set]</code></td></tr>
+<tr class="memdesc:ad729d853134402a9c8eeddac0e6f7a08"><td class="mdescLeft">&#160;</td><td class="mdescRight">Attempt a direct connection when both players enable it. Configure before connecting. <br /></td></tr>
+<tr class="separator:ad729d853134402a9c8eeddac0e6f7a08"><td class="memSeparator" colspan="2">&#160;</td></tr>
 <tr class="memitem:a14892dc32e17023db8badbb49b5fda3f"><td class="memItemLeft" align="right" valign="top"><a id="a14892dc32e17023db8badbb49b5fda3f" name="a14892dc32e17023db8badbb49b5fda3f"></a>
 bool&#160;</td><td class="memItemRight" valign="bottom"><b>useNat</b><code> [get, set]</code></td></tr>
+<tr class="memdesc:a14892dc32e17023db8badbb49b5fda3f"><td class="mdescLeft">&#160;</td><td class="mdescRight">Compatibility alias for <a class="el" href="classPurrNet_1_1Transports_1_1PurrTransport.html#ad729d853134402a9c8eeddac0e6f7a08" title="Attempt a direct connection when both players enable it. Configure before connecting.">attemptDirectConnection</a>. <br /></td></tr>
 <tr class="separator:a14892dc32e17023db8badbb49b5fda3f"><td class="memSeparator" colspan="2">&#160;</td></tr>
+<tr class="memitem:acfe8a7db402852b3687bb9930c289bfb"><td class="memItemLeft" align="right" valign="top"><a id="acfe8a7db402852b3687bb9930c289bfb" name="acfe8a7db402852b3687bb9930c289bfb"></a>
+ConnectionProtocol&#160;</td><td class="memItemRight" valign="bottom"><b>clientConnectionProtocol</b><code> [get]</code></td></tr>
+<tr class="memdesc:acfe8a7db402852b3687bb9930c289bfb"><td class="mdescLeft">&#160;</td><td class="mdescRight">Client protocol, or None unless connected. <br /></td></tr>
+<tr class="separator:acfe8a7db402852b3687bb9930c289bfb"><td class="memSeparator" colspan="2">&#160;</td></tr>
+<tr class="memitem:a5309ed8104536227fd533d88e1313782"><td class="memItemLeft" align="right" valign="top"><a id="a5309ed8104536227fd533d88e1313782" name="a5309ed8104536227fd533d88e1313782"></a>
+ConnectionProtocol&#160;</td><td class="memItemRight" valign="bottom"><b>hostConnectionProtocol</b><code> [get]</code></td></tr>
+<tr class="memdesc:a5309ed8104536227fd533d88e1313782"><td class="mdescLeft">&#160;</td><td class="mdescRight">Protocol of the local host-to-relay link, or None unless connected. <br /></td></tr>
+<tr class="separator:a5309ed8104536227fd533d88e1313782"><td class="memSeparator" colspan="2">&#160;</td></tr>
 <tr class="memitem:a5bf95d839dc60b37fec0e3342992b63a"><td class="memItemLeft" align="right" valign="top"><a id="a5bf95d839dc60b37fec0e3342992b63a" name="a5bf95d839dc60b37fec0e3342992b63a"></a>
 <a class="el" href="classPurrNet_1_1Transports_1_1PurrTransport.html#a9c1074a3457b1be31fbf09f912e17661">SessionLink</a>&#160;</td><td class="memItemRight" valign="bottom"><b>clientSessionLink</b><code> [get]</code></td></tr>
 <tr class="memdesc:a5bf95d839dc60b37fec0e3342992b63a"><td class="mdescLeft">&#160;</td><td class="mdescRight">Which link the local client's session is running over (relay vs direct P2P). <br /></td></tr>
@@ -283,7 +344,7 @@ int&#160;</td><td class="memItemRight" valign="bottom"><b>p2pConnectionCount</b>
 <tr class="separator:ab6765727ea69bff54704c3bd7c4e3233"><td class="memSeparator" colspan="2">&#160;</td></tr>
 <tr class="memitem:a6b359d220a83037363b8914f15949953"><td class="memItemLeft" align="right" valign="top"><a id="a6b359d220a83037363b8914f15949953" name="a6b359d220a83037363b8914f15949953"></a>
 string&#160;</td><td class="memItemRight" valign="bottom"><b>p2pHostEndpoint</b><code> [get]</code></td></tr>
-<tr class="memdesc:a6b359d220a83037363b8914f15949953"><td class="mdescLeft">&#160;</td><td class="mdescRight">Remote endpoint of the direct P2P link to the host, or null when not on a P2P session. <br /></td></tr>
+<tr class="memdesc:a6b359d220a83037363b8914f15949953"><td class="mdescLeft">&#160;</td><td class="mdescRight">Remote endpoint of a native UDP P2P link to the host, or null for other routes. <br /></td></tr>
 <tr class="separator:a6b359d220a83037363b8914f15949953"><td class="memSeparator" colspan="2">&#160;</td></tr>
 <tr class="memitem:a8c2e8caf9e42196d01011c3da71fb363"><td class="memItemLeft" align="right" valign="top"><a id="a8c2e8caf9e42196d01011c3da71fb363" name="a8c2e8caf9e42196d01011c3da71fb363"></a>
 bool&#160;</td><td class="memItemRight" valign="bottom"><b>hasRegionAndHost</b><code> [get]</code></td></tr>
@@ -313,9 +374,46 @@ bool&#160;</td><td class="memItemRight" valign="bottom"><b>isPipeMode</b><code> 
 <tr class="separator:ad8f50689a677ee6b4acfca4f4b316e06"><td class="memSeparator" colspan="2">&#160;</td></tr>
 <tr class="memitem:a97d087a39e7c81fcf0cdfe27f2016d49"><td class="memItemLeft" align="right" valign="top">ConnectionState&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="classPurrNet_1_1Transports_1_1PurrTransport.html#a97d087a39e7c81fcf0cdfe27f2016d49">clientState</a><code> [get]</code></td></tr>
 <tr class="separator:a97d087a39e7c81fcf0cdfe27f2016d49"><td class="memSeparator" colspan="2">&#160;</td></tr>
+<tr class="memitem:a2ea946d54c8b9d389029e5f61b9c1cd0"><td class="memItemLeft" align="right" valign="top">bool&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="classPurrNet_1_1Transports_1_1PurrTransport.html#a2ea946d54c8b9d389029e5f61b9c1cd0">measuresRoundTripTime</a><code> [get]</code></td></tr>
+<tr class="memdesc:a2ea946d54c8b9d389029e5f61b9c1cd0"><td class="mdescLeft">&#160;</td><td class="mdescRight">Whether <a class="el" href="classPurrNet_1_1Transports_1_1PurrTransport.html#aab98e7f9322ba813c454a1e468adec2c" title="Round trip time in milliseconds for a connection, or -1 when the transport has not measured it yet or...">GetRoundTripTime</a> can ever return a value on this transport. When false a ping reports connect time only instead of waiting for a measurement.   <a href="classPurrNet_1_1Transports_1_1PurrTransport.html#a2ea946d54c8b9d389029e5f61b9c1cd0">More...</a><br /></td></tr>
+<tr class="separator:a2ea946d54c8b9d389029e5f61b9c1cd0"><td class="memSeparator" colspan="2">&#160;</td></tr>
+<tr class="memitem:aa0fbb400e927e0d486e009b8cca6b5f2"><td class="memItemLeft" align="right" valign="top">string&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="classPurrNet_1_1Transports_1_1PurrTransport.html#aa0fbb400e927e0d486e009b8cca6b5f2">clientLinkDescription</a><code> [get]</code></td></tr>
+<tr class="memdesc:aa0fbb400e927e0d486e009b8cca6b5f2"><td class="mdescLeft">&#160;</td><td class="mdescRight">Client route and protocol, Connecting while pending, or null when inactive.  <a href="classPurrNet_1_1Transports_1_1PurrTransport.html#aa0fbb400e927e0d486e009b8cca6b5f2">More...</a><br /></td></tr>
+<tr class="separator:aa0fbb400e927e0d486e009b8cca6b5f2"><td class="memSeparator" colspan="2">&#160;</td></tr>
+<tr class="memitem:ac028086c22f5dd8adaed9c8bb9f3b3c8"><td class="memItemLeft" align="right" valign="top"><a id="ac028086c22f5dd8adaed9c8bb9f3b3c8" name="ac028086c22f5dd8adaed9c8bb9f3b3c8"></a>
+string&#160;</td><td class="memItemRight" valign="bottom"><b>hostLinkDescription</b><code> [get]</code></td></tr>
+<tr class="memdesc:ac028086c22f5dd8adaed9c8bb9f3b3c8"><td class="mdescLeft">&#160;</td><td class="mdescRight">Local host-to-relay route and protocol, Connecting while pending, or null when inactive. <br /></td></tr>
+<tr class="separator:ac028086c22f5dd8adaed9c8bb9f3b3c8"><td class="memSeparator" colspan="2">&#160;</td></tr>
+<tr class="memitem:a83744f36d9067b63a463048692a16994"><td class="memItemLeft" align="right" valign="top"><a id="a83744f36d9067b63a463048692a16994" name="a83744f36d9067b63a463048692a16994"></a>
+int&#160;</td><td class="memItemRight" valign="bottom"><b>hostRelayRoundTripTime</b><code> [get]</code></td></tr>
+<tr class="memdesc:a83744f36d9067b63a463048692a16994"><td class="mdescLeft">&#160;</td><td class="mdescRight">Round trip time in ms between the local host and the relay, or -1 when not hosting over UDP. <br /></td></tr>
+<tr class="separator:a83744f36d9067b63a463048692a16994"><td class="memSeparator" colspan="2">&#160;</td></tr>
+<tr class="memitem:a12b0015ef7b13d01e9bd6c067eb1c7d7"><td class="memItemLeft" align="right" valign="top"><a id="a12b0015ef7b13d01e9bd6c067eb1c7d7" name="a12b0015ef7b13d01e9bd6c067eb1c7d7"></a>
+int&#160;</td><td class="memItemRight" valign="bottom"><b>clientRelayRoundTripTime</b><code> [get]</code></td></tr>
+<tr class="memdesc:a12b0015ef7b13d01e9bd6c067eb1c7d7"><td class="mdescLeft">&#160;</td><td class="mdescRight">Round trip time in ms between the local client and the relay, or -1 when not connected over UDP. <br /></td></tr>
+<tr class="separator:a12b0015ef7b13d01e9bd6c067eb1c7d7"><td class="memSeparator" colspan="2">&#160;</td></tr>
 <tr class="memitem:a7a02fd7406e7a1ff1816418ae2489220"><td class="memItemLeft" align="right" valign="top">IReadOnlyList&lt; <a class="el" href="structPurrNet_1_1Transports_1_1Connection.html">Connection</a> &gt;&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="classPurrNet_1_1Transports_1_1PurrTransport.html#a7a02fd7406e7a1ff1816418ae2489220">connections</a><code> [get]</code></td></tr>
 <tr class="separator:a7a02fd7406e7a1ff1816418ae2489220"><td class="memSeparator" colspan="2">&#160;</td></tr>
+<tr class="memitem:a0e02385dd506d2bd419bb8c1d065f4b8"><td class="memItemLeft" align="right" valign="top"><a id="a0e02385dd506d2bd419bb8c1d065f4b8" name="a0e02385dd506d2bd419bb8c1d065f4b8"></a>
+bool&#160;</td><td class="memItemRight" valign="bottom"><b>hostUsesWebRtc</b><code> [get]</code></td></tr>
+<tr class="memdesc:a0e02385dd506d2bd419bb8c1d065f4b8"><td class="mdescLeft">&#160;</td><td class="mdescRight">Whether the local host's connection to the relay uses WebRTC. <br /></td></tr>
+<tr class="separator:a0e02385dd506d2bd419bb8c1d065f4b8"><td class="memSeparator" colspan="2">&#160;</td></tr>
+<tr class="memitem:a755807cd87236f10f56fe6554343f8b2"><td class="memItemLeft" align="right" valign="top"><a id="a755807cd87236f10f56fe6554343f8b2" name="a755807cd87236f10f56fe6554343f8b2"></a>
+bool&#160;</td><td class="memItemRight" valign="bottom"><b>clientUsesWebRtc</b><code> [get]</code></td></tr>
+<tr class="memdesc:a755807cd87236f10f56fe6554343f8b2"><td class="mdescLeft">&#160;</td><td class="mdescRight">Whether the local client's connection to the relay uses WebRTC. <br /></td></tr>
+<tr class="separator:a755807cd87236f10f56fe6554343f8b2"><td class="memSeparator" colspan="2">&#160;</td></tr>
+<tr class="memitem:a9fd61698e2d5ff7268b2b544464282d1"><td class="memItemLeft" align="right" valign="top"><a id="a9fd61698e2d5ff7268b2b544464282d1" name="a9fd61698e2d5ff7268b2b544464282d1"></a>
+bool&#160;</td><td class="memItemRight" valign="bottom"><b>useWebRtcP2P</b><code> [get, set]</code></td></tr>
+<tr class="memdesc:a9fd61698e2d5ff7268b2b544464282d1"><td class="mdescLeft">&#160;</td><td class="mdescRight">Compatibility alias for <a class="el" href="classPurrNet_1_1Transports_1_1PurrTransport.html#ad729d853134402a9c8eeddac0e6f7a08" title="Attempt a direct connection when both players enable it. Configure before connecting.">attemptDirectConnection</a>. <br /></td></tr>
+<tr class="separator:a9fd61698e2d5ff7268b2b544464282d1"><td class="memSeparator" colspan="2">&#160;</td></tr>
+<tr class="memitem:a67a69867c927e9c3d51d13928bbc96d5"><td class="memItemLeft" align="right" valign="top"><a id="a67a69867c927e9c3d51d13928bbc96d5" name="a67a69867c927e9c3d51d13928bbc96d5"></a>
+string&#160;</td><td class="memItemRight" valign="bottom"><b>webRtcStunServer</b><code> [get, set]</code></td></tr>
+<tr class="separator:a67a69867c927e9c3d51d13928bbc96d5"><td class="memSeparator" colspan="2">&#160;</td></tr>
 <tr class="inherit_header properties_classPurrNet_1_1Transports_1_1GenericTransport"><td colspan="2" onclick="javascript:toggleInherit('properties_classPurrNet_1_1Transports_1_1GenericTransport')"><img src="closed.png" alt="-"/>&#160;Properties inherited from <a class="el" href="classPurrNet_1_1Transports_1_1GenericTransport.html">PurrNet.Transports.GenericTransport</a></td></tr>
+<tr class="memitem:ade0bd9e4af51211e8ff1e801c28f9cbf inherit properties_classPurrNet_1_1Transports_1_1GenericTransport"><td class="memItemLeft" align="right" valign="top"><a id="ade0bd9e4af51211e8ff1e801c28f9cbf" name="ade0bd9e4af51211e8ff1e801c28f9cbf"></a>
+virtual bool&#160;</td><td class="memItemRight" valign="bottom"><b>isPinging</b><code> [get]</code></td></tr>
+<tr class="memdesc:ade0bd9e4af51211e8ff1e801c28f9cbf inherit properties_classPurrNet_1_1Transports_1_1GenericTransport"><td class="mdescLeft">&#160;</td><td class="mdescRight">True while <a class="el" href="classPurrNet_1_1Transports_1_1GenericTransport.html#a913bb87eb425b32192663ba43260508b" title="Measures latency to the server this transport is configured to connect to. Opens a transport level co...">Ping(CancellationToken)</a> is running a probe connection on this transport. The <a class="el" href="classPurrNet_1_1NetworkManager.html">NetworkManager</a> ignores client events from the transport while this is set.  <br /></td></tr>
+<tr class="separator:ade0bd9e4af51211e8ff1e801c28f9cbf inherit properties_classPurrNet_1_1Transports_1_1GenericTransport"><td class="memSeparator" colspan="2">&#160;</td></tr>
 <tr class="memitem:a4dc62a7fe67db86b7941ae87fa931160 inherit properties_classPurrNet_1_1Transports_1_1GenericTransport"><td class="memItemLeft" align="right" valign="top"><a id="a4dc62a7fe67db86b7941ae87fa931160" name="a4dc62a7fe67db86b7941ae87fa931160"></a>
 abstract bool&#160;</td><td class="memItemRight" valign="bottom"><b>isSupported</b><code> [get]</code></td></tr>
 <tr class="memdesc:a4dc62a7fe67db86b7941ae87fa931160 inherit properties_classPurrNet_1_1Transports_1_1GenericTransport"><td class="mdescLeft">&#160;</td><td class="mdescRight">Returns true if the transport is supported on the current platform. For example, WebGL does not support UDP or SteamTransport. This will return false if the transport is not supported.  <br /></td></tr>
@@ -328,6 +426,12 @@ abstract <a class="el" href="interfacePurrNet_1_1Transports_1_1ITransport.html">
 <tr class="memitem:ae46b353c5e0e2d7985706a507deaa246 inherit properties_interfacePurrNet_1_1Transports_1_1ITransport"><td class="memItemLeft" align="right" valign="top"><a id="ae46b353c5e0e2d7985706a507deaa246" name="ae46b353c5e0e2d7985706a507deaa246"></a>
 IReadOnlyList&lt; <a class="el" href="structPurrNet_1_1Transports_1_1Connection.html">Connection</a> &gt;&#160;</td><td class="memItemRight" valign="bottom"><b>connections</b><code> [get]</code></td></tr>
 <tr class="separator:ae46b353c5e0e2d7985706a507deaa246 inherit properties_interfacePurrNet_1_1Transports_1_1ITransport"><td class="memSeparator" colspan="2">&#160;</td></tr>
+<tr class="memitem:af32dc7e3e88614bea579fb25a25f93a0 inherit properties_interfacePurrNet_1_1Transports_1_1ITransport"><td class="memItemLeft" align="right" valign="top">bool&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="interfacePurrNet_1_1Transports_1_1ITransport.html#af32dc7e3e88614bea579fb25a25f93a0">measuresRoundTripTime</a><code> [get]</code></td></tr>
+<tr class="memdesc:af32dc7e3e88614bea579fb25a25f93a0 inherit properties_interfacePurrNet_1_1Transports_1_1ITransport"><td class="mdescLeft">&#160;</td><td class="mdescRight">Whether <a class="el" href="interfacePurrNet_1_1Transports_1_1ITransport.html#ae3e1f81560c564104469b5fc729ba137" title="Round trip time in milliseconds for a connection, or -1 when the transport has not measured it yet or...">GetRoundTripTime</a> can ever return a value on this transport. When false a ping reports connect time only instead of waiting for a measurement.   <a href="interfacePurrNet_1_1Transports_1_1ITransport.html#af32dc7e3e88614bea579fb25a25f93a0">More...</a><br /></td></tr>
+<tr class="separator:af32dc7e3e88614bea579fb25a25f93a0 inherit properties_interfacePurrNet_1_1Transports_1_1ITransport"><td class="memSeparator" colspan="2">&#160;</td></tr>
+<tr class="memitem:a42279793baeca33c813bc1c73ac8a5b7 inherit properties_interfacePurrNet_1_1Transports_1_1ITransport"><td class="memItemLeft" align="right" valign="top">string&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="interfacePurrNet_1_1Transports_1_1ITransport.html#a42279793baeca33c813bc1c73ac8a5b7">clientLinkDescription</a><code> [get]</code></td></tr>
+<tr class="memdesc:a42279793baeca33c813bc1c73ac8a5b7 inherit properties_interfacePurrNet_1_1Transports_1_1ITransport"><td class="mdescLeft">&#160;</td><td class="mdescRight">Short human readable description of the link the local client is currently using, for example which relay region or whether it is a direct P2P session. Null when the transport has nothing to add.   <a href="interfacePurrNet_1_1Transports_1_1ITransport.html#a42279793baeca33c813bc1c73ac8a5b7">More...</a><br /></td></tr>
+<tr class="separator:a42279793baeca33c813bc1c73ac8a5b7 inherit properties_interfacePurrNet_1_1Transports_1_1ITransport"><td class="memSeparator" colspan="2">&#160;</td></tr>
 <tr class="memitem:a3177feeee5b51d8e8dc1abc3a1b197b1 inherit properties_interfacePurrNet_1_1Transports_1_1ITransport"><td class="memItemLeft" align="right" valign="top"><a id="a3177feeee5b51d8e8dc1abc3a1b197b1" name="a3177feeee5b51d8e8dc1abc3a1b197b1"></a>
 bool&#160;</td><td class="memItemRight" valign="bottom"><b>shouldServerSendKeepAlive</b><code> [get]</code></td></tr>
 <tr class="separator:a3177feeee5b51d8e8dc1abc3a1b197b1 inherit properties_interfacePurrNet_1_1Transports_1_1ITransport"><td class="memSeparator" colspan="2">&#160;</td></tr>
@@ -380,6 +484,13 @@ OnDataSent&#160;</td><td class="memItemRight" valign="bottom"><b>onDataSent</b><
 <tr class="memitem:af48ce5536f81aebe68e238361ff46e51 inherit events_interfacePurrNet_1_1Transports_1_1ITransport"><td class="memItemLeft" align="right" valign="top"><a id="af48ce5536f81aebe68e238361ff46e51" name="af48ce5536f81aebe68e238361ff46e51"></a>
 OnConnectionState&#160;</td><td class="memItemRight" valign="bottom"><b>onConnectionState</b></td></tr>
 <tr class="separator:af48ce5536f81aebe68e238361ff46e51 inherit events_interfacePurrNet_1_1Transports_1_1ITransport"><td class="memSeparator" colspan="2">&#160;</td></tr>
+</table><table class="memberdecls">
+<tr class="heading"><td colspan="2"><h2 class="groupheader"><a id="inherited" name="inherited"></a>
+Additional Inherited Members</h2></td></tr>
+<tr class="inherit_header pub_static_attribs_classPurrNet_1_1Transports_1_1GenericTransport"><td colspan="2" onclick="javascript:toggleInherit('pub_static_attribs_classPurrNet_1_1Transports_1_1GenericTransport')"><img src="closed.png" alt="-"/>&#160;Static Public Attributes inherited from <a class="el" href="classPurrNet_1_1Transports_1_1GenericTransport.html">PurrNet.Transports.GenericTransport</a></td></tr>
+<tr class="memitem:ab68f96cda8cac5947d1bff88cfcc5314 inherit pub_static_attribs_classPurrNet_1_1Transports_1_1GenericTransport"><td class="memItemLeft" align="right" valign="top"><a id="ab68f96cda8cac5947d1bff88cfcc5314" name="ab68f96cda8cac5947d1bff88cfcc5314"></a>
+const float&#160;</td><td class="memItemRight" valign="bottom"><b>DEFAULT_PING_TIMEOUT</b> = 15f</td></tr>
+<tr class="separator:ab68f96cda8cac5947d1bff88cfcc5314 inherit pub_static_attribs_classPurrNet_1_1Transports_1_1GenericTransport"><td class="memSeparator" colspan="2">&#160;</td></tr>
 </table>
 <h2 class="groupheader">Member Function Documentation</h2>
 <a id="aedea6dfd41ac805efab4405ca6369073" name="aedea6dfd41ac805efab4405ca6369073"></a>
@@ -451,6 +562,38 @@ OnConnectionState&#160;</td><td class="memItemRight" valign="bottom"><b>onConnec
 
 </div>
 </div>
+<a id="ab39527cd4fca47ccde3d57cc731e5a9c" name="ab39527cd4fca47ccde3d57cc731e5a9c"></a>
+<h2 class="memtitle"><span class="permalink"><a href="#ab39527cd4fca47ccde3d57cc731e5a9c">&#9670;&#160;</a></span>FlushConnection()</h2>
+
+<div class="memitem">
+<div class="memproto">
+      <table class="memname">
+        <tr>
+          <td class="memname">bool PurrNet.Transports.PurrTransport.FlushConnection </td>
+          <td>(</td>
+          <td class="paramtype"><a class="el" href="structPurrNet_1_1Transports_1_1Connection.html">Connection</a>&#160;</td>
+          <td class="paramname"><em>conn</em>, </td>
+        </tr>
+        <tr>
+          <td class="paramkey"></td>
+          <td></td>
+          <td class="paramtype">bool&#160;</td>
+          <td class="paramname"><em>asServer</em>&#160;</td>
+        </tr>
+        <tr>
+          <td></td>
+          <td>)</td>
+          <td></td><td></td>
+        </tr>
+      </table>
+</div><div class="memdoc">
+
+<p>Pushes data already queued for one connection onto the wire without a full send pass. Returns false when the transport cannot do this, in which case the caller falls back to SendMessages. On the client side the connection argument is ignored.  </p>
+
+<p>Implements <a class="el" href="interfacePurrNet_1_1Transports_1_1ITransport.html#a84d8be7b2d22babc84aec7313f41e66c">PurrNet.Transports.ITransport</a>.</p>
+
+</div>
+</div>
 <a id="aec42f838e005770b2a25ba87674350ad" name="aec42f838e005770b2a25ba87674350ad"></a>
 <h2 class="memtitle"><span class="permalink"><a href="#aec42f838e005770b2a25ba87674350ad">&#9670;&#160;</a></span>GetMTU()</h2>
 
@@ -487,6 +630,38 @@ OnConnectionState&#160;</td><td class="memItemRight" valign="bottom"><b>onConnec
 
 </div>
 </div>
+<a id="aab98e7f9322ba813c454a1e468adec2c" name="aab98e7f9322ba813c454a1e468adec2c"></a>
+<h2 class="memtitle"><span class="permalink"><a href="#aab98e7f9322ba813c454a1e468adec2c">&#9670;&#160;</a></span>GetRoundTripTime()</h2>
+
+<div class="memitem">
+<div class="memproto">
+      <table class="memname">
+        <tr>
+          <td class="memname">int PurrNet.Transports.PurrTransport.GetRoundTripTime </td>
+          <td>(</td>
+          <td class="paramtype"><a class="el" href="structPurrNet_1_1Transports_1_1Connection.html">Connection</a>&#160;</td>
+          <td class="paramname"><em>conn</em>, </td>
+        </tr>
+        <tr>
+          <td class="paramkey"></td>
+          <td></td>
+          <td class="paramtype">bool&#160;</td>
+          <td class="paramname"><em>asServer</em>&#160;</td>
+        </tr>
+        <tr>
+          <td></td>
+          <td>)</td>
+          <td></td><td></td>
+        </tr>
+      </table>
+</div><div class="memdoc">
+
+<p>Round trip time in milliseconds for a connection, or -1 when the transport has not measured it yet or does not support it. On the client side the connection argument is ignored.  </p>
+
+<p>Implements <a class="el" href="interfacePurrNet_1_1Transports_1_1ITransport.html#ae3e1f81560c564104469b5fc729ba137">PurrNet.Transports.ITransport</a>.</p>
+
+</div>
+</div>
 <a id="af02665fbf9f1ad67f286a26b2a5d82e6" name="af02665fbf9f1ad67f286a26b2a5d82e6"></a>
 <h2 class="memtitle"><span class="permalink"><a href="#af02665fbf9f1ad67f286a26b2a5d82e6">&#9670;&#160;</a></span>Listen()</h2>
 
@@ -504,6 +679,64 @@ OnConnectionState&#160;</td><td class="memItemRight" valign="bottom"><b>onConnec
 </div><div class="memdoc">
 
 <p>Implements <a class="el" href="interfacePurrNet_1_1Transports_1_1IListener.html">PurrNet.Transports.IListener</a>.</p>
+
+</div>
+</div>
+<a id="a7d3471c46b45ed73ba31bfc43e427b94" name="a7d3471c46b45ed73ba31bfc43e427b94"></a>
+<h2 class="memtitle"><span class="permalink"><a href="#a7d3471c46b45ed73ba31bfc43e427b94">&#9670;&#160;</a></span>PingInternal()</h2>
+
+<div class="memitem">
+<div class="memproto">
+<table class="mlabels">
+  <tr>
+  <td class="mlabels-left">
+      <table class="memname">
+        <tr>
+          <td class="memname">override async Task&lt; <a class="el" href="structPurrNet_1_1Transports_1_1PingResult.html">PingResult</a> &gt; PurrNet.Transports.PurrTransport.PingInternal </td>
+          <td>(</td>
+          <td class="paramtype">string&#160;</td>
+          <td class="paramname"><em>address</em>, </td>
+        </tr>
+        <tr>
+          <td class="paramkey"></td>
+          <td></td>
+          <td class="paramtype">ushort&#160;</td>
+          <td class="paramname"><em>port</em>, </td>
+        </tr>
+        <tr>
+          <td class="paramkey"></td>
+          <td></td>
+          <td class="paramtype">bool&#160;</td>
+          <td class="paramname"><em>useAddress</em>, </td>
+        </tr>
+        <tr>
+          <td class="paramkey"></td>
+          <td></td>
+          <td class="paramtype">float&#160;</td>
+          <td class="paramname"><em>timeoutSeconds</em>, </td>
+        </tr>
+        <tr>
+          <td class="paramkey"></td>
+          <td></td>
+          <td class="paramtype">CancellationToken&#160;</td>
+          <td class="paramname"><em>token</em>&#160;</td>
+        </tr>
+        <tr>
+          <td></td>
+          <td>)</td>
+          <td></td><td></td>
+        </tr>
+      </table>
+  </td>
+  <td class="mlabels-right">
+<span class="mlabels"><span class="mlabel">protected</span><span class="mlabel">virtual</span></span>  </td>
+  </tr>
+</table>
+</div><div class="memdoc">
+
+<p>Pinging a <a class="el" href="classPurrNet_1_1Transports_1_1PurrTransport.html">PurrTransport</a> joins the room as a throwaway client when a host is running it, which measures the real link (direct P2P or relay). Without a room it pings the relay of the configured region over HTTP.  </p>
+
+<p>Reimplemented from <a class="el" href="classPurrNet_1_1Transports_1_1GenericTransport.html#afd13e5b9fdb385641b9907676da37a29">PurrNet.Transports.GenericTransport</a>.</p>
 
 </div>
 </div>
@@ -818,6 +1051,32 @@ OnConnectionState&#160;</td><td class="memItemRight" valign="bottom"><b>onConnec
 </div>
 </div>
 <h2 class="groupheader">Property Documentation</h2>
+<a id="aa0fbb400e927e0d486e009b8cca6b5f2" name="aa0fbb400e927e0d486e009b8cca6b5f2"></a>
+<h2 class="memtitle"><span class="permalink"><a href="#aa0fbb400e927e0d486e009b8cca6b5f2">&#9670;&#160;</a></span>clientLinkDescription</h2>
+
+<div class="memitem">
+<div class="memproto">
+<table class="mlabels">
+  <tr>
+  <td class="mlabels-left">
+      <table class="memname">
+        <tr>
+          <td class="memname">string PurrNet.Transports.PurrTransport.clientLinkDescription</td>
+        </tr>
+      </table>
+  </td>
+  <td class="mlabels-right">
+<span class="mlabels"><span class="mlabel">get</span></span>  </td>
+  </tr>
+</table>
+</div><div class="memdoc">
+
+<p>Client route and protocol, Connecting while pending, or null when inactive. </p>
+
+<p>Implements <a class="el" href="interfacePurrNet_1_1Transports_1_1ITransport.html#a42279793baeca33c813bc1c73ac8a5b7">PurrNet.Transports.ITransport</a>.</p>
+
+</div>
+</div>
 <a id="a97d087a39e7c81fcf0cdfe27f2016d49" name="a97d087a39e7c81fcf0cdfe27f2016d49"></a>
 <h2 class="memtitle"><span class="permalink"><a href="#a97d087a39e7c81fcf0cdfe27f2016d49">&#9670;&#160;</a></span>clientState</h2>
 
@@ -890,6 +1149,32 @@ OnConnectionState&#160;</td><td class="memItemRight" valign="bottom"><b>onConnec
 
 </div>
 </div>
+<a id="a2ea946d54c8b9d389029e5f61b9c1cd0" name="a2ea946d54c8b9d389029e5f61b9c1cd0"></a>
+<h2 class="memtitle"><span class="permalink"><a href="#a2ea946d54c8b9d389029e5f61b9c1cd0">&#9670;&#160;</a></span>measuresRoundTripTime</h2>
+
+<div class="memitem">
+<div class="memproto">
+<table class="mlabels">
+  <tr>
+  <td class="mlabels-left">
+      <table class="memname">
+        <tr>
+          <td class="memname">bool PurrNet.Transports.PurrTransport.measuresRoundTripTime</td>
+        </tr>
+      </table>
+  </td>
+  <td class="mlabels-right">
+<span class="mlabels"><span class="mlabel">get</span></span>  </td>
+  </tr>
+</table>
+</div><div class="memdoc">
+
+<p>Whether <a class="el" href="classPurrNet_1_1Transports_1_1PurrTransport.html#aab98e7f9322ba813c454a1e468adec2c" title="Round trip time in milliseconds for a connection, or -1 when the transport has not measured it yet or...">GetRoundTripTime</a> can ever return a value on this transport. When false a ping reports connect time only instead of waiting for a measurement.  </p>
+
+<p>Implements <a class="el" href="interfacePurrNet_1_1Transports_1_1ITransport.html#af32dc7e3e88614bea579fb25a25f93a0">PurrNet.Transports.ITransport</a>.</p>
+
+</div>
+</div>
 <a id="af3bb4cda74c9cedd5562565bfcf005d4" name="af3bb4cda74c9cedd5562565bfcf005d4"></a>
 <h2 class="memtitle"><span class="permalink"><a href="#af3bb4cda74c9cedd5562565bfcf005d4">&#9670;&#160;</a></span>shouldClientSendKeepAlive</h2>
 
@@ -938,8 +1223,9 @@ OnConnectionState&#160;</td><td class="memItemRight" valign="bottom"><b>onConnec
 
 </div>
 </div>
-<hr/>The documentation for this class was generated from the following file:<ul>
+<hr/>The documentation for this class was generated from the following files:<ul>
 <li>Assets/PurrNet/Runtime/Transports/PurrTransport.cs</li>
+<li>Assets/PurrNet/Runtime/Transports/WebRtc/PurrTransport.WebRtc.cs</li>
 </ul>
 </div><!-- contents -->
 </div><!-- doc-content -->

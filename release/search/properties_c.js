@@ -11,5 +11,6 @@ var searchData=
   ['pooled_8',['pooled',['../structPurrNet_1_1PrefabData.html#a66cf031bc481ffd1edbd38661595fd07',1,'PurrNet::PrefabData']]],
   ['positiontransform_9',['positionTransform',['../classPurrNet_1_1NetworkRigidbody.html#af03e259ba604c57476834135fc38c69b',1,'PurrNet::NetworkRigidbody']]],
   ['prefabprovider_10',['prefabProvider',['../classPurrNet_1_1NetworkManager.html#af323793ea42a36db67a21019ec004a3e',1,'PurrNet::NetworkManager']]],
-  ['progress_11',['progress',['../classPurrNet_1_1SyncBigData.html#a25d43321e68e2df834090dc1303ca2f5',1,'PurrNet::SyncBigData']]]
+  ['prefabresolver_11',['prefabResolver',['../classPurrNet_1_1NetworkManager.html#acee5e0b3e1be1528054a5d525aa1a650',1,'PurrNet::NetworkManager']]],
+  ['progress_12',['progress',['../classPurrNet_1_1SyncBigData.html#a25d43321e68e2df834090dc1303ca2f5',1,'PurrNet::SyncBigData']]]
 ];

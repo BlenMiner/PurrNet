@@ -152,9 +152,9 @@ Public Member Functions</h2></td></tr>
 <tr class="memitem:ae2bc097590e198beb7b31719d0d46fb4"><td class="memItemLeft" align="right" valign="top">void&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="classPurrNet_1_1NetworkManager.html#ae2bc097590e198beb7b31719d0d46fb4">SendToAll&lt; T &gt;</a> (T data, Channel method=Channel.ReliableOrdered)</td></tr>
 <tr class="memdesc:ae2bc097590e198beb7b31719d0d46fb4"><td class="mdescLeft">&#160;</td><td class="mdescRight">Send a broadcast to everyone listening. Only possible as the server   <a href="classPurrNet_1_1NetworkManager.html#ae2bc097590e198beb7b31719d0d46fb4">More...</a><br /></td></tr>
 <tr class="separator:ae2bc097590e198beb7b31719d0d46fb4"><td class="memSeparator" colspan="2">&#160;</td></tr>
-<tr class="memitem:a56b78dfe383fe18bc945580d2b5c85ef"><td class="memItemLeft" align="right" valign="top"><a id="a56b78dfe383fe18bc945580d2b5c85ef" name="a56b78dfe383fe18bc945580d2b5c85ef"></a>
-bool&#160;</td><td class="memItemRight" valign="bottom"><b>TryGetPrefabPersistentId</b> (int prefabId, out string persistentId)</td></tr>
-<tr class="separator:a56b78dfe383fe18bc945580d2b5c85ef"><td class="memSeparator" colspan="2">&#160;</td></tr>
+<tr class="memitem:a3a5554ecc92e391cae7749f8d9ae5e6f"><td class="memItemLeft" align="right" valign="top"><a id="a3a5554ecc92e391cae7749f8d9ae5e6f" name="a3a5554ecc92e391cae7749f8d9ae5e6f"></a>
+bool&#160;</td><td class="memItemRight" valign="bottom"><b>TryGetPrefabPersistentId</b> (<a class="el" href="structPurrNet_1_1PrefabID.html">PrefabID</a> prefabId, out string persistentId)</td></tr>
+<tr class="separator:a3a5554ecc92e391cae7749f8d9ae5e6f"><td class="memSeparator" colspan="2">&#160;</td></tr>
 <tr class="memitem:ad14aa7fbd1bf2e7fbddf30f67b36557c"><td class="memItemLeft" align="right" valign="top"><a id="ad14aa7fbd1bf2e7fbddf30f67b36557c" name="ad14aa7fbd1bf2e7fbddf30f67b36557c"></a>
 bool&#160;</td><td class="memItemRight" valign="bottom"><b>TryGetPrefabPersistentId</b> (GameObject prefab, out string persistentId)</td></tr>
 <tr class="separator:ad14aa7fbd1bf2e7fbddf30f67b36557c"><td class="memSeparator" colspan="2">&#160;</td></tr>
@@ -208,6 +208,12 @@ void&#160;</td><td class="memItemRight" valign="bottom"><b>GetAllPlayerOwnedIds<
 <tr class="separator:a49db790742361e72eab69a082943bfd2"><td class="memSeparator" colspan="2">&#160;</td></tr>
 <tr class="memitem:a1eb39e76f6bf832a20b9f72f7343d465"><td class="memItemLeft" align="right" valign="top">void&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="classPurrNet_1_1NetworkManager.html#a1eb39e76f6bf832a20b9f72f7343d465">RegisterModules</a> (<a class="el" href="structPurrNet_1_1ModulesCollection.html">ModulesCollection</a> modules, bool asServer)</td></tr>
 <tr class="separator:a1eb39e76f6bf832a20b9f72f7343d465"><td class="memSeparator" colspan="2">&#160;</td></tr>
+<tr class="memitem:a4253fe17a87e6e5ac113dca47c131dac"><td class="memItemLeft" align="right" valign="top">void&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="classPurrNet_1_1NetworkManager.html#a4253fe17a87e6e5ac113dca47c131dac">RequestSendFlushThisFrame</a> ()</td></tr>
+<tr class="memdesc:a4253fe17a87e6e5ac113dca47c131dac"><td class="mdescLeft">&#160;</td><td class="mdescRight">Asks the manager to push queued transport data out before the next tick (this frame), so a latency-sensitive message does not wait for the tick's regular send.   <a href="classPurrNet_1_1NetworkManager.html#a4253fe17a87e6e5ac113dca47c131dac">More...</a><br /></td></tr>
+<tr class="separator:a4253fe17a87e6e5ac113dca47c131dac"><td class="memSeparator" colspan="2">&#160;</td></tr>
+<tr class="memitem:af638f828c1e3c5dd93b8c83796a3e9a2"><td class="memItemLeft" align="right" valign="top">void&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="classPurrNet_1_1NetworkManager.html#af638f828c1e3c5dd93b8c83796a3e9a2">RequestSendFlushThisFrame</a> (<a class="el" href="structPurrNet_1_1Transports_1_1Connection.html">Connection</a> conn, bool asServer)</td></tr>
+<tr class="memdesc:af638f828c1e3c5dd93b8c83796a3e9a2"><td class="mdescLeft">&#160;</td><td class="mdescRight">Same as <a class="el" href="classPurrNet_1_1NetworkManager.html#a4253fe17a87e6e5ac113dca47c131dac" title="Asks the manager to push queued transport data out before the next tick (this frame),...">RequestSendFlushThisFrame()</a> but scoped to one connection, so a transport that supports it can push just that peer instead of a full send pass. On the client side the connection argument is ignored.   <a href="classPurrNet_1_1NetworkManager.html#af638f828c1e3c5dd93b8c83796a3e9a2">More...</a><br /></td></tr>
+<tr class="separator:af638f828c1e3c5dd93b8c83796a3e9a2"><td class="memSeparator" colspan="2">&#160;</td></tr>
 <tr class="memitem:a19356953402a12f76fe3284da8824a80"><td class="memItemLeft" align="right" valign="top"><a id="a19356953402a12f76fe3284da8824a80" name="a19356953402a12f76fe3284da8824a80"></a>
 void&#160;</td><td class="memItemRight" valign="bottom"><b>FlushBatchedRPCs</b> ()</td></tr>
 <tr class="separator:a19356953402a12f76fe3284da8824a80"><td class="memSeparator" colspan="2">&#160;</td></tr>
@@ -312,18 +318,24 @@ void&#160;</td><td class="memItemRight" valign="bottom"><b>InternalUnregisterSer
 <tr class="separator:a5fbc32eff231c98a4e62d26c456ad9a5"><td class="memSeparator" colspan="2">&#160;</td></tr>
 <tr class="memitem:a136b52160d4acf46522f33224e800616"><td class="memItemLeft" align="right" valign="top">bool&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="interfacePurrNet_1_1INetworkManager.html#a136b52160d4acf46522f33224e800616">HasModule&lt; T &gt;</a> (bool asServer)</td></tr>
 <tr class="separator:a136b52160d4acf46522f33224e800616"><td class="memSeparator" colspan="2">&#160;</td></tr>
+<tr class="memitem:a1ad347be50df29501ed3a38d5a9894f3"><td class="memItemLeft" align="right" valign="top">void&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="interfacePurrNet_1_1INetworkManager.html#a1ad347be50df29501ed3a38d5a9894f3">RequestSendFlushThisFrame</a> ()</td></tr>
+<tr class="memdesc:a1ad347be50df29501ed3a38d5a9894f3"><td class="mdescLeft">&#160;</td><td class="mdescRight">Asks the manager to push queued transport data out before the next tick (this frame), so a latency-sensitive message does not wait for the tick's regular send.   <a href="interfacePurrNet_1_1INetworkManager.html#a1ad347be50df29501ed3a38d5a9894f3">More...</a><br /></td></tr>
+<tr class="separator:a1ad347be50df29501ed3a38d5a9894f3"><td class="memSeparator" colspan="2">&#160;</td></tr>
+<tr class="memitem:a474bf9fb0bde93dd0ade0abfbd7bfc7b"><td class="memItemLeft" align="right" valign="top">void&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="interfacePurrNet_1_1INetworkManager.html#a474bf9fb0bde93dd0ade0abfbd7bfc7b">RequestSendFlushThisFrame</a> (<a class="el" href="structPurrNet_1_1Transports_1_1Connection.html">Connection</a> conn, bool asServer)</td></tr>
+<tr class="memdesc:a474bf9fb0bde93dd0ade0abfbd7bfc7b"><td class="mdescLeft">&#160;</td><td class="mdescRight">Same as <a class="el" href="interfacePurrNet_1_1INetworkManager.html#a1ad347be50df29501ed3a38d5a9894f3" title="Asks the manager to push queued transport data out before the next tick (this frame),...">RequestSendFlushThisFrame()</a> but scoped to one connection, so a transport that supports it can push just that peer instead of a full send pass. On the client side the connection argument is ignored.   <a href="interfacePurrNet_1_1INetworkManager.html#a474bf9fb0bde93dd0ade0abfbd7bfc7b">More...</a><br /></td></tr>
+<tr class="separator:a474bf9fb0bde93dd0ade0abfbd7bfc7b"><td class="memSeparator" colspan="2">&#160;</td></tr>
 </table><table class="memberdecls">
 <tr class="heading"><td colspan="2"><h2 class="groupheader"><a id="pub-static-methods" name="pub-static-methods"></a>
 Static Public Member Functions</h2></td></tr>
 <tr class="memitem:acb2f7c4e72a52689ffb75b6686f2a291"><td class="memItemLeft" align="right" valign="top">static void&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="classPurrNet_1_1NetworkManager.html#acb2f7c4e72a52689ffb75b6686f2a291">SetMainInstance</a> (<a class="el" href="classPurrNet_1_1NetworkManager.html">NetworkManager</a> instance)</td></tr>
 <tr class="memdesc:acb2f7c4e72a52689ffb75b6686f2a291"><td class="mdescLeft">&#160;</td><td class="mdescRight">Sets the main instance of the network manager. This is used for convinience but also for static RPCs and other static functionality.   <a href="classPurrNet_1_1NetworkManager.html#acb2f7c4e72a52689ffb75b6686f2a291">More...</a><br /></td></tr>
 <tr class="separator:acb2f7c4e72a52689ffb75b6686f2a291"><td class="memSeparator" colspan="2">&#160;</td></tr>
-<tr class="memitem:a971e0a7391e5053c7d34d3e05487e3ae"><td class="memItemLeft" align="right" valign="top">static void&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="classPurrNet_1_1NetworkManager.html#a971e0a7391e5053c7d34d3e05487e3ae">SetupPrefabInfo</a> (GameObject instance, int pid, bool shouldBePooled)</td></tr>
-<tr class="memdesc:a971e0a7391e5053c7d34d3e05487e3ae"><td class="mdescLeft">&#160;</td><td class="mdescRight">Prepares the prefab info for the given instance. This needs to be ready before the object is spawned.   <a href="classPurrNet_1_1NetworkManager.html#a971e0a7391e5053c7d34d3e05487e3ae">More...</a><br /></td></tr>
-<tr class="separator:a971e0a7391e5053c7d34d3e05487e3ae"><td class="memSeparator" colspan="2">&#160;</td></tr>
-<tr class="memitem:a0762d62a9296e0b1070c69c4295a3e29"><td class="memItemLeft" align="right" valign="top">static void&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="classPurrNet_1_1NetworkManager.html#a0762d62a9296e0b1070c69c4295a3e29">SetupPrefabInfo</a> (GameObject instance, int pid, bool shouldBePooled, List&lt; <a class="el" href="classPurrNet_1_1NetworkIdentity.html">NetworkIdentity</a> &gt; children)</td></tr>
-<tr class="memdesc:a0762d62a9296e0b1070c69c4295a3e29"><td class="mdescLeft">&#160;</td><td class="mdescRight">Prepares the prefab info for the given instance, reusing an already collected identity list.   <a href="classPurrNet_1_1NetworkManager.html#a0762d62a9296e0b1070c69c4295a3e29">More...</a><br /></td></tr>
-<tr class="separator:a0762d62a9296e0b1070c69c4295a3e29"><td class="memSeparator" colspan="2">&#160;</td></tr>
+<tr class="memitem:a98a85e6d719d876a062e15283fe8c7a9"><td class="memItemLeft" align="right" valign="top">static void&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="classPurrNet_1_1NetworkManager.html#a98a85e6d719d876a062e15283fe8c7a9">SetupPrefabInfo</a> (GameObject instance, <a class="el" href="structPurrNet_1_1PrefabID.html">PrefabID</a> pid, bool shouldBePooled)</td></tr>
+<tr class="memdesc:a98a85e6d719d876a062e15283fe8c7a9"><td class="mdescLeft">&#160;</td><td class="mdescRight">Prepares the prefab info for the given instance. This needs to be ready before the object is spawned.   <a href="classPurrNet_1_1NetworkManager.html#a98a85e6d719d876a062e15283fe8c7a9">More...</a><br /></td></tr>
+<tr class="separator:a98a85e6d719d876a062e15283fe8c7a9"><td class="memSeparator" colspan="2">&#160;</td></tr>
+<tr class="memitem:ad4460f9f449ba77e8cb3513b111a1ca5"><td class="memItemLeft" align="right" valign="top">static void&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="classPurrNet_1_1NetworkManager.html#ad4460f9f449ba77e8cb3513b111a1ca5">SetupPrefabInfo</a> (GameObject instance, <a class="el" href="structPurrNet_1_1PrefabID.html">PrefabID</a> pid, bool shouldBePooled, List&lt; <a class="el" href="classPurrNet_1_1NetworkIdentity.html">NetworkIdentity</a> &gt; children)</td></tr>
+<tr class="memdesc:ad4460f9f449ba77e8cb3513b111a1ca5"><td class="mdescLeft">&#160;</td><td class="mdescRight">Prepares the prefab info for the given instance, reusing an already collected identity list.   <a href="classPurrNet_1_1NetworkManager.html#ad4460f9f449ba77e8cb3513b111a1ca5">More...</a><br /></td></tr>
+<tr class="separator:ad4460f9f449ba77e8cb3513b111a1ca5"><td class="memSeparator" colspan="2">&#160;</td></tr>
 <tr class="memitem:a49ad27ed87bea42024332494d166009a"><td class="memItemLeft" align="right" valign="top"><a id="a49ad27ed87bea42024332494d166009a" name="a49ad27ed87bea42024332494d166009a"></a>
 static void&#160;</td><td class="memItemRight" valign="bottom"><b>CallAllRegisters</b> ()</td></tr>
 <tr class="separator:a49ad27ed87bea42024332494d166009a"><td class="memSeparator" colspan="2">&#160;</td></tr>
@@ -382,6 +394,14 @@ StartFlags&#160;</td><td class="memItemRight" valign="bottom"><b>startClientFlag
 <a class="el" href="interfacePurrNet_1_1IPrefabProvider.html">IPrefabProvider</a>&#160;</td><td class="memItemRight" valign="bottom"><b>prefabProvider</b><code> [get]</code></td></tr>
 <tr class="memdesc:af323793ea42a36db67a21019ec004a3e"><td class="mdescLeft">&#160;</td><td class="mdescRight">The prefab provider of the network manager.  <br /></td></tr>
 <tr class="separator:af323793ea42a36db67a21019ec004a3e"><td class="memSeparator" colspan="2">&#160;</td></tr>
+<tr class="memitem:acee5e0b3e1be1528054a5d525aa1a650"><td class="memItemLeft" align="right" valign="top"><a id="acee5e0b3e1be1528054a5d525aa1a650" name="acee5e0b3e1be1528054a5d525aa1a650"></a>
+<a class="el" href="classPurrNet_1_1PrefabResolver.html">PrefabResolver</a>&#160;</td><td class="memItemRight" valign="bottom"><b>prefabResolver</b><code> [get]</code></td></tr>
+<tr class="memdesc:acee5e0b3e1be1528054a5d525aa1a650"><td class="mdescLeft">&#160;</td><td class="mdescRight">Resolves prefab ids and prefab references to prefab data. All runtime lookups go through this.  <br /></td></tr>
+<tr class="separator:acee5e0b3e1be1528054a5d525aa1a650"><td class="memSeparator" colspan="2">&#160;</td></tr>
+<tr class="memitem:a01842951d0c4809b686d0090cd02d771"><td class="memItemLeft" align="right" valign="top"><a id="a01842951d0c4809b686d0090cd02d771" name="a01842951d0c4809b686d0090cd02d771"></a>
+<a class="el" href="classPurrNet_1_1NetworkAssetResolver.html">NetworkAssetResolver</a>&#160;</td><td class="memItemRight" valign="bottom"><b>networkAssetResolver</b><code> [get]</code></td></tr>
+<tr class="memdesc:a01842951d0c4809b686d0090cd02d771"><td class="mdescLeft">&#160;</td><td class="mdescRight">Resolves network asset ids and asset references to registered assets. All runtime lookups go through this.  <br /></td></tr>
+<tr class="separator:a01842951d0c4809b686d0090cd02d771"><td class="memSeparator" colspan="2">&#160;</td></tr>
 <tr class="memitem:a3d02f1808663d7c208d2300f8955d8de"><td class="memItemLeft" align="right" valign="top"><a id="a3d02f1808663d7c208d2300f8955d8de" name="a3d02f1808663d7c208d2300f8955d8de"></a>
 <a class="el" href="classPurrNet_1_1NetworkVisibilityRuleSet.html">NetworkVisibilityRuleSet</a>&#160;</td><td class="memItemRight" valign="bottom"><b>visibilityRules</b><code> [get]</code></td></tr>
 <tr class="memdesc:a3d02f1808663d7c208d2300f8955d8de"><td class="mdescLeft">&#160;</td><td class="mdescRight">The visibility rules of the network manager.  <br /></td></tr>
@@ -1012,6 +1032,59 @@ OnPlayerSceneEvent&#160;</td><td class="memItemRight" valign="bottom"><b>onPlaye
 
 </div>
 </div>
+<a id="a4253fe17a87e6e5ac113dca47c131dac" name="a4253fe17a87e6e5ac113dca47c131dac"></a>
+<h2 class="memtitle"><span class="permalink"><a href="#a4253fe17a87e6e5ac113dca47c131dac">&#9670;&#160;</a></span>RequestSendFlushThisFrame() <span class="overload">[1/2]</span></h2>
+
+<div class="memitem">
+<div class="memproto">
+      <table class="memname">
+        <tr>
+          <td class="memname">void PurrNet.NetworkManager.RequestSendFlushThisFrame </td>
+          <td>(</td>
+          <td class="paramname"></td><td>)</td>
+          <td></td>
+        </tr>
+      </table>
+</div><div class="memdoc">
+
+<p>Asks the manager to push queued transport data out before the next tick (this frame), so a latency-sensitive message does not wait for the tick's regular send.  </p>
+
+<p>Implements <a class="el" href="interfacePurrNet_1_1INetworkManager.html#a1ad347be50df29501ed3a38d5a9894f3">PurrNet.INetworkManager</a>.</p>
+
+</div>
+</div>
+<a id="af638f828c1e3c5dd93b8c83796a3e9a2" name="af638f828c1e3c5dd93b8c83796a3e9a2"></a>
+<h2 class="memtitle"><span class="permalink"><a href="#af638f828c1e3c5dd93b8c83796a3e9a2">&#9670;&#160;</a></span>RequestSendFlushThisFrame() <span class="overload">[2/2]</span></h2>
+
+<div class="memitem">
+<div class="memproto">
+      <table class="memname">
+        <tr>
+          <td class="memname">void PurrNet.NetworkManager.RequestSendFlushThisFrame </td>
+          <td>(</td>
+          <td class="paramtype"><a class="el" href="structPurrNet_1_1Transports_1_1Connection.html">Connection</a>&#160;</td>
+          <td class="paramname"><em>conn</em>, </td>
+        </tr>
+        <tr>
+          <td class="paramkey"></td>
+          <td></td>
+          <td class="paramtype">bool&#160;</td>
+          <td class="paramname"><em>asServer</em>&#160;</td>
+        </tr>
+        <tr>
+          <td></td>
+          <td>)</td>
+          <td></td><td></td>
+        </tr>
+      </table>
+</div><div class="memdoc">
+
+<p>Same as <a class="el" href="classPurrNet_1_1NetworkManager.html#a4253fe17a87e6e5ac113dca47c131dac" title="Asks the manager to push queued transport data out before the next tick (this frame),...">RequestSendFlushThisFrame()</a> but scoped to one connection, so a transport that supports it can push just that peer instead of a full send pass. On the client side the connection argument is ignored.  </p>
+
+<p>Implements <a class="el" href="interfacePurrNet_1_1INetworkManager.html#a474bf9fb0bde93dd0ade0abfbd7bfc7b">PurrNet.INetworkManager</a>.</p>
+
+</div>
+</div>
 <a id="a55b449859e905ad3abe77f305285fee3" name="a55b449859e905ad3abe77f305285fee3"></a>
 <h2 class="memtitle"><span class="permalink"><a href="#a55b449859e905ad3abe77f305285fee3">&#9670;&#160;</a></span>Send&lt; T &gt;() <span class="overload">[1/2]</span></h2>
 
@@ -1308,8 +1381,8 @@ OnPlayerSceneEvent&#160;</td><td class="memItemRight" valign="bottom"><b>onPlaye
 
 </div>
 </div>
-<a id="a971e0a7391e5053c7d34d3e05487e3ae" name="a971e0a7391e5053c7d34d3e05487e3ae"></a>
-<h2 class="memtitle"><span class="permalink"><a href="#a971e0a7391e5053c7d34d3e05487e3ae">&#9670;&#160;</a></span>SetupPrefabInfo() <span class="overload">[1/2]</span></h2>
+<a id="a98a85e6d719d876a062e15283fe8c7a9" name="a98a85e6d719d876a062e15283fe8c7a9"></a>
+<h2 class="memtitle"><span class="permalink"><a href="#a98a85e6d719d876a062e15283fe8c7a9">&#9670;&#160;</a></span>SetupPrefabInfo() <span class="overload">[1/2]</span></h2>
 
 <div class="memitem">
 <div class="memproto">
@@ -1326,7 +1399,7 @@ OnPlayerSceneEvent&#160;</td><td class="memItemRight" valign="bottom"><b>onPlaye
         <tr>
           <td class="paramkey"></td>
           <td></td>
-          <td class="paramtype">int&#160;</td>
+          <td class="paramtype"><a class="el" href="structPurrNet_1_1PrefabID.html">PrefabID</a>&#160;</td>
           <td class="paramname"><em>pid</em>, </td>
         </tr>
         <tr>
@@ -1360,8 +1433,8 @@ OnPlayerSceneEvent&#160;</td><td class="memItemRight" valign="bottom"><b>onPlaye
 
 </div>
 </div>
-<a id="a0762d62a9296e0b1070c69c4295a3e29" name="a0762d62a9296e0b1070c69c4295a3e29"></a>
-<h2 class="memtitle"><span class="permalink"><a href="#a0762d62a9296e0b1070c69c4295a3e29">&#9670;&#160;</a></span>SetupPrefabInfo() <span class="overload">[2/2]</span></h2>
+<a id="ad4460f9f449ba77e8cb3513b111a1ca5" name="ad4460f9f449ba77e8cb3513b111a1ca5"></a>
+<h2 class="memtitle"><span class="permalink"><a href="#ad4460f9f449ba77e8cb3513b111a1ca5">&#9670;&#160;</a></span>SetupPrefabInfo() <span class="overload">[2/2]</span></h2>
 
 <div class="memitem">
 <div class="memproto">
@@ -1378,7 +1451,7 @@ OnPlayerSceneEvent&#160;</td><td class="memItemRight" valign="bottom"><b>onPlaye
         <tr>
           <td class="paramkey"></td>
           <td></td>
-          <td class="paramtype">int&#160;</td>
+          <td class="paramtype"><a class="el" href="structPurrNet_1_1PrefabID.html">PrefabID</a>&#160;</td>
           <td class="paramname"><em>pid</em>, </td>
         </tr>
         <tr>

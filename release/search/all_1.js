@@ -13,9 +13,10 @@ var searchData=
   ['bonecount_10',['boneCount',['../classPurrNet_1_1NetworkBones.html#a05fd9874715d9c2031faa73bea0de15e',1,'PurrNet::NetworkBones']]],
   ['boneinfo_11',['BoneInfo',['../structPurrNet_1_1BoneInfo.html',1,'PurrNet']]],
   ['breakredundancy_12',['breakRedundancy',['../classPurrNet_1_1NetworkTransformSyncStrategy.html#ae5143c9389d8cae25fd2e36068b2fcbf',1,'PurrNet::NetworkTransformSyncStrategy']]],
-  ['broadcastmodule_13',['broadcastModule',['../classPurrNet_1_1NetworkManager.html#a8d129afa999c0098236701eef111185c',1,'PurrNet.NetworkManager.broadcastModule()'],['../classPurrNet_1_1RawNetManager.html#af3b4d846154aad1a0a53bc54d9ced439',1,'PurrNet.RawNetManager.broadcastModule()']]],
+  ['broadcastmodule_13',['broadcastModule',['../classPurrNet_1_1RawNetManager.html#af3b4d846154aad1a0a53bc54d9ced439',1,'PurrNet.RawNetManager.broadcastModule()'],['../classPurrNet_1_1NetworkManager.html#a8d129afa999c0098236701eef111185c',1,'PurrNet.NetworkManager.broadcastModule()']]],
   ['broadcastmodule_14',['BroadcastModule',['../classPurrNet_1_1Modules_1_1BroadcastModule.html',1,'PurrNet::Modules']]],
   ['broadcastsample_15',['BroadcastSample',['../structPurrNet_1_1Profiler_1_1BroadcastSample.html',1,'PurrNet::Profiler']]],
-  ['bypassloggingexception_16',['BypassLoggingException',['../classPurrNet_1_1BypassLoggingException.html',1,'PurrNet']]],
-  ['bytedata_17',['ByteData',['../structPurrNet_1_1Transports_1_1ByteData.html',1,'PurrNet::Transports']]]
+  ['buildrepresentatives_16',['BuildRepresentatives',['../classPurrNet_1_1Modules_1_1DeltaFanoutGrouper.html#a91e5ad72323a0467ef3a10a6c61a0970',1,'PurrNet::Modules::DeltaFanoutGrouper']]],
+  ['bypassloggingexception_17',['BypassLoggingException',['../classPurrNet_1_1BypassLoggingException.html',1,'PurrNet']]],
+  ['bytedata_18',['ByteData',['../structPurrNet_1_1Transports_1_1ByteData.html',1,'PurrNet::Transports']]]
 ];

@@ -8,6 +8,7 @@ var classPurrNet_1_1NetworkTransform =
     [ "OnEarlySpawn", "classPurrNet_1_1NetworkTransform.html#af1afaf75f36fe5bb777f9e205d0d1c5e", null ],
     [ "OnObserverAdded", "classPurrNet_1_1NetworkTransform.html#ab80b05c91be6ae800af6302be6ef3ab6", null ],
     [ "OnObserverRemoved", "classPurrNet_1_1NetworkTransform.html#a743a803391991f00af2fb1a1a22f3b84", null ],
+    [ "OnObserversAdded", "classPurrNet_1_1NetworkTransform.html#a9f296fba894ade39ccec9608175fbc51", null ],
     [ "OnOwnerChanged", "classPurrNet_1_1NetworkTransform.html#ace053bc3faab6bdca4cfb4efcea68e81", null ],
     [ "OnOwnerDisconnected", "classPurrNet_1_1NetworkTransform.html#a493ff9e0bc2ff53e9fe0b160ab9d049e", null ],
     [ "OnOwnerReconnected", "classPurrNet_1_1NetworkTransform.html#aa8e99a9f22f420b8e7efe0a187562c53", null ],

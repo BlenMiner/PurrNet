@@ -1,5 +1,6 @@
 var classPurrNet_1_1RawNetManager =
 [
+    [ "RequestSendFlushThisFrame", "classPurrNet_1_1RawNetManager.html#a32fd72545a790da9e335b846abd89477", null ],
     [ "StartClient", "classPurrNet_1_1RawNetManager.html#a9017a0a229fb49df401c7a70b561e161", null ],
     [ "StartHost", "classPurrNet_1_1RawNetManager.html#ab154da3466010ab9795bb8486a9bfd55", null ],
     [ "StartServer", "classPurrNet_1_1RawNetManager.html#affea3952a4dc25d5355c506a5327e7f4", null ],

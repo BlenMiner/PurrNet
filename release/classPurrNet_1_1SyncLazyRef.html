@@ -113,9 +113,9 @@ Inheritance diagram for PurrNet.SyncLazyRef&lt; T &gt;:</div>
 <table class="memberdecls">
 <tr class="heading"><td colspan="2"><h2 class="groupheader"><a id="pub-methods" name="pub-methods"></a>
 Public Member Functions</h2></td></tr>
-<tr class="memitem:adc084c7403474acd9325b447c8fd0d8b"><td class="memItemLeft" align="right" valign="top"><a id="adc084c7403474acd9325b447c8fd0d8b" name="adc084c7403474acd9325b447c8fd0d8b"></a>
-&#160;</td><td class="memItemRight" valign="bottom"><b>SyncLazyRef</b> (bool ownerAuth=false)</td></tr>
-<tr class="separator:adc084c7403474acd9325b447c8fd0d8b"><td class="memSeparator" colspan="2">&#160;</td></tr>
+<tr class="memitem:ae1cfee86a257bd773c89ad2d00478403"><td class="memItemLeft" align="right" valign="top"><a id="ae1cfee86a257bd773c89ad2d00478403" name="ae1cfee86a257bd773c89ad2d00478403"></a>
+&#160;</td><td class="memItemRight" valign="bottom"><b>SyncLazyRef</b> (bool ownerAuth=false, bool ownerOnly=false)</td></tr>
+<tr class="separator:ae1cfee86a257bd773c89ad2d00478403"><td class="memSeparator" colspan="2">&#160;</td></tr>
 <tr class="memitem:a59f58fda33eb298733e0d1e3abef76e6"><td class="memItemLeft" align="right" valign="top">override void&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="classPurrNet_1_1SyncLazyRef.html#a59f58fda33eb298733e0d1e3abef76e6">OnEarlySpawn</a> (bool asServer)</td></tr>
 <tr class="memdesc:a59f58fda33eb298733e0d1e3abef76e6"><td class="mdescLeft">&#160;</td><td class="mdescRight">Called when this object is spawned but before any other data is received. At this point you might be missing ownership data, module data, etc. This is called twice in host mode, once for the server and once for the client.   <a href="classPurrNet_1_1SyncLazyRef.html#a59f58fda33eb298733e0d1e3abef76e6">More...</a><br /></td></tr>
 <tr class="separator:a59f58fda33eb298733e0d1e3abef76e6"><td class="memSeparator" colspan="2">&#160;</td></tr>
@@ -220,6 +220,9 @@ Properties</h2></td></tr>
 <tr class="memitem:a2a3d537124fa36db1fabcbe3c7e8c766"><td class="memItemLeft" align="right" valign="top"><a id="a2a3d537124fa36db1fabcbe3c7e8c766" name="a2a3d537124fa36db1fabcbe3c7e8c766"></a>
 T&#160;</td><td class="memItemRight" valign="bottom"><b>value</b><code> [get, set]</code></td></tr>
 <tr class="separator:a2a3d537124fa36db1fabcbe3c7e8c766"><td class="memSeparator" colspan="2">&#160;</td></tr>
+<tr class="memitem:aa6b951adfcc7b2ec7b824fb360dbb0be"><td class="memItemLeft" align="right" valign="top"><a id="aa6b951adfcc7b2ec7b824fb360dbb0be" name="aa6b951adfcc7b2ec7b824fb360dbb0be"></a>
+override bool&#160;</td><td class="memItemRight" valign="bottom"><b>ownerOnly</b><code> [get]</code></td></tr>
+<tr class="separator:aa6b951adfcc7b2ec7b824fb360dbb0be"><td class="memSeparator" colspan="2">&#160;</td></tr>
 <tr class="inherit_header properties_classPurrNet_1_1NetworkModule"><td colspan="2" onclick="javascript:toggleInherit('properties_classPurrNet_1_1NetworkModule')"><img src="closed.png" alt="-"/>&#160;Properties inherited from <a class="el" href="classPurrNet_1_1NetworkModule.html">PurrNet.NetworkModule</a></td></tr>
 <tr class="memitem:a41edc6b530121f65f707d0f2a26412d7 inherit properties_classPurrNet_1_1NetworkModule"><td class="memItemLeft" align="right" valign="top"><a id="a41edc6b530121f65f707d0f2a26412d7" name="a41edc6b530121f65f707d0f2a26412d7"></a>
 <a class="el" href="classPurrNet_1_1NetworkIdentity.html">NetworkIdentity</a>&#160;</td><td class="memItemRight" valign="bottom"><b>parent</b><code> [get]</code></td></tr>
@@ -269,6 +272,14 @@ bool&#160;</td><td class="memItemRight" valign="bottom"><b>hasConnectedOwner</b>
 <tr class="memitem:ab531a61b7264152615e260f114f9fb23 inherit properties_classPurrNet_1_1NetworkModule"><td class="memItemLeft" align="right" valign="top"><a id="ab531a61b7264152615e260f114f9fb23" name="ab531a61b7264152615e260f114f9fb23"></a>
 <a class="el" href="structPurrNet_1_1PlayerID.html">PlayerID</a>?&#160;</td><td class="memItemRight" valign="bottom"><b>owner</b><code> [get]</code></td></tr>
 <tr class="separator:ab531a61b7264152615e260f114f9fb23 inherit properties_classPurrNet_1_1NetworkModule"><td class="memSeparator" colspan="2">&#160;</td></tr>
+<tr class="memitem:a4e3079e7c0e3aefebf4d28383429ff41 inherit properties_classPurrNet_1_1NetworkModule"><td class="memItemLeft" align="right" valign="top"><a id="a4e3079e7c0e3aefebf4d28383429ff41" name="a4e3079e7c0e3aefebf4d28383429ff41"></a>
+virtual bool&#160;</td><td class="memItemRight" valign="bottom"><b>ownerOnly</b><code> [get]</code></td></tr>
+<tr class="memdesc:a4e3079e7c0e3aefebf4d28383429ff41 inherit properties_classPurrNet_1_1NetworkModule"><td class="mdescLeft">&#160;</td><td class="mdescRight">When true, this module's state is only ever sent to the owner of the parent identity. Non-owner observers still see the object, they just never receive this module's data. Override in your module (or pass ownerOnly: true to a sync type's constructor) to enable.  <br /></td></tr>
+<tr class="separator:a4e3079e7c0e3aefebf4d28383429ff41 inherit properties_classPurrNet_1_1NetworkModule"><td class="memSeparator" colspan="2">&#160;</td></tr>
+<tr class="memitem:a9bc3a60a1dfd5f741ac25ff487873f7c inherit properties_classPurrNet_1_1NetworkModule"><td class="memItemLeft" align="right" valign="top"><a id="a9bc3a60a1dfd5f741ac25ff487873f7c" name="a9bc3a60a1dfd5f741ac25ff487873f7c"></a>
+IReadOnlyList&lt; <a class="el" href="structPurrNet_1_1PlayerID.html">PlayerID</a> &gt;&#160;</td><td class="memItemRight" valign="bottom"><b>observers</b><code> [get]</code></td></tr>
+<tr class="memdesc:a9bc3a60a1dfd5f741ac25ff487873f7c inherit properties_classPurrNet_1_1NetworkModule"><td class="mdescLeft">&#160;</td><td class="mdescRight">The observers this module is allowed to send to. Same as the parent's observer list, unless the module is <a class="el" href="classPurrNet_1_1NetworkModule.html#a4e3079e7c0e3aefebf4d28383429ff41" title="When true, this module&#39;s state is only ever sent to the owner of the parent identity....">ownerOnly</a>, in which case it contains only the owner (or nothing when there is no owner). Server only.  <br /></td></tr>
+<tr class="separator:a9bc3a60a1dfd5f741ac25ff487873f7c inherit properties_classPurrNet_1_1NetworkModule"><td class="memSeparator" colspan="2">&#160;</td></tr>
 <tr class="memitem:a800586ec7553c06f52bb03648203db54 inherit properties_classPurrNet_1_1NetworkModule"><td class="memItemLeft" align="right" valign="top"><a id="a800586ec7553c06f52bb03648203db54" name="a800586ec7553c06f52bb03648203db54"></a>
 bool&#160;</td><td class="memItemRight" valign="bottom"><b>isController</b><code> [get]</code></td></tr>
 <tr class="separator:a800586ec7553c06f52bb03648203db54 inherit properties_classPurrNet_1_1NetworkModule"><td class="memSeparator" colspan="2">&#160;</td></tr>

@@ -1,21 +1,4 @@
 var searchData=
 [
-  ['canenter_0',['CanEnter',['../classPurrNet_1_1StateMachine_1_1StateNode.html#a7e9e60e32f54d9b2f75c62f64daa40f3',1,'PurrNet.StateMachine.StateNode.CanEnter(T data)'],['../classPurrNet_1_1StateMachine_1_1StateNode.html#a164ea21c44eb2c124ce46ed3a91591e5',1,'PurrNet.StateMachine.StateNode.CanEnter()']]],
-  ['canexit_1',['CanExit',['../classPurrNet_1_1StateMachine_1_1StateNode.html#ab125dd959bda0692dc9de551ac03b9a6',1,'PurrNet::StateMachine::StateNode']]],
-  ['cansee_2',['CanSee',['../classPurrNet_1_1AlwaysVisibleRule.html#aca715d7409278bcffb3fea4f17969283',1,'PurrNet.AlwaysVisibleRule.CanSee()'],['../classPurrNet_1_1DistanceRule.html#a2563c8c84a3b6667513b2facda65fabc',1,'PurrNet.DistanceRule.CanSee()'],['../interfacePurrNet_1_1INetworkVisibilityRule.html#a484bb8fb133d80f9b0ff16a399d6ed50',1,'PurrNet.INetworkVisibilityRule.CanSee()'],['../classPurrNet_1_1NetworkVisibilityRule.html#a0a03c9d2cefe99390d7f41183d346378',1,'PurrNet.NetworkVisibilityRule.CanSee()'],['../classPurrNet_1_1NoVisibilityRule.html#a483bd1e31a37cf11c6b8145e00f649fa',1,'PurrNet.NoVisibilityRule.CanSee()']]],
-  ['cleanupstale_3',['CleanupStale',['../classPurrNet_1_1Transports_1_1FragmentationLayer.html#afabcecb90fa4b9997b7f148df8bd3671',1,'PurrNet::Transports::FragmentationLayer']]],
-  ['cleanupstaleifdue_4',['CleanupStaleIfDue',['../classPurrNet_1_1Transports_1_1FragmentationLayer.html#ae807bae572f1fa3b13f8d1fee5eed5b8',1,'PurrNet::Transports::FragmentationLayer']]],
-  ['clear_5',['Clear',['../classPurrNet_1_1SyncDictionary.html#a62c5378b073c7ff719475aa70164a422',1,'PurrNet.SyncDictionary.Clear()'],['../classPurrNet_1_1SyncHashSet.html#a0d75d35d5015317a5fb11e1e09ce8694',1,'PurrNet.SyncHashSet.Clear()'],['../classPurrNet_1_1SyncList.html#a83c1020260598e0e1ce83491ff971440',1,'PurrNet.SyncList.Clear()']]],
-  ['clearfuture_6',['ClearFuture',['../classPurrNet_1_1Modules_1_1SimpleHistory.html#af0c2621c953effefd6f4e08427a6f74b',1,'PurrNet::Modules::SimpleHistory']]],
-  ['clearinterpolation_7',['ClearInterpolation',['../interfacePurrNet_1_1INetworkTransform.html#a39cd6bbcf091951284317363b09ec235',1,'PurrNet.INetworkTransform.ClearInterpolation()'],['../classPurrNet_1_1NetworkTransform.html#a9c221c6f4c2c8978f4a03c77f3538d6b',1,'PurrNet.NetworkTransform.ClearInterpolation()']]],
-  ['clearownerships_8',['ClearOwnerships',['../classPurrNet_1_1Modules_1_1GlobalOwnershipModule.html#a8c28e6e5c4d92ea4d447674bacb90d68',1,'PurrNet::Modules::GlobalOwnershipModule']]],
-  ['clearpast_9',['ClearPast',['../classPurrNet_1_1Modules_1_1SimpleHistory.html#a6084cacf773a7fdf1b40fa522317eaff',1,'PurrNet::Modules::SimpleHistory']]],
-  ['clearservertransportfilter_10',['ClearServerTransportFilter',['../classPurrNet_1_1Transports_1_1CompositeTransport.html#a88e15a7f876566b8c0294e04e0811b8d',1,'PurrNet::Transports::CompositeTransport']]],
-  ['clearsoftparent_11',['ClearSoftParent',['../classPurrNet_1_1NetworkRigidbody.html#a9178f3aae34e5de1f92f2b75ff281487',1,'PurrNet::NetworkRigidbody']]],
-  ['compareto_12',['CompareTo',['../structPurrNet_1_1Packing_1_1Half.html#ab8bcf3bc5826881dcd901b701f6ab214',1,'PurrNet.Packing.Half.CompareTo(Half other)'],['../structPurrNet_1_1Packing_1_1Half.html#a565dbedf44864368c1d6386ce47301b9',1,'PurrNet.Packing.Half.CompareTo(object obj)']]],
-  ['configure_13',['Configure',['../classPurrNet_1_1NetworkLODProfile.html#a22f8e795ccff8a103d0419b077accd05',1,'PurrNet::NetworkLODProfile']]],
-  ['connectaspipe_14',['ConnectAsPipe',['../classPurrNet_1_1Transports_1_1PurrTransport.html#a3042976559865d9b8b8a9cc7deb57977',1,'PurrNet::Transports::PurrTransport']]],
-  ['contains_15',['Contains',['../interfacePurrNet_1_1Collections_1_1IReadonlyHashSet.html#aa87379b63804d381b446d9546ff7b499',1,'PurrNet.Collections.IReadonlyHashSet.Contains()'],['../classPurrNet_1_1Collections_1_1PurrHashSet.html#a65e9c8cae7805721c8655361920456db',1,'PurrNet.Collections.PurrHashSet.Contains()']]],
-  ['createbot_16',['CreateBot',['../classPurrNet_1_1Modules_1_1PlayersManager.html#afcc4d8439d05cb7ed9fca3be12d52429',1,'PurrNet::Modules::PlayersManager']]],
-  ['createprototype_17',['CreatePrototype',['../classPurrNet_1_1Modules_1_1HierarchyV2.html#a9b147ed32462002e028cb4b65b7d2ff8',1,'PurrNet::Modules::HierarchyV2']]]
+  ['buildrepresentatives_0',['BuildRepresentatives',['../classPurrNet_1_1Modules_1_1DeltaFanoutGrouper.html#a91e5ad72323a0467ef3a10a6c61a0970',1,'PurrNet::Modules::DeltaFanoutGrouper']]]
 ];

@@ -111,9 +111,9 @@ Inheritance diagram for PurrNet.SyncTimer:</div>
 <table class="memberdecls">
 <tr class="heading"><td colspan="2"><h2 class="groupheader"><a id="pub-methods" name="pub-methods"></a>
 Public Member Functions</h2></td></tr>
-<tr class="memitem:a9458981ca3510cf1103a3a99abdcef4d"><td class="memItemLeft" align="right" valign="top"><a id="a9458981ca3510cf1103a3a99abdcef4d" name="a9458981ca3510cf1103a3a99abdcef4d"></a>
-&#160;</td><td class="memItemRight" valign="bottom"><b>SyncTimer</b> (bool ownerAuth=false, float reconcileInterval=3, bool manualUpdate=false)</td></tr>
-<tr class="separator:a9458981ca3510cf1103a3a99abdcef4d"><td class="memSeparator" colspan="2">&#160;</td></tr>
+<tr class="memitem:a6a9bcf677731276776fb742b6ac87c18"><td class="memItemLeft" align="right" valign="top"><a id="a6a9bcf677731276776fb742b6ac87c18" name="a6a9bcf677731276776fb742b6ac87c18"></a>
+&#160;</td><td class="memItemRight" valign="bottom"><b>SyncTimer</b> (bool ownerAuth=false, float reconcileInterval=3, bool manualUpdate=false, bool ownerOnly=false)</td></tr>
+<tr class="separator:a6a9bcf677731276776fb742b6ac87c18"><td class="memSeparator" colspan="2">&#160;</td></tr>
 <tr class="memitem:aa19e2c5ff8a6caeb2e56add31777e95f"><td class="memItemLeft" align="right" valign="top">void&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="classPurrNet_1_1SyncTimer.html#aa19e2c5ff8a6caeb2e56add31777e95f">OnTick</a> (float delta)</td></tr>
 <tr class="memdesc:aa19e2c5ff8a6caeb2e56add31777e95f"><td class="mdescLeft">&#160;</td><td class="mdescRight">Similar to FixedUpdate but tailored for networked objects and it's tick system.   <a href="classPurrNet_1_1SyncTimer.html#aa19e2c5ff8a6caeb2e56add31777e95f">More...</a><br /></td></tr>
 <tr class="separator:aa19e2c5ff8a6caeb2e56add31777e95f"><td class="memSeparator" colspan="2">&#160;</td></tr>
@@ -234,6 +234,9 @@ virtual void&#160;</td><td class="memItemRight" valign="bottom"><b>PromoteToServ
 </table><table class="memberdecls">
 <tr class="heading"><td colspan="2"><h2 class="groupheader"><a id="properties" name="properties"></a>
 Properties</h2></td></tr>
+<tr class="memitem:a5a704e3776786f8653c0effd50c60a97"><td class="memItemLeft" align="right" valign="top"><a id="a5a704e3776786f8653c0effd50c60a97" name="a5a704e3776786f8653c0effd50c60a97"></a>
+override bool&#160;</td><td class="memItemRight" valign="bottom"><b>ownerOnly</b><code> [get]</code></td></tr>
+<tr class="separator:a5a704e3776786f8653c0effd50c60a97"><td class="memSeparator" colspan="2">&#160;</td></tr>
 <tr class="memitem:aafac6f1a7954657989d2d1e456b874bf"><td class="memItemLeft" align="right" valign="top"><a id="aafac6f1a7954657989d2d1e456b874bf" name="aafac6f1a7954657989d2d1e456b874bf"></a>
 float&#160;</td><td class="memItemRight" valign="bottom"><b>remaining</b><code> [get]</code></td></tr>
 <tr class="separator:aafac6f1a7954657989d2d1e456b874bf"><td class="memSeparator" colspan="2">&#160;</td></tr>
@@ -295,6 +298,14 @@ bool&#160;</td><td class="memItemRight" valign="bottom"><b>hasConnectedOwner</b>
 <tr class="memitem:ab531a61b7264152615e260f114f9fb23 inherit properties_classPurrNet_1_1NetworkModule"><td class="memItemLeft" align="right" valign="top"><a id="ab531a61b7264152615e260f114f9fb23" name="ab531a61b7264152615e260f114f9fb23"></a>
 <a class="el" href="structPurrNet_1_1PlayerID.html">PlayerID</a>?&#160;</td><td class="memItemRight" valign="bottom"><b>owner</b><code> [get]</code></td></tr>
 <tr class="separator:ab531a61b7264152615e260f114f9fb23 inherit properties_classPurrNet_1_1NetworkModule"><td class="memSeparator" colspan="2">&#160;</td></tr>
+<tr class="memitem:a4e3079e7c0e3aefebf4d28383429ff41 inherit properties_classPurrNet_1_1NetworkModule"><td class="memItemLeft" align="right" valign="top"><a id="a4e3079e7c0e3aefebf4d28383429ff41" name="a4e3079e7c0e3aefebf4d28383429ff41"></a>
+virtual bool&#160;</td><td class="memItemRight" valign="bottom"><b>ownerOnly</b><code> [get]</code></td></tr>
+<tr class="memdesc:a4e3079e7c0e3aefebf4d28383429ff41 inherit properties_classPurrNet_1_1NetworkModule"><td class="mdescLeft">&#160;</td><td class="mdescRight">When true, this module's state is only ever sent to the owner of the parent identity. Non-owner observers still see the object, they just never receive this module's data. Override in your module (or pass ownerOnly: true to a sync type's constructor) to enable.  <br /></td></tr>
+<tr class="separator:a4e3079e7c0e3aefebf4d28383429ff41 inherit properties_classPurrNet_1_1NetworkModule"><td class="memSeparator" colspan="2">&#160;</td></tr>
+<tr class="memitem:a9bc3a60a1dfd5f741ac25ff487873f7c inherit properties_classPurrNet_1_1NetworkModule"><td class="memItemLeft" align="right" valign="top"><a id="a9bc3a60a1dfd5f741ac25ff487873f7c" name="a9bc3a60a1dfd5f741ac25ff487873f7c"></a>
+IReadOnlyList&lt; <a class="el" href="structPurrNet_1_1PlayerID.html">PlayerID</a> &gt;&#160;</td><td class="memItemRight" valign="bottom"><b>observers</b><code> [get]</code></td></tr>
+<tr class="memdesc:a9bc3a60a1dfd5f741ac25ff487873f7c inherit properties_classPurrNet_1_1NetworkModule"><td class="mdescLeft">&#160;</td><td class="mdescRight">The observers this module is allowed to send to. Same as the parent's observer list, unless the module is <a class="el" href="classPurrNet_1_1NetworkModule.html#a4e3079e7c0e3aefebf4d28383429ff41" title="When true, this module&#39;s state is only ever sent to the owner of the parent identity....">ownerOnly</a>, in which case it contains only the owner (or nothing when there is no owner). Server only.  <br /></td></tr>
+<tr class="separator:a9bc3a60a1dfd5f741ac25ff487873f7c inherit properties_classPurrNet_1_1NetworkModule"><td class="memSeparator" colspan="2">&#160;</td></tr>
 <tr class="memitem:a800586ec7553c06f52bb03648203db54 inherit properties_classPurrNet_1_1NetworkModule"><td class="memItemLeft" align="right" valign="top"><a id="a800586ec7553c06f52bb03648203db54" name="a800586ec7553c06f52bb03648203db54"></a>
 bool&#160;</td><td class="memItemRight" valign="bottom"><b>isController</b><code> [get]</code></td></tr>
 <tr class="separator:a800586ec7553c06f52bb03648203db54 inherit properties_classPurrNet_1_1NetworkModule"><td class="memSeparator" colspan="2">&#160;</td></tr>

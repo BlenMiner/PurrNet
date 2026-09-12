@@ -1,25 +1,7 @@
 var searchData=
 [
-  ['generate_0',['Generate',['../classPurrNet_1_1NetworkPrefabs.html#a045dabd40864f5ea742adee2aeda9067',1,'PurrNet::NetworkPrefabs']]],
-  ['get_1',['Get',['../classPurrNet_1_1Modules_1_1CookiesModule.html#a4ab56f82bb417d08d30712e5105ca2ca',1,'PurrNet::Modules::CookiesModule']]],
-  ['getallplayerownedids_2',['GetAllPlayerOwnedIds',['../classPurrNet_1_1Modules_1_1GlobalOwnershipModule.html#a515f2d0fad584409687cd7681a0c8572',1,'PurrNet.Modules.GlobalOwnershipModule.GetAllPlayerOwnedIds()'],['../classPurrNet_1_1NetworkManager.html#a6b9c91925340f5f473bb23fcba4ce183',1,'PurrNet.NetworkManager.GetAllPlayerOwnedIds(PlayerID player, bool asServer)'],['../classPurrNet_1_1NetworkManager.html#af8473a2c0ef652f32a53fe633aa09559',1,'PurrNet.NetworkManager.GetAllPlayerOwnedIds(PlayerID player, bool asServer, List&lt; NetworkIdentity &gt; result)']]],
-  ['getbits_3',['GetBits',['../structPurrNet_1_1Packing_1_1Half.html#a51fec6d99ac3671e484b7d450469027b',1,'PurrNet::Packing::Half']]],
-  ['getbytes_4',['GetBytes',['../structPurrNet_1_1Packing_1_1Half.html#aa1f8a55efbff541d478b2a7ce20acb62',1,'PurrNet::Packing::Half']]],
-  ['getclientpayload_5',['GetClientPayload',['../classPurrNet_1_1Authentication_1_1AuthenticationBehaviour.html#ac4b8d8b72299b48509e58aa33b56a8e0',1,'PurrNet.Authentication.AuthenticationBehaviour.GetClientPayload()'],['../classPurrNet_1_1Authentication_1_1AuthenticationBehaviour.html#a7582fe12a7b79c83604efccba2170e61',1,'PurrNet.Authentication.AuthenticationBehaviour.GetClientPayload()'],['../classPurrNet_1_1Authentication_1_1SimpleAuthenticator.html#a251b29dde40ff2dbc1288a4f07ae42fd',1,'PurrNet.Authentication.SimpleAuthenticator.GetClientPayload()']]],
-  ['getentrytick_6',['GetEntryTick',['../classPurrNet_1_1Modules_1_1SimpleHistory.html#a8d3f2981c1226aa31b136914bceb4d09',1,'PurrNet::Modules::SimpleHistory']]],
-  ['getenumerator_7',['GetEnumerator',['../classPurrNet_1_1Collections_1_1PurrHashSet.html#a80409228024b21dea3c01735f67422ec',1,'PurrNet::Collections::PurrHashSet']]],
-  ['gethashcode_8',['GetHashCode',['../structPurrNet_1_1Packing_1_1Half.html#a56b8b965490a529a81e4c8e934a24dff',1,'PurrNet::Packing::Half']]],
-  ['getlodtier_9',['GetLODTier',['../classPurrNet_1_1NetworkIdentity.html#ae7f22c47059dbdf11779a30ef80ac9ce',1,'PurrNet::NetworkIdentity']]],
-  ['getmaxmessagesize_10',['GetMaxMessageSize',['../classPurrNet_1_1Transports_1_1FragmentationLayer.html#a2372835de3e10997ed4fed14b09f98c0',1,'PurrNet::Transports::FragmentationLayer']]],
-  ['getmaxsequencedmessagesize_11',['GetMaxSequencedMessageSize',['../classPurrNet_1_1Transports_1_1FragmentationLayer.html#aee4df19ad64c3765fcefd3c7e74c5124',1,'PurrNet::Transports::FragmentationLayer']]],
-  ['getmodule_3c_20t_20_3e_12',['GetModule&lt; T &gt;',['../classPurrNet_1_1NetworkManager.html#a997afb3100d7e6b303e37ba2b8fd5ca6',1,'PurrNet::NetworkManager']]],
-  ['getnearestparent_13',['GetNearestParent',['../classPurrNet_1_1NetworkIdentity.html#aacf2429591c4c7a1a12f7d110674c312',1,'PurrNet::NetworkIdentity']]],
-  ['getnextid_14',['GetNextId',['../classPurrNet_1_1NetworkIdentity.html#a6894228bb2810c322ee8dff28353e7ba',1,'PurrNet::NetworkIdentity']]],
-  ['getnextid_3c_20t_20_3e_15',['GetNextId&lt; T &gt;',['../classPurrNet_1_1NetworkIdentity.html#aa9ca1d8499152c7c2a641b0b8783adf6',1,'PurrNet::NetworkIdentity']]],
-  ['getp2pendpoint_16',['GetP2pEndpoint',['../classPurrNet_1_1Transports_1_1PurrTransport.html#a494876d88e0afc801b7a91f4a82cbed2',1,'PurrNet::Transports::PurrTransport']]],
-  ['getpendingoperations_17',['GetPendingOperations',['../classPurrNet_1_1Modules_1_1ScenesModule.html#a3a7f73366d9d53e262795607b3ba6244',1,'PurrNet::Modules::ScenesModule']]],
-  ['getstate_3c_20t_20_3e_18',['GetState&lt; T &gt;',['../classPurrNet_1_1StateMachine_1_1StateMachine.html#ab970c2f0ea7d01a78584b1f681739dfb',1,'PurrNet::StateMachine::StateMachine']]],
-  ['gettier_19',['GetTier',['../classPurrNet_1_1NetworkLOD.html#ae3a3eb53995e1e4b6f2f8c02bb4aa929',1,'PurrNet::NetworkLOD']]],
-  ['gettypecode_20',['GetTypeCode',['../structPurrNet_1_1Packing_1_1Half.html#a68013ae5140b43ecb16d23c22f1928bb',1,'PurrNet::Packing::Half']]],
-  ['giveownership_21',['GiveOwnership',['../classPurrNet_1_1NetworkIdentity.html#a9ea4ce263917261b1e18c822863cb9c3',1,'PurrNet::NetworkIdentity']]]
+  ['find_0',['Find',['../classPurrNet_1_1Modules_1_1SimpleHistory.html#ac4f7400328c7a31e38a1d7c2c3bb7510',1,'PurrNet::Modules::SimpleHistory']]],
+  ['flushconnection_1',['FlushConnection',['../classPurrNet_1_1Transports_1_1CompositeTransport.html#a25acda4d49ef470e042a0448e3b55345',1,'PurrNet.Transports.CompositeTransport.FlushConnection()'],['../interfacePurrNet_1_1Transports_1_1ITransport.html#a84d8be7b2d22babc84aec7313f41e66c',1,'PurrNet.Transports.ITransport.FlushConnection()'],['../classPurrNet_1_1Transports_1_1PurrTransport.html#ab39527cd4fca47ccde3d57cc731e5a9c',1,'PurrNet.Transports.PurrTransport.FlushConnection()'],['../classPurrNet_1_1Transports_1_1UDPTransport.html#a8cbd0dd1f771aa89d500896ca9e273db',1,'PurrNet.Transports.UDPTransport.FlushConnection()']]],
+  ['forcesync_2',['ForceSync',['../interfacePurrNet_1_1INetworkTransform.html#a1e0f2217a1df1df7511a5d4e73339db4',1,'PurrNet.INetworkTransform.ForceSync(PlayerID target)'],['../interfacePurrNet_1_1INetworkTransform.html#a0613080cf8a16745787e02319f02baa5',1,'PurrNet.INetworkTransform.ForceSync()'],['../classPurrNet_1_1NetworkTransform.html#a4e5b386f968c2710f36a5d5db15376de',1,'PurrNet.NetworkTransform.ForceSync(PlayerID target)'],['../classPurrNet_1_1NetworkTransform.html#a39207ab962a55ede8548732de65d3adf',1,'PurrNet.NetworkTransform.ForceSync()']]],
+  ['forcesyncfor_3',['ForceSyncFor',['../classPurrNet_1_1NetworkRigidbody.html#a390362c0481733d175190856810cff48',1,'PurrNet::NetworkRigidbody']]]
 ];

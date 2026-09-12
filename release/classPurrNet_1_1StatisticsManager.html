@@ -147,6 +147,14 @@ float&#160;</td><td class="memItemRight" valign="bottom"><b>checkInterval</b> = 
 </table><table class="memberdecls">
 <tr class="heading"><td colspan="2"><h2 class="groupheader"><a id="properties" name="properties"></a>
 Properties</h2></td></tr>
+<tr class="memitem:a815128cf578f70ac3617f80d88f31549"><td class="memItemLeft" align="right" valign="top"><a id="a815128cf578f70ac3617f80d88f31549" name="a815128cf578f70ac3617f80d88f31549"></a>
+string&#160;</td><td class="memItemRight" valign="bottom"><b>clientConnectionDescription</b><code> [get]</code></td></tr>
+<tr class="memdesc:a815128cf578f70ac3617f80d88f31549"><td class="mdescLeft">&#160;</td><td class="mdescRight">The local client's current route and protocol, or its connection state. <br /></td></tr>
+<tr class="separator:a815128cf578f70ac3617f80d88f31549"><td class="memSeparator" colspan="2">&#160;</td></tr>
+<tr class="memitem:a7172541de88678060d8ffdd979690730"><td class="memItemLeft" align="right" valign="top"><a id="a7172541de88678060d8ffdd979690730" name="a7172541de88678060d8ffdd979690730"></a>
+string&#160;</td><td class="memItemRight" valign="bottom"><b>serverConnectionDescription</b><code> [get]</code></td></tr>
+<tr class="memdesc:a7172541de88678060d8ffdd979690730"><td class="mdescLeft">&#160;</td><td class="mdescRight">Active server transports. PurrTransport reports the local host-to-relay link.  <br /></td></tr>
+<tr class="separator:a7172541de88678060d8ffdd979690730"><td class="memSeparator" colspan="2">&#160;</td></tr>
 <tr class="memitem:a90332a363a52ffd243b68ea137cd3466"><td class="memItemLeft" align="right" valign="top"><a id="a90332a363a52ffd243b68ea137cd3466" name="a90332a363a52ffd243b68ea137cd3466"></a>
 int&#160;</td><td class="memItemRight" valign="bottom"><b>ping</b><code> [get]</code></td></tr>
 <tr class="separator:a90332a363a52ffd243b68ea137cd3466"><td class="memSeparator" colspan="2">&#160;</td></tr>
@@ -162,6 +170,10 @@ float&#160;</td><td class="memItemRight" valign="bottom"><b>upload</b><code> [ge
 <tr class="memitem:a9bf4267bf3a99439505fd87377a60a7d"><td class="memItemLeft" align="right" valign="top"><a id="a9bf4267bf3a99439505fd87377a60a7d" name="a9bf4267bf3a99439505fd87377a60a7d"></a>
 float&#160;</td><td class="memItemRight" valign="bottom"><b>download</b><code> [get]</code></td></tr>
 <tr class="separator:a9bf4267bf3a99439505fd87377a60a7d"><td class="memSeparator" colspan="2">&#160;</td></tr>
+<tr class="memitem:ae862864d983e6d6f64d41a2884486d07"><td class="memItemLeft" align="right" valign="top"><a id="ae862864d983e6d6f64d41a2884486d07" name="ae862864d983e6d6f64d41a2884486d07"></a>
+bool&#160;</td><td class="memItemRight" valign="bottom"><b>hasPingEstimate</b><code> [get]</code></td></tr>
+<tr class="memdesc:ae862864d983e6d6f64d41a2884486d07"><td class="mdescLeft">&#160;</td><td class="mdescRight">False until the warmup has enough clean samples to publish a ping. While it is false ping and jitter are 0 and no quality flag can raise, so a UI can hide a readout rather than show a zero it would have to explain.  <br /></td></tr>
+<tr class="separator:ae862864d983e6d6f64d41a2884486d07"><td class="memSeparator" colspan="2">&#160;</td></tr>
 <tr class="memitem:adf24651fe038e0996d13441a81174648"><td class="memItemLeft" align="right" valign="top"><a id="adf24651fe038e0996d13441a81174648" name="adf24651fe038e0996d13441a81174648"></a>
 bool&#160;</td><td class="memItemRight" valign="bottom"><b>isHighPing</b><code> [get]</code></td></tr>
 <tr class="separator:adf24651fe038e0996d13441a81174648"><td class="memSeparator" colspan="2">&#160;</td></tr>
@@ -197,6 +209,7 @@ ConnectionStalledChanged&#160;</td><td class="memItemRight" valign="bottom"><b>o
 <tr class="separator:a5837cceaddd4124dfed1a9211653339c"><td class="memSeparator" colspan="2">&#160;</td></tr>
 </table>
 <hr/>The documentation for this class was generated from the following files:<ul>
+<li>Assets/PurrNet/Runtime/Managers/StatisticsManager.Connection.cs</li>
 <li>Assets/PurrNet/Runtime/Managers/StatisticsManager.cs</li>
 <li>Assets/PurrNet/Runtime/Managers/StatisticsManager.ServerStats.cs</li>
 </ul>

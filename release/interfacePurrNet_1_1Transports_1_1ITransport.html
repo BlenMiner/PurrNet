@@ -122,6 +122,12 @@ bool&#160;</td><td class="memItemRight" valign="bottom"><b>SupportsChannel</b> (
 <tr class="memitem:a0ac3bb184fe2913de57666f3ff4b01f6"><td class="memItemLeft" align="right" valign="top"><a id="a0ac3bb184fe2913de57666f3ff4b01f6" name="a0ac3bb184fe2913de57666f3ff4b01f6"></a>
 int&#160;</td><td class="memItemRight" valign="bottom"><b>GetMTU</b> (<a class="el" href="structPurrNet_1_1Transports_1_1Connection.html">Connection</a> target, Channel channel, bool asServer)</td></tr>
 <tr class="separator:a0ac3bb184fe2913de57666f3ff4b01f6"><td class="memSeparator" colspan="2">&#160;</td></tr>
+<tr class="memitem:ae3e1f81560c564104469b5fc729ba137"><td class="memItemLeft" align="right" valign="top">int&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="interfacePurrNet_1_1Transports_1_1ITransport.html#ae3e1f81560c564104469b5fc729ba137">GetRoundTripTime</a> (<a class="el" href="structPurrNet_1_1Transports_1_1Connection.html">Connection</a> conn, bool asServer)</td></tr>
+<tr class="memdesc:ae3e1f81560c564104469b5fc729ba137"><td class="mdescLeft">&#160;</td><td class="mdescRight">Round trip time in milliseconds for a connection, or -1 when the transport has not measured it yet or does not support it. On the client side the connection argument is ignored.   <a href="interfacePurrNet_1_1Transports_1_1ITransport.html#ae3e1f81560c564104469b5fc729ba137">More...</a><br /></td></tr>
+<tr class="separator:ae3e1f81560c564104469b5fc729ba137"><td class="memSeparator" colspan="2">&#160;</td></tr>
+<tr class="memitem:a84d8be7b2d22babc84aec7313f41e66c"><td class="memItemLeft" align="right" valign="top">bool&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="interfacePurrNet_1_1Transports_1_1ITransport.html#a84d8be7b2d22babc84aec7313f41e66c">FlushConnection</a> (<a class="el" href="structPurrNet_1_1Transports_1_1Connection.html">Connection</a> conn, bool asServer)</td></tr>
+<tr class="memdesc:a84d8be7b2d22babc84aec7313f41e66c"><td class="mdescLeft">&#160;</td><td class="mdescRight">Pushes data already queued for one connection onto the wire without a full send pass. Returns false when the transport cannot do this, in which case the caller falls back to SendMessages. On the client side the connection argument is ignored.   <a href="interfacePurrNet_1_1Transports_1_1ITransport.html#a84d8be7b2d22babc84aec7313f41e66c">More...</a><br /></td></tr>
+<tr class="separator:a84d8be7b2d22babc84aec7313f41e66c"><td class="memSeparator" colspan="2">&#160;</td></tr>
 <tr class="memitem:af93c7e3cc31101e327f392839e24f9b1"><td class="memItemLeft" align="right" valign="top"><a id="af93c7e3cc31101e327f392839e24f9b1" name="af93c7e3cc31101e327f392839e24f9b1"></a>
 void&#160;</td><td class="memItemRight" valign="bottom"><b>SendServerKeepAlive</b> ()</td></tr>
 <tr class="separator:af93c7e3cc31101e327f392839e24f9b1"><td class="memSeparator" colspan="2">&#160;</td></tr>
@@ -168,6 +174,12 @@ Properties</h2></td></tr>
 <tr class="memitem:ae46b353c5e0e2d7985706a507deaa246"><td class="memItemLeft" align="right" valign="top"><a id="ae46b353c5e0e2d7985706a507deaa246" name="ae46b353c5e0e2d7985706a507deaa246"></a>
 IReadOnlyList&lt; <a class="el" href="structPurrNet_1_1Transports_1_1Connection.html">Connection</a> &gt;&#160;</td><td class="memItemRight" valign="bottom"><b>connections</b><code> [get]</code></td></tr>
 <tr class="separator:ae46b353c5e0e2d7985706a507deaa246"><td class="memSeparator" colspan="2">&#160;</td></tr>
+<tr class="memitem:af32dc7e3e88614bea579fb25a25f93a0"><td class="memItemLeft" align="right" valign="top">bool&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="interfacePurrNet_1_1Transports_1_1ITransport.html#af32dc7e3e88614bea579fb25a25f93a0">measuresRoundTripTime</a><code> [get]</code></td></tr>
+<tr class="memdesc:af32dc7e3e88614bea579fb25a25f93a0"><td class="mdescLeft">&#160;</td><td class="mdescRight">Whether <a class="el" href="interfacePurrNet_1_1Transports_1_1ITransport.html#ae3e1f81560c564104469b5fc729ba137" title="Round trip time in milliseconds for a connection, or -1 when the transport has not measured it yet or...">GetRoundTripTime</a> can ever return a value on this transport. When false a ping reports connect time only instead of waiting for a measurement.   <a href="interfacePurrNet_1_1Transports_1_1ITransport.html#af32dc7e3e88614bea579fb25a25f93a0">More...</a><br /></td></tr>
+<tr class="separator:af32dc7e3e88614bea579fb25a25f93a0"><td class="memSeparator" colspan="2">&#160;</td></tr>
+<tr class="memitem:a42279793baeca33c813bc1c73ac8a5b7"><td class="memItemLeft" align="right" valign="top">string&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="interfacePurrNet_1_1Transports_1_1ITransport.html#a42279793baeca33c813bc1c73ac8a5b7">clientLinkDescription</a><code> [get]</code></td></tr>
+<tr class="memdesc:a42279793baeca33c813bc1c73ac8a5b7"><td class="mdescLeft">&#160;</td><td class="mdescRight">Short human readable description of the link the local client is currently using, for example which relay region or whether it is a direct P2P session. Null when the transport has nothing to add.   <a href="interfacePurrNet_1_1Transports_1_1ITransport.html#a42279793baeca33c813bc1c73ac8a5b7">More...</a><br /></td></tr>
+<tr class="separator:a42279793baeca33c813bc1c73ac8a5b7"><td class="memSeparator" colspan="2">&#160;</td></tr>
 <tr class="memitem:a3177feeee5b51d8e8dc1abc3a1b197b1"><td class="memItemLeft" align="right" valign="top"><a id="a3177feeee5b51d8e8dc1abc3a1b197b1" name="a3177feeee5b51d8e8dc1abc3a1b197b1"></a>
 bool&#160;</td><td class="memItemRight" valign="bottom"><b>shouldServerSendKeepAlive</b><code> [get]</code></td></tr>
 <tr class="separator:a3177feeee5b51d8e8dc1abc3a1b197b1"><td class="memSeparator" colspan="2">&#160;</td></tr>
@@ -202,6 +214,70 @@ OnConnectionState&#160;</td><td class="memItemRight" valign="bottom"><b>onConnec
 <tr class="separator:af48ce5536f81aebe68e238361ff46e51"><td class="memSeparator" colspan="2">&#160;</td></tr>
 </table>
 <h2 class="groupheader">Member Function Documentation</h2>
+<a id="a84d8be7b2d22babc84aec7313f41e66c" name="a84d8be7b2d22babc84aec7313f41e66c"></a>
+<h2 class="memtitle"><span class="permalink"><a href="#a84d8be7b2d22babc84aec7313f41e66c">&#9670;&#160;</a></span>FlushConnection()</h2>
+
+<div class="memitem">
+<div class="memproto">
+      <table class="memname">
+        <tr>
+          <td class="memname">bool PurrNet.Transports.ITransport.FlushConnection </td>
+          <td>(</td>
+          <td class="paramtype"><a class="el" href="structPurrNet_1_1Transports_1_1Connection.html">Connection</a>&#160;</td>
+          <td class="paramname"><em>conn</em>, </td>
+        </tr>
+        <tr>
+          <td class="paramkey"></td>
+          <td></td>
+          <td class="paramtype">bool&#160;</td>
+          <td class="paramname"><em>asServer</em>&#160;</td>
+        </tr>
+        <tr>
+          <td></td>
+          <td>)</td>
+          <td></td><td></td>
+        </tr>
+      </table>
+</div><div class="memdoc">
+
+<p>Pushes data already queued for one connection onto the wire without a full send pass. Returns false when the transport cannot do this, in which case the caller falls back to SendMessages. On the client side the connection argument is ignored.  </p>
+
+<p>Implemented in <a class="el" href="classPurrNet_1_1Transports_1_1CompositeTransport.html#a25acda4d49ef470e042a0448e3b55345">PurrNet.Transports.CompositeTransport</a>, <a class="el" href="classPurrNet_1_1Transports_1_1PurrTransport.html#ab39527cd4fca47ccde3d57cc731e5a9c">PurrNet.Transports.PurrTransport</a>, and <a class="el" href="classPurrNet_1_1Transports_1_1UDPTransport.html#a8cbd0dd1f771aa89d500896ca9e273db">PurrNet.Transports.UDPTransport</a>.</p>
+
+</div>
+</div>
+<a id="ae3e1f81560c564104469b5fc729ba137" name="ae3e1f81560c564104469b5fc729ba137"></a>
+<h2 class="memtitle"><span class="permalink"><a href="#ae3e1f81560c564104469b5fc729ba137">&#9670;&#160;</a></span>GetRoundTripTime()</h2>
+
+<div class="memitem">
+<div class="memproto">
+      <table class="memname">
+        <tr>
+          <td class="memname">int PurrNet.Transports.ITransport.GetRoundTripTime </td>
+          <td>(</td>
+          <td class="paramtype"><a class="el" href="structPurrNet_1_1Transports_1_1Connection.html">Connection</a>&#160;</td>
+          <td class="paramname"><em>conn</em>, </td>
+        </tr>
+        <tr>
+          <td class="paramkey"></td>
+          <td></td>
+          <td class="paramtype">bool&#160;</td>
+          <td class="paramname"><em>asServer</em>&#160;</td>
+        </tr>
+        <tr>
+          <td></td>
+          <td>)</td>
+          <td></td><td></td>
+        </tr>
+      </table>
+</div><div class="memdoc">
+
+<p>Round trip time in milliseconds for a connection, or -1 when the transport has not measured it yet or does not support it. On the client side the connection argument is ignored.  </p>
+
+<p>Implemented in <a class="el" href="classPurrNet_1_1Transports_1_1PurrTransport.html#aab98e7f9322ba813c454a1e468adec2c">PurrNet.Transports.PurrTransport</a>, <a class="el" href="classPurrNet_1_1Transports_1_1UDPTransport.html#a604d335158eae7b6b70c052d695a973b">PurrNet.Transports.UDPTransport</a>, and <a class="el" href="classPurrNet_1_1Transports_1_1CompositeTransport.html#a6f8a4fadd2607b5f6c26828005d0939c">PurrNet.Transports.CompositeTransport</a>.</p>
+
+</div>
+</div>
 <a id="a224188d3fad9b0263657b9f25d0999da" name="a224188d3fad9b0263657b9f25d0999da"></a>
 <h2 class="memtitle"><span class="permalink"><a href="#a224188d3fad9b0263657b9f25d0999da">&#9670;&#160;</a></span>ReceiveMessages()</h2>
 
@@ -219,6 +295,59 @@ OnConnectionState&#160;</td><td class="memItemRight" valign="bottom"><b>onConnec
 </div><div class="memdoc">
 
 <p>Implemented in <a class="el" href="classPurrNet_1_1Transports_1_1UDPTransport.html#a3db40ff9e16c355fdac855a2b16ca830">PurrNet.Transports.UDPTransport</a>.</p>
+
+</div>
+</div>
+<h2 class="groupheader">Property Documentation</h2>
+<a id="a42279793baeca33c813bc1c73ac8a5b7" name="a42279793baeca33c813bc1c73ac8a5b7"></a>
+<h2 class="memtitle"><span class="permalink"><a href="#a42279793baeca33c813bc1c73ac8a5b7">&#9670;&#160;</a></span>clientLinkDescription</h2>
+
+<div class="memitem">
+<div class="memproto">
+<table class="mlabels">
+  <tr>
+  <td class="mlabels-left">
+      <table class="memname">
+        <tr>
+          <td class="memname">string PurrNet.Transports.ITransport.clientLinkDescription</td>
+        </tr>
+      </table>
+  </td>
+  <td class="mlabels-right">
+<span class="mlabels"><span class="mlabel">get</span></span>  </td>
+  </tr>
+</table>
+</div><div class="memdoc">
+
+<p>Short human readable description of the link the local client is currently using, for example which relay region or whether it is a direct P2P session. Null when the transport has nothing to add.  </p>
+
+<p>Implemented in <a class="el" href="classPurrNet_1_1Transports_1_1CompositeTransport.html#a5d8fdb6d9eeb5867efcdb1d7127c1b91">PurrNet.Transports.CompositeTransport</a>, and <a class="el" href="classPurrNet_1_1Transports_1_1PurrTransport.html#aa0fbb400e927e0d486e009b8cca6b5f2">PurrNet.Transports.PurrTransport</a>.</p>
+
+</div>
+</div>
+<a id="af32dc7e3e88614bea579fb25a25f93a0" name="af32dc7e3e88614bea579fb25a25f93a0"></a>
+<h2 class="memtitle"><span class="permalink"><a href="#af32dc7e3e88614bea579fb25a25f93a0">&#9670;&#160;</a></span>measuresRoundTripTime</h2>
+
+<div class="memitem">
+<div class="memproto">
+<table class="mlabels">
+  <tr>
+  <td class="mlabels-left">
+      <table class="memname">
+        <tr>
+          <td class="memname">bool PurrNet.Transports.ITransport.measuresRoundTripTime</td>
+        </tr>
+      </table>
+  </td>
+  <td class="mlabels-right">
+<span class="mlabels"><span class="mlabel">get</span></span>  </td>
+  </tr>
+</table>
+</div><div class="memdoc">
+
+<p>Whether <a class="el" href="interfacePurrNet_1_1Transports_1_1ITransport.html#ae3e1f81560c564104469b5fc729ba137" title="Round trip time in milliseconds for a connection, or -1 when the transport has not measured it yet or...">GetRoundTripTime</a> can ever return a value on this transport. When false a ping reports connect time only instead of waiting for a measurement.  </p>
+
+<p>Implemented in <a class="el" href="classPurrNet_1_1Transports_1_1CompositeTransport.html#a5f94eb8020fc8d203b8d4f15fad99fb6">PurrNet.Transports.CompositeTransport</a>, <a class="el" href="classPurrNet_1_1Transports_1_1PurrTransport.html#a2ea946d54c8b9d389029e5f61b9c1cd0">PurrNet.Transports.PurrTransport</a>, and <a class="el" href="classPurrNet_1_1Transports_1_1UDPTransport.html#aa0972dce8a179c0f2d22fa68eb0ce1ba">PurrNet.Transports.UDPTransport</a>.</p>
 
 </div>
 </div>

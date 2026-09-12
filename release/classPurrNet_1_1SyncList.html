@@ -120,12 +120,12 @@ delegate void&#160;</td><td class="memItemRight" valign="bottom"><b>SyncListChan
 <tr class="memitem:a70c659495f425728fd25762a866d558d"><td class="memItemLeft" align="right" valign="top">override void&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="classPurrNet_1_1SyncList.html#a70c659495f425728fd25762a866d558d">OnPoolReset</a> ()</td></tr>
 <tr class="memdesc:a70c659495f425728fd25762a866d558d"><td class="mdescLeft">&#160;</td><td class="mdescRight">Called when this object is put back into the pool. Use this to reset any values for the next spawn.   <a href="classPurrNet_1_1SyncList.html#a70c659495f425728fd25762a866d558d">More...</a><br /></td></tr>
 <tr class="separator:a70c659495f425728fd25762a866d558d"><td class="memSeparator" colspan="2">&#160;</td></tr>
-<tr class="memitem:a8a4bf399365e575f31e889b625677927"><td class="memItemLeft" align="right" valign="top"><a id="a8a4bf399365e575f31e889b625677927" name="a8a4bf399365e575f31e889b625677927"></a>
-&#160;</td><td class="memItemRight" valign="bottom"><b>SyncList</b> (bool <a class="el" href="classPurrNet_1_1SyncList.html#a9b0d65a3c572544c2c379d7226fe7748">ownerAuth</a>=false)</td></tr>
-<tr class="separator:a8a4bf399365e575f31e889b625677927"><td class="memSeparator" colspan="2">&#160;</td></tr>
-<tr class="memitem:aa9b00bde2a4dae891737c2c4ffcc889c"><td class="memItemLeft" align="right" valign="top"><a id="aa9b00bde2a4dae891737c2c4ffcc889c" name="aa9b00bde2a4dae891737c2c4ffcc889c"></a>
-&#160;</td><td class="memItemRight" valign="bottom"><b>SyncList</b> (List&lt; T &gt; defaultValues, bool <a class="el" href="classPurrNet_1_1SyncList.html#a9b0d65a3c572544c2c379d7226fe7748">ownerAuth</a>=false)</td></tr>
-<tr class="separator:aa9b00bde2a4dae891737c2c4ffcc889c"><td class="memSeparator" colspan="2">&#160;</td></tr>
+<tr class="memitem:a34872a30bdcaff11df6a4869ab09d665"><td class="memItemLeft" align="right" valign="top"><a id="a34872a30bdcaff11df6a4869ab09d665" name="a34872a30bdcaff11df6a4869ab09d665"></a>
+&#160;</td><td class="memItemRight" valign="bottom"><b>SyncList</b> (bool <a class="el" href="classPurrNet_1_1SyncList.html#a9b0d65a3c572544c2c379d7226fe7748">ownerAuth</a>=false, bool ownerOnly=false)</td></tr>
+<tr class="separator:a34872a30bdcaff11df6a4869ab09d665"><td class="memSeparator" colspan="2">&#160;</td></tr>
+<tr class="memitem:a9df6853983f6b4ae561e01bd44ff07f1"><td class="memItemLeft" align="right" valign="top"><a id="a9df6853983f6b4ae561e01bd44ff07f1" name="a9df6853983f6b4ae561e01bd44ff07f1"></a>
+&#160;</td><td class="memItemRight" valign="bottom"><b>SyncList</b> (List&lt; T &gt; defaultValues, bool <a class="el" href="classPurrNet_1_1SyncList.html#a9b0d65a3c572544c2c379d7226fe7748">ownerAuth</a>=false, bool ownerOnly=false)</td></tr>
+<tr class="separator:a9df6853983f6b4ae561e01bd44ff07f1"><td class="memSeparator" colspan="2">&#160;</td></tr>
 <tr class="memitem:ab50ac2bf9ce32afd6fb47eacbe311b9c"><td class="memItemLeft" align="right" valign="top">override void&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="classPurrNet_1_1SyncList.html#ab50ac2bf9ce32afd6fb47eacbe311b9c">OnSpawnSent</a> ()</td></tr>
 <tr class="memdesc:ab50ac2bf9ce32afd6fb47eacbe311b9c"><td class="mdescLeft">&#160;</td><td class="mdescRight">Called only on the spawning peer, at the end of the frame the object was spawned in, right before batched RPCs flush. Anything queued here departs in the same flush as the spawn, ordered right behind the spawn packet.   <a href="classPurrNet_1_1SyncList.html#ab50ac2bf9ce32afd6fb47eacbe311b9c">More...</a><br /></td></tr>
 <tr class="separator:ab50ac2bf9ce32afd6fb47eacbe311b9c"><td class="memSeparator" colspan="2">&#160;</td></tr>
@@ -281,6 +281,9 @@ List&lt; T &gt;&#160;</td><td class="memItemRight" valign="bottom"><b>list</b><c
 bool&#160;</td><td class="memItemRight" valign="bottom"><b>ownerAuth</b><code> [get]</code></td></tr>
 <tr class="memdesc:a9b0d65a3c572544c2c379d7226fe7748"><td class="mdescLeft">&#160;</td><td class="mdescRight">Whether it is the owner or the server that has the authority to modify the list  <br /></td></tr>
 <tr class="separator:a9b0d65a3c572544c2c379d7226fe7748"><td class="memSeparator" colspan="2">&#160;</td></tr>
+<tr class="memitem:a6b04ffda0e9f5318c6abef6d8b48a043"><td class="memItemLeft" align="right" valign="top"><a id="a6b04ffda0e9f5318c6abef6d8b48a043" name="a6b04ffda0e9f5318c6abef6d8b48a043"></a>
+override bool&#160;</td><td class="memItemRight" valign="bottom"><b>ownerOnly</b><code> [get]</code></td></tr>
+<tr class="separator:a6b04ffda0e9f5318c6abef6d8b48a043"><td class="memSeparator" colspan="2">&#160;</td></tr>
 <tr class="memitem:a0c69be57aeb02f1485e38e88e0809af8"><td class="memItemLeft" align="right" valign="top"><a id="a0c69be57aeb02f1485e38e88e0809af8" name="a0c69be57aeb02f1485e38e88e0809af8"></a>
 float&#160;</td><td class="memItemRight" valign="bottom"><b>sendIntervalInSeconds</b><code> [get, set]</code></td></tr>
 <tr class="separator:a0c69be57aeb02f1485e38e88e0809af8"><td class="memSeparator" colspan="2">&#160;</td></tr>
@@ -343,6 +346,14 @@ bool&#160;</td><td class="memItemRight" valign="bottom"><b>hasConnectedOwner</b>
 <tr class="memitem:ab531a61b7264152615e260f114f9fb23 inherit properties_classPurrNet_1_1NetworkModule"><td class="memItemLeft" align="right" valign="top"><a id="ab531a61b7264152615e260f114f9fb23" name="ab531a61b7264152615e260f114f9fb23"></a>
 <a class="el" href="structPurrNet_1_1PlayerID.html">PlayerID</a>?&#160;</td><td class="memItemRight" valign="bottom"><b>owner</b><code> [get]</code></td></tr>
 <tr class="separator:ab531a61b7264152615e260f114f9fb23 inherit properties_classPurrNet_1_1NetworkModule"><td class="memSeparator" colspan="2">&#160;</td></tr>
+<tr class="memitem:a4e3079e7c0e3aefebf4d28383429ff41 inherit properties_classPurrNet_1_1NetworkModule"><td class="memItemLeft" align="right" valign="top"><a id="a4e3079e7c0e3aefebf4d28383429ff41" name="a4e3079e7c0e3aefebf4d28383429ff41"></a>
+virtual bool&#160;</td><td class="memItemRight" valign="bottom"><b>ownerOnly</b><code> [get]</code></td></tr>
+<tr class="memdesc:a4e3079e7c0e3aefebf4d28383429ff41 inherit properties_classPurrNet_1_1NetworkModule"><td class="mdescLeft">&#160;</td><td class="mdescRight">When true, this module's state is only ever sent to the owner of the parent identity. Non-owner observers still see the object, they just never receive this module's data. Override in your module (or pass ownerOnly: true to a sync type's constructor) to enable.  <br /></td></tr>
+<tr class="separator:a4e3079e7c0e3aefebf4d28383429ff41 inherit properties_classPurrNet_1_1NetworkModule"><td class="memSeparator" colspan="2">&#160;</td></tr>
+<tr class="memitem:a9bc3a60a1dfd5f741ac25ff487873f7c inherit properties_classPurrNet_1_1NetworkModule"><td class="memItemLeft" align="right" valign="top"><a id="a9bc3a60a1dfd5f741ac25ff487873f7c" name="a9bc3a60a1dfd5f741ac25ff487873f7c"></a>
+IReadOnlyList&lt; <a class="el" href="structPurrNet_1_1PlayerID.html">PlayerID</a> &gt;&#160;</td><td class="memItemRight" valign="bottom"><b>observers</b><code> [get]</code></td></tr>
+<tr class="memdesc:a9bc3a60a1dfd5f741ac25ff487873f7c inherit properties_classPurrNet_1_1NetworkModule"><td class="mdescLeft">&#160;</td><td class="mdescRight">The observers this module is allowed to send to. Same as the parent's observer list, unless the module is <a class="el" href="classPurrNet_1_1NetworkModule.html#a4e3079e7c0e3aefebf4d28383429ff41" title="When true, this module&#39;s state is only ever sent to the owner of the parent identity....">ownerOnly</a>, in which case it contains only the owner (or nothing when there is no owner). Server only.  <br /></td></tr>
+<tr class="separator:a9bc3a60a1dfd5f741ac25ff487873f7c inherit properties_classPurrNet_1_1NetworkModule"><td class="memSeparator" colspan="2">&#160;</td></tr>
 <tr class="memitem:a800586ec7553c06f52bb03648203db54 inherit properties_classPurrNet_1_1NetworkModule"><td class="memItemLeft" align="right" valign="top"><a id="a800586ec7553c06f52bb03648203db54" name="a800586ec7553c06f52bb03648203db54"></a>
 bool&#160;</td><td class="memItemRight" valign="bottom"><b>isController</b><code> [get]</code></td></tr>
 <tr class="separator:a800586ec7553c06f52bb03648203db54 inherit properties_classPurrNet_1_1NetworkModule"><td class="memSeparator" colspan="2">&#160;</td></tr>

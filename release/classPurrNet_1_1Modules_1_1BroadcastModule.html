@@ -119,7 +119,7 @@ Public Member Functions</h2></td></tr>
 <tr class="separator:a961023ebe5a39df1803088c717021549"><td class="memSeparator" colspan="2">&#160;</td></tr>
 <tr class="memitem:aa14d483db6930c6eb20e54603abeba8e"><td class="memItemLeft" align="right" valign="top"><a id="aa14d483db6930c6eb20e54603abeba8e" name="aa14d483db6930c6eb20e54603abeba8e"></a>
 void&#160;</td><td class="memItemRight" valign="bottom"><b>RegisterImmediateType&lt; T &gt;</b> ()</td></tr>
-<tr class="memdesc:aa14d483db6930c6eb20e54603abeba8e"><td class="mdescLeft">&#160;</td><td class="mdescRight">Marks a broadcast type as immediate: while the defer window is active, messages of this type dispatch on arrival while everything else is queued for the next fixed receive phase.  <br /></td></tr>
+<tr class="memdesc:aa14d483db6930c6eb20e54603abeba8e"><td class="mdescLeft">&#160;</td><td class="mdescRight">Marks a broadcast type as immediate in both directions: incoming messages of this type dispatch on arrival instead of waiting for the next fixed receive phase, and sending one requests a transport flush this frame instead of waiting for the tick.  <br /></td></tr>
 <tr class="separator:aa14d483db6930c6eb20e54603abeba8e"><td class="memSeparator" colspan="2">&#160;</td></tr>
 <tr class="memitem:a78bc07364eac086a7c9fefb677bbcca2"><td class="memItemLeft" align="right" valign="top"><a id="a78bc07364eac086a7c9fefb677bbcca2" name="a78bc07364eac086a7c9fefb677bbcca2"></a>
 void&#160;</td><td class="memItemRight" valign="bottom"><b>UnregisterImmediateType&lt; T &gt;</b> ()</td></tr>

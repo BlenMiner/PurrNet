@@ -93,7 +93,7 @@ $(document).ready(function(){initNavTree('classPurrNet_1_1UnityLatestUpdate.html
   <div class="summary">
 <a href="#nested-classes">Classes</a> &#124;
 <a href="#pub-static-methods">Static Public Member Functions</a> &#124;
-<a href="#events">Events</a> &#124;
+<a href="#properties">Properties</a> &#124;
 <a href="classPurrNet_1_1UnityLatestUpdate-members.html">List of all members</a>  </div>
   <div class="headertitle"><div class="title">PurrNet.UnityLatestUpdate Class Reference</div></div>
 </div><!--header-->
@@ -113,15 +113,15 @@ Static Public Member Functions</h2></td></tr>
 <tr class="memitem:af5ba3bcba99f94a6fbc8c732d50247ed"><td class="memItemLeft" align="right" valign="top"><a id="af5ba3bcba99f94a6fbc8c732d50247ed" name="af5ba3bcba99f94a6fbc8c732d50247ed"></a>
 static void&#160;</td><td class="memItemRight" valign="bottom"><b>TriggerPendingAsaps</b> ()</td></tr>
 <tr class="separator:af5ba3bcba99f94a6fbc8c732d50247ed"><td class="memSeparator" colspan="2">&#160;</td></tr>
-<tr class="memitem:adf035180b29b5d419a4bca88b5003b1f"><td class="memItemLeft" align="right" valign="top"><a id="adf035180b29b5d419a4bca88b5003b1f" name="adf035180b29b5d419a4bca88b5003b1f"></a>
-static Task&#160;</td><td class="memItemRight" valign="bottom"><b>Yield</b> ()</td></tr>
+<tr class="memitem:adf035180b29b5d419a4bca88b5003b1f"><td class="memItemLeft" align="right" valign="top">static Task&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="classPurrNet_1_1UnityLatestUpdate.html#adf035180b29b5d419a4bca88b5003b1f">Yield</a> ()</td></tr>
+<tr class="memdesc:adf035180b29b5d419a4bca88b5003b1f"><td class="mdescLeft">&#160;</td><td class="mdescRight">Completes during the next Unity update.  <a href="classPurrNet_1_1UnityLatestUpdate.html#adf035180b29b5d419a4bca88b5003b1f">More...</a><br /></td></tr>
 <tr class="separator:adf035180b29b5d419a4bca88b5003b1f"><td class="memSeparator" colspan="2">&#160;</td></tr>
-<tr class="memitem:af520da1fd10293cff7889c32c2591205"><td class="memItemLeft" align="right" valign="top"><a id="af520da1fd10293cff7889c32c2591205" name="af520da1fd10293cff7889c32c2591205"></a>
-static Task&#160;</td><td class="memItemRight" valign="bottom"><b>WaitSeconds</b> (float seconds)</td></tr>
+<tr class="memitem:af520da1fd10293cff7889c32c2591205"><td class="memItemLeft" align="right" valign="top">static Task&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="classPurrNet_1_1UnityLatestUpdate.html#af520da1fd10293cff7889c32c2591205">WaitSeconds</a> (float seconds)</td></tr>
+<tr class="memdesc:af520da1fd10293cff7889c32c2591205"><td class="mdescLeft">&#160;</td><td class="mdescRight">Completes after at least <em>seconds</em>  of Unity update time.  <a href="classPurrNet_1_1UnityLatestUpdate.html#af520da1fd10293cff7889c32c2591205">More...</a><br /></td></tr>
 <tr class="separator:af520da1fd10293cff7889c32c2591205"><td class="memSeparator" colspan="2">&#160;</td></tr>
 </table><table class="memberdecls">
-<tr class="heading"><td colspan="2"><h2 class="groupheader"><a id="events" name="events"></a>
-Events</h2></td></tr>
+<tr class="heading"><td colspan="2"><h2 class="groupheader"><a id="properties" name="properties"></a>
+Properties</h2></td></tr>
 <tr class="memitem:a950f861ab8321dbde47bef81afa978a2"><td class="memItemLeft" align="right" valign="top"><a id="a950f861ab8321dbde47bef81afa978a2" name="a950f861ab8321dbde47bef81afa978a2"></a>
 static Action&#160;</td><td class="memItemRight" valign="bottom"><b>onUpdate</b></td></tr>
 <tr class="separator:a950f861ab8321dbde47bef81afa978a2"><td class="memSeparator" colspan="2">&#160;</td></tr>
@@ -186,6 +186,63 @@ static Action&#160;</td><td class="memItemRight" valign="bottom"><b>onPostLatest
   </table>
   </dd>
 </dl>
+
+</div>
+</div>
+<a id="af520da1fd10293cff7889c32c2591205" name="af520da1fd10293cff7889c32c2591205"></a>
+<h2 class="memtitle"><span class="permalink"><a href="#af520da1fd10293cff7889c32c2591205">&#9670;&#160;</a></span>WaitSeconds()</h2>
+
+<div class="memitem">
+<div class="memproto">
+<table class="mlabels">
+  <tr>
+  <td class="mlabels-left">
+      <table class="memname">
+        <tr>
+          <td class="memname">static Task PurrNet.UnityLatestUpdate.WaitSeconds </td>
+          <td>(</td>
+          <td class="paramtype">float&#160;</td>
+          <td class="paramname"><em>seconds</em></td><td>)</td>
+          <td></td>
+        </tr>
+      </table>
+  </td>
+  <td class="mlabels-right">
+<span class="mlabels"><span class="mlabel">static</span></span>  </td>
+  </tr>
+</table>
+</div><div class="memdoc">
+
+<p>Completes after at least <em>seconds</em>  of Unity update time. </p>
+<p >Call from the Unity main thread.</p>
+
+</div>
+</div>
+<a id="adf035180b29b5d419a4bca88b5003b1f" name="adf035180b29b5d419a4bca88b5003b1f"></a>
+<h2 class="memtitle"><span class="permalink"><a href="#adf035180b29b5d419a4bca88b5003b1f">&#9670;&#160;</a></span>Yield()</h2>
+
+<div class="memitem">
+<div class="memproto">
+<table class="mlabels">
+  <tr>
+  <td class="mlabels-left">
+      <table class="memname">
+        <tr>
+          <td class="memname">static Task PurrNet.UnityLatestUpdate.Yield </td>
+          <td>(</td>
+          <td class="paramname"></td><td>)</td>
+          <td></td>
+        </tr>
+      </table>
+  </td>
+  <td class="mlabels-right">
+<span class="mlabels"><span class="mlabel">static</span></span>  </td>
+  </tr>
+</table>
+</div><div class="memdoc">
+
+<p>Completes during the next Unity update. </p>
+<p >Call from the Unity main thread.</p>
 
 </div>
 </div>

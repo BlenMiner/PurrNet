@@ -91,6 +91,7 @@ $(document).ready(function(){initNavTree('classPurrNet_1_1Modules_1_1HierarchyPo
 
 <div class="header">
   <div class="summary">
+<a href="#nested-classes">Classes</a> &#124;
 <a href="#pub-methods">Public Member Functions</a> &#124;
 <a href="#pub-static-methods">Static Public Member Functions</a> &#124;
 <a href="classPurrNet_1_1Modules_1_1HierarchyPool-members.html">List of all members</a>  </div>
@@ -100,13 +101,20 @@ $(document).ready(function(){initNavTree('classPurrNet_1_1Modules_1_1HierarchyPo
 <table class="memberdecls">
 <tr class="heading"><td colspan="2"><h2 class="groupheader"><a id="pub-methods" name="pub-methods"></a>
 Public Member Functions</h2></td></tr>
-<tr class="memitem:a0a465b0972c21567177bafcf40458258"><td class="memItemLeft" align="right" valign="top"><a id="a0a465b0972c21567177bafcf40458258" name="a0a465b0972c21567177bafcf40458258"></a>
-&#160;</td><td class="memItemRight" valign="bottom"><b>HierarchyPool</b> (Transform parent, <a class="el" href="interfacePurrNet_1_1IPrefabProvider.html">IPrefabProvider</a> prefabs=null, bool forceWarmupPieces=false)</td></tr>
-<tr class="separator:a0a465b0972c21567177bafcf40458258"><td class="memSeparator" colspan="2">&#160;</td></tr>
+<tr class="memitem:a5ca1811a630d8e713cd76d74bfcfea21"><td class="memItemLeft" align="right" valign="top"><a id="a5ca1811a630d8e713cd76d74bfcfea21" name="a5ca1811a630d8e713cd76d74bfcfea21"></a>
+int&#160;</td><td class="memItemRight" valign="bottom"><b>GetPooledCount</b> (<a class="el" href="structPurrNet_1_1PrefabID.html">PrefabID</a> prefabId)</td></tr>
+<tr class="memdesc:a5ca1811a630d8e713cd76d74bfcfea21"><td class="mdescLeft">&#160;</td><td class="mdescRight">Number of idle pooled pieces belonging to the given prefab, summed over all of its pieces.  <br /></td></tr>
+<tr class="separator:a5ca1811a630d8e713cd76d74bfcfea21"><td class="memSeparator" colspan="2">&#160;</td></tr>
+<tr class="memitem:aec542fbf0cfd1807bd13f9fbc0b69ae0"><td class="memItemLeft" align="right" valign="top"><a id="aec542fbf0cfd1807bd13f9fbc0b69ae0" name="aec542fbf0cfd1807bd13f9fbc0b69ae0"></a>
+&#160;</td><td class="memItemRight" valign="bottom"><b>HierarchyPool</b> (Transform parent, <a class="el" href="classPurrNet_1_1PrefabResolver.html">PrefabResolver</a> prefabs=null, bool forceWarmupPieces=false)</td></tr>
+<tr class="separator:aec542fbf0cfd1807bd13f9fbc0b69ae0"><td class="memSeparator" colspan="2">&#160;</td></tr>
 <tr class="memitem:a3a0cf39485da1af31f23462bda8a1280"><td class="memItemLeft" align="right" valign="top"><a id="a3a0cf39485da1af31f23462bda8a1280" name="a3a0cf39485da1af31f23462bda8a1280"></a>
 void&#160;</td><td class="memItemRight" valign="bottom"><b>Warmup</b> ()</td></tr>
 <tr class="memdesc:a3a0cf39485da1af31f23462bda8a1280"><td class="mdescLeft">&#160;</td><td class="mdescRight">Warmup all the prefabs that are marked as poolable. If a prefab was already warmed up, it will be skipped.  <br /></td></tr>
 <tr class="separator:a3a0cf39485da1af31f23462bda8a1280"><td class="memSeparator" colspan="2">&#160;</td></tr>
+<tr class="memitem:ac1b6a45a869835439dbe2f4856f8a664"><td class="memItemLeft" align="right" valign="top"><a id="ac1b6a45a869835439dbe2f4856f8a664" name="ac1b6a45a869835439dbe2f4856f8a664"></a>
+void&#160;</td><td class="memItemRight" valign="bottom"><b>Warmup</b> (IEnumerable&lt; <a class="el" href="structPurrNet_1_1PrefabData.html">PrefabData</a> &gt; prefabs)</td></tr>
+<tr class="separator:ac1b6a45a869835439dbe2f4856f8a664"><td class="memSeparator" colspan="2">&#160;</td></tr>
 <tr class="memitem:a332b6a751703e810146d4c29cf7c0435"><td class="memItemLeft" align="right" valign="top"><a id="a332b6a751703e810146d4c29cf7c0435" name="a332b6a751703e810146d4c29cf7c0435"></a>
 void&#160;</td><td class="memItemRight" valign="bottom"><b>PutBackInPool</b> (GameObject target, bool tagName=false, bool respectSkipSceneAutoSpawning=false)</td></tr>
 <tr class="separator:a332b6a751703e810146d4c29cf7c0435"><td class="memSeparator" colspan="2">&#160;</td></tr>
@@ -122,15 +130,29 @@ void&#160;</td><td class="memItemRight" valign="bottom"><b>Dispose</b> ()</td></
 </table><table class="memberdecls">
 <tr class="heading"><td colspan="2"><h2 class="groupheader"><a id="pub-static-methods" name="pub-static-methods"></a>
 Static Public Member Functions</h2></td></tr>
+<tr class="memitem:ad049d85239fc4767241cb2f8b4c7e2b6"><td class="memItemLeft" align="right" valign="top"><a id="ad049d85239fc4767241cb2f8b4c7e2b6" name="ad049d85239fc4767241cb2f8b4c7e2b6"></a>
+static void&#160;</td><td class="memItemRight" valign="bottom"><b>EvictPrototypes</b> (<a class="el" href="structPurrNet_1_1SceneID.html">SceneID</a> scene)</td></tr>
+<tr class="memdesc:ad049d85239fc4767241cb2f8b4c7e2b6"><td class="mdescLeft">&#160;</td><td class="mdescRight">Drops cached prototypes of prefabs scoped to the given scene so nothing outlives it.  <br /></td></tr>
+<tr class="separator:ad049d85239fc4767241cb2f8b4c7e2b6"><td class="memSeparator" colspan="2">&#160;</td></tr>
+<tr class="memitem:a0e303c197372e488c0223ee970b175de"><td class="memItemLeft" align="right" valign="top"><a id="a0e303c197372e488c0223ee970b175de" name="a0e303c197372e488c0223ee970b175de"></a>
+static void&#160;</td><td class="memItemRight" valign="bottom"><b>EvictGlobalPrototypes</b> ()</td></tr>
+<tr class="memdesc:a0e303c197372e488c0223ee970b175de"><td class="mdescLeft">&#160;</td><td class="mdescRight">Drops cached prototypes of global prefabs. Global ids are plain indices into the active provider, so they must not survive a provider swap.  <br /></td></tr>
+<tr class="separator:a0e303c197372e488c0223ee970b175de"><td class="memSeparator" colspan="2">&#160;</td></tr>
+<tr class="memitem:ad810c6c287b0d1c31af07d72d00d61ca"><td class="memItemLeft" align="right" valign="top"><a id="ad810c6c287b0d1c31af07d72d00d61ca" name="ad810c6c287b0d1c31af07d72d00d61ca"></a>
+static bool&#160;</td><td class="memItemRight" valign="bottom"><b>HasPrototype</b> (<a class="el" href="structPurrNet_1_1PrefabID.html">PrefabID</a> prefabId)</td></tr>
+<tr class="separator:ad810c6c287b0d1c31af07d72d00d61ca"><td class="memSeparator" colspan="2">&#160;</td></tr>
+<tr class="memitem:abfb1d4bb82525405907042366e07f8ca"><td class="memItemLeft" align="right" valign="top"><a id="abfb1d4bb82525405907042366e07f8ca" name="abfb1d4bb82525405907042366e07f8ca"></a>
+static void&#160;</td><td class="memItemRight" valign="bottom"><b>ClearPrototypes</b> ()</td></tr>
+<tr class="separator:abfb1d4bb82525405907042366e07f8ca"><td class="memSeparator" colspan="2">&#160;</td></tr>
 <tr class="memitem:a32df1258b23aafea63f3a1bb4a466441"><td class="memItemLeft" align="right" valign="top"><a id="a32df1258b23aafea63f3a1bb4a466441" name="a32df1258b23aafea63f3a1bb4a466441"></a>
 static void&#160;</td><td class="memItemRight" valign="bottom"><b>PutBackInPool</b> (<a class="el" href="structPurrNet_1_1Modules_1_1PoolPair.html">PoolPair</a> pool, GameObject target, bool tagName=false)</td></tr>
 <tr class="separator:a32df1258b23aafea63f3a1bb4a466441"><td class="memSeparator" colspan="2">&#160;</td></tr>
 <tr class="memitem:abaa77860cf2312774843901db7c7f066"><td class="memItemLeft" align="right" valign="top"><a id="abaa77860cf2312774843901db7c7f066" name="abaa77860cf2312774843901db7c7f066"></a>
 static <a class="el" href="structPurrNet_1_1Pooling_1_1DisposableList.html">DisposableList</a>&lt; int &gt;&#160;</td><td class="memItemRight" valign="bottom"><b>GetInvPath</b> (Transform parent, Transform transform)</td></tr>
 <tr class="separator:abaa77860cf2312774843901db7c7f066"><td class="memSeparator" colspan="2">&#160;</td></tr>
-<tr class="memitem:a0e4e0d8ac720c48de482e66caa1da222"><td class="memItemLeft" align="right" valign="top"><a id="a0e4e0d8ac720c48de482e66caa1da222" name="a0e4e0d8ac720c48de482e66caa1da222"></a>
-static bool&#160;</td><td class="memItemRight" valign="bottom"><b>TryGetPrefabPrototype</b> (GameObject prefab, out <a class="el" href="structPurrNet_1_1Modules_1_1GameObjectPrototype.html">GameObjectPrototype</a> prototype)</td></tr>
-<tr class="separator:a0e4e0d8ac720c48de482e66caa1da222"><td class="memSeparator" colspan="2">&#160;</td></tr>
+<tr class="memitem:a98795b54fa1cd0140b50b69d8f85662c"><td class="memItemLeft" align="right" valign="top"><a id="a98795b54fa1cd0140b50b69d8f85662c" name="a98795b54fa1cd0140b50b69d8f85662c"></a>
+static bool&#160;</td><td class="memItemRight" valign="bottom"><b>TryGetPrefabPrototype</b> (<a class="el" href="structPurrNet_1_1PrefabID.html">PrefabID</a> prefabId, out <a class="el" href="structPurrNet_1_1Modules_1_1GameObjectPrototype.html">GameObjectPrototype</a> prototype)</td></tr>
+<tr class="separator:a98795b54fa1cd0140b50b69d8f85662c"><td class="memSeparator" colspan="2">&#160;</td></tr>
 <tr class="memitem:a2bc25bb77c0a397f9827e34c666f8381"><td class="memItemLeft" align="right" valign="top"><a id="a2bc25bb77c0a397f9827e34c666f8381" name="a2bc25bb77c0a397f9827e34c666f8381"></a>
 static bool&#160;</td><td class="memItemRight" valign="bottom"><b>TryGetOrCreatePrefabPrototype</b> (<a class="el" href="structPurrNet_1_1PrefabData.html">PrefabData</a> prefabData, out <a class="el" href="structPurrNet_1_1Modules_1_1GameObjectPrototype.html">GameObjectPrototype</a> prototype)</td></tr>
 <tr class="separator:a2bc25bb77c0a397f9827e34c666f8381"><td class="memSeparator" colspan="2">&#160;</td></tr>

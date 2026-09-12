@@ -92,6 +92,7 @@ $(document).ready(function(){initNavTree('classPurrNet_1_1Transports_1_1GenericT
 <div class="header">
   <div class="summary">
 <a href="#pub-methods">Public Member Functions</a> &#124;
+<a href="#pub-static-attribs">Static Public Attributes</a> &#124;
 <a href="#pro-methods">Protected Member Functions</a> &#124;
 <a href="#properties">Properties</a> &#124;
 <a href="classPurrNet_1_1Transports_1_1GenericTransport-members.html">List of all members</a>  </div>
@@ -130,9 +131,36 @@ void&#160;</td><td class="memItemRight" valign="bottom"><b>StartClient</b> ()</t
 void&#160;</td><td class="memItemRight" valign="bottom"><b>StopClient</b> ()</td></tr>
 <tr class="memdesc:afcc3e6a38f346833675235496a200563"><td class="mdescLeft">&#160;</td><td class="mdescRight">Stops the client. This will disconnect from the server. Optionally, you can pass a <a class="el" href="classPurrNet_1_1NetworkManager.html">NetworkManager</a> to register client modules. If you do not pass a <a class="el" href="classPurrNet_1_1NetworkManager.html">NetworkManager</a>, it will try to find one in the hierarchy.  <br /></td></tr>
 <tr class="separator:afcc3e6a38f346833675235496a200563"><td class="memSeparator" colspan="2">&#160;</td></tr>
+<tr class="memitem:a913bb87eb425b32192663ba43260508b"><td class="memItemLeft" align="right" valign="top"><a id="a913bb87eb425b32192663ba43260508b" name="a913bb87eb425b32192663ba43260508b"></a>
+Task&lt; <a class="el" href="structPurrNet_1_1Transports_1_1PingResult.html">PingResult</a> &gt;&#160;</td><td class="memItemRight" valign="bottom"><b>Ping</b> (CancellationToken token=default)</td></tr>
+<tr class="memdesc:a913bb87eb425b32192663ba43260508b"><td class="mdescLeft">&#160;</td><td class="mdescRight">Measures latency to the server this transport is configured to connect to. Opens a transport level connection, reads the round trip time, then disconnects. The probe never registers with the <a class="el" href="classPurrNet_1_1NetworkManager.html">NetworkManager</a> or authenticates, so it never becomes a player.  <br /></td></tr>
+<tr class="separator:a913bb87eb425b32192663ba43260508b"><td class="memSeparator" colspan="2">&#160;</td></tr>
+<tr class="memitem:a653f5fddf060c27c21658a2307f78fd7"><td class="memItemLeft" align="right" valign="top"><a id="a653f5fddf060c27c21658a2307f78fd7" name="a653f5fddf060c27c21658a2307f78fd7"></a>
+Task&lt; <a class="el" href="structPurrNet_1_1Transports_1_1PingResult.html">PingResult</a> &gt;&#160;</td><td class="memItemRight" valign="bottom"><b>Ping</b> (float timeoutSeconds, CancellationToken token=default)</td></tr>
+<tr class="separator:a653f5fddf060c27c21658a2307f78fd7"><td class="memSeparator" colspan="2">&#160;</td></tr>
+<tr class="memitem:ac3f5a835d1615ff0d7dce56469e9cdc3"><td class="memItemLeft" align="right" valign="top"><a id="ac3f5a835d1615ff0d7dce56469e9cdc3" name="ac3f5a835d1615ff0d7dce56469e9cdc3"></a>
+Task&lt; <a class="el" href="structPurrNet_1_1Transports_1_1PingResult.html">PingResult</a> &gt;&#160;</td><td class="memItemRight" valign="bottom"><b>Ping</b> (string address, ushort port, CancellationToken token=default)</td></tr>
+<tr class="memdesc:ac3f5a835d1615ff0d7dce56469e9cdc3"><td class="mdescLeft">&#160;</td><td class="mdescRight">Measures latency to a specific address, using the same address semantics as IConnectable.Connect.  <br /></td></tr>
+<tr class="separator:ac3f5a835d1615ff0d7dce56469e9cdc3"><td class="memSeparator" colspan="2">&#160;</td></tr>
+<tr class="memitem:a0bde9bbf480674e977cf71421844491f"><td class="memItemLeft" align="right" valign="top"><a id="a0bde9bbf480674e977cf71421844491f" name="a0bde9bbf480674e977cf71421844491f"></a>
+Task&lt; <a class="el" href="structPurrNet_1_1Transports_1_1PingResult.html">PingResult</a> &gt;&#160;</td><td class="memItemRight" valign="bottom"><b>Ping</b> (string address, ushort port, float timeoutSeconds, CancellationToken token=default)</td></tr>
+<tr class="separator:a0bde9bbf480674e977cf71421844491f"><td class="memSeparator" colspan="2">&#160;</td></tr>
+</table><table class="memberdecls">
+<tr class="heading"><td colspan="2"><h2 class="groupheader"><a id="pub-static-attribs" name="pub-static-attribs"></a>
+Static Public Attributes</h2></td></tr>
+<tr class="memitem:ab68f96cda8cac5947d1bff88cfcc5314"><td class="memItemLeft" align="right" valign="top"><a id="ab68f96cda8cac5947d1bff88cfcc5314" name="ab68f96cda8cac5947d1bff88cfcc5314"></a>
+const float&#160;</td><td class="memItemRight" valign="bottom"><b>DEFAULT_PING_TIMEOUT</b> = 15f</td></tr>
+<tr class="separator:ab68f96cda8cac5947d1bff88cfcc5314"><td class="memSeparator" colspan="2">&#160;</td></tr>
 </table><table class="memberdecls">
 <tr class="heading"><td colspan="2"><h2 class="groupheader"><a id="pro-methods" name="pro-methods"></a>
 Protected Member Functions</h2></td></tr>
+<tr class="memitem:afd13e5b9fdb385641b9907676da37a29"><td class="memItemLeft" align="right" valign="top">virtual Task&lt; <a class="el" href="structPurrNet_1_1Transports_1_1PingResult.html">PingResult</a> &gt;&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="classPurrNet_1_1Transports_1_1GenericTransport.html#afd13e5b9fdb385641b9907676da37a29">PingInternal</a> (string address, ushort port, bool useAddress, float timeoutSeconds, CancellationToken token)</td></tr>
+<tr class="memdesc:afd13e5b9fdb385641b9907676da37a29"><td class="mdescLeft">&#160;</td><td class="mdescRight">Runs the ping. <a class="el" href="namespacePurrNet_1_1Transports.html">Transports</a> can override this when a plain probe connection is not the right way to measure latency, and call <a class="el" href="classPurrNet_1_1Transports_1_1GenericTransport.html#a40f47428234cfff40a56f1889aa47c26" title="Default ping: connect at the transport level, read the round trip time, then disconnect.">ProbeConnection</a> for the default behaviour.   <a href="classPurrNet_1_1Transports_1_1GenericTransport.html#afd13e5b9fdb385641b9907676da37a29">More...</a><br /></td></tr>
+<tr class="separator:afd13e5b9fdb385641b9907676da37a29"><td class="memSeparator" colspan="2">&#160;</td></tr>
+<tr class="memitem:a40f47428234cfff40a56f1889aa47c26"><td class="memItemLeft" align="right" valign="top"><a id="a40f47428234cfff40a56f1889aa47c26" name="a40f47428234cfff40a56f1889aa47c26"></a>
+async Task&lt; <a class="el" href="structPurrNet_1_1Transports_1_1PingResult.html">PingResult</a> &gt;&#160;</td><td class="memItemRight" valign="bottom"><b>ProbeConnection</b> (string address, ushort port, bool useAddress, float timeoutSeconds, CancellationToken token)</td></tr>
+<tr class="memdesc:a40f47428234cfff40a56f1889aa47c26"><td class="mdescLeft">&#160;</td><td class="mdescRight">Default ping: connect at the transport level, read the round trip time, then disconnect.  <br /></td></tr>
+<tr class="separator:a40f47428234cfff40a56f1889aa47c26"><td class="memSeparator" colspan="2">&#160;</td></tr>
 <tr class="memitem:ae3060eb86de7c625eb57deab6e938ee1"><td class="memItemLeft" align="right" valign="top"><a id="ae3060eb86de7c625eb57deab6e938ee1" name="ae3060eb86de7c625eb57deab6e938ee1"></a>
 abstract void&#160;</td><td class="memItemRight" valign="bottom"><b>StartClientInternal</b> ()</td></tr>
 <tr class="separator:ae3060eb86de7c625eb57deab6e938ee1"><td class="memSeparator" colspan="2">&#160;</td></tr>
@@ -148,6 +176,10 @@ void&#160;</td><td class="memItemRight" valign="bottom"><b>StopServerInternal</b
 </table><table class="memberdecls">
 <tr class="heading"><td colspan="2"><h2 class="groupheader"><a id="properties" name="properties"></a>
 Properties</h2></td></tr>
+<tr class="memitem:ade0bd9e4af51211e8ff1e801c28f9cbf"><td class="memItemLeft" align="right" valign="top"><a id="ade0bd9e4af51211e8ff1e801c28f9cbf" name="ade0bd9e4af51211e8ff1e801c28f9cbf"></a>
+virtual bool&#160;</td><td class="memItemRight" valign="bottom"><b>isPinging</b><code> [get]</code></td></tr>
+<tr class="memdesc:ade0bd9e4af51211e8ff1e801c28f9cbf"><td class="mdescLeft">&#160;</td><td class="mdescRight">True while <a class="el" href="classPurrNet_1_1Transports_1_1GenericTransport.html#a913bb87eb425b32192663ba43260508b" title="Measures latency to the server this transport is configured to connect to. Opens a transport level co...">Ping(CancellationToken)</a> is running a probe connection on this transport. The <a class="el" href="classPurrNet_1_1NetworkManager.html">NetworkManager</a> ignores client events from the transport while this is set.  <br /></td></tr>
+<tr class="separator:ade0bd9e4af51211e8ff1e801c28f9cbf"><td class="memSeparator" colspan="2">&#160;</td></tr>
 <tr class="memitem:a4dc62a7fe67db86b7941ae87fa931160"><td class="memItemLeft" align="right" valign="top"><a id="a4dc62a7fe67db86b7941ae87fa931160" name="a4dc62a7fe67db86b7941ae87fa931160"></a>
 abstract bool&#160;</td><td class="memItemRight" valign="bottom"><b>isSupported</b><code> [get]</code></td></tr>
 <tr class="memdesc:a4dc62a7fe67db86b7941ae87fa931160"><td class="mdescLeft">&#160;</td><td class="mdescRight">Returns true if the transport is supported on the current platform. For example, WebGL does not support UDP or SteamTransport. This will return false if the transport is not supported.  <br /></td></tr>
@@ -157,6 +189,65 @@ abstract <a class="el" href="interfacePurrNet_1_1Transports_1_1ITransport.html">
 <tr class="memdesc:aaab002062b833cde82d0eed05d1633a2"><td class="mdescLeft">&#160;</td><td class="mdescRight">Access the underlying transport interface. This is used for low-level operations and should not be used directly. Unless you know what you are doing.  <br /></td></tr>
 <tr class="separator:aaab002062b833cde82d0eed05d1633a2"><td class="memSeparator" colspan="2">&#160;</td></tr>
 </table>
+<h2 class="groupheader">Member Function Documentation</h2>
+<a id="afd13e5b9fdb385641b9907676da37a29" name="afd13e5b9fdb385641b9907676da37a29"></a>
+<h2 class="memtitle"><span class="permalink"><a href="#afd13e5b9fdb385641b9907676da37a29">&#9670;&#160;</a></span>PingInternal()</h2>
+
+<div class="memitem">
+<div class="memproto">
+<table class="mlabels">
+  <tr>
+  <td class="mlabels-left">
+      <table class="memname">
+        <tr>
+          <td class="memname">virtual Task&lt; <a class="el" href="structPurrNet_1_1Transports_1_1PingResult.html">PingResult</a> &gt; PurrNet.Transports.GenericTransport.PingInternal </td>
+          <td>(</td>
+          <td class="paramtype">string&#160;</td>
+          <td class="paramname"><em>address</em>, </td>
+        </tr>
+        <tr>
+          <td class="paramkey"></td>
+          <td></td>
+          <td class="paramtype">ushort&#160;</td>
+          <td class="paramname"><em>port</em>, </td>
+        </tr>
+        <tr>
+          <td class="paramkey"></td>
+          <td></td>
+          <td class="paramtype">bool&#160;</td>
+          <td class="paramname"><em>useAddress</em>, </td>
+        </tr>
+        <tr>
+          <td class="paramkey"></td>
+          <td></td>
+          <td class="paramtype">float&#160;</td>
+          <td class="paramname"><em>timeoutSeconds</em>, </td>
+        </tr>
+        <tr>
+          <td class="paramkey"></td>
+          <td></td>
+          <td class="paramtype">CancellationToken&#160;</td>
+          <td class="paramname"><em>token</em>&#160;</td>
+        </tr>
+        <tr>
+          <td></td>
+          <td>)</td>
+          <td></td><td></td>
+        </tr>
+      </table>
+  </td>
+  <td class="mlabels-right">
+<span class="mlabels"><span class="mlabel">protected</span><span class="mlabel">virtual</span></span>  </td>
+  </tr>
+</table>
+</div><div class="memdoc">
+
+<p>Runs the ping. <a class="el" href="namespacePurrNet_1_1Transports.html">Transports</a> can override this when a plain probe connection is not the right way to measure latency, and call <a class="el" href="classPurrNet_1_1Transports_1_1GenericTransport.html#a40f47428234cfff40a56f1889aa47c26" title="Default ping: connect at the transport level, read the round trip time, then disconnect.">ProbeConnection</a> for the default behaviour.  </p>
+
+<p>Reimplemented in <a class="el" href="classPurrNet_1_1Transports_1_1PurrTransport.html#a7d3471c46b45ed73ba31bfc43e427b94">PurrNet.Transports.PurrTransport</a>.</p>
+
+</div>
+</div>
 <hr/>The documentation for this class was generated from the following file:<ul>
 <li>Assets/PurrNet/Runtime/Transports/Interface/GenericTransport.cs</li>
 </ul>

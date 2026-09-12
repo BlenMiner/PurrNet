@@ -117,9 +117,9 @@ delegate void&#160;</td><td class="memItemRight" valign="bottom"><b>SyncDictiona
 <tr class="memitem:a03bff9c393c6ed0151ff77d66be88a1e"><td class="memItemLeft" align="right" valign="top">override void&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="classPurrNet_1_1SyncDictionary.html#a03bff9c393c6ed0151ff77d66be88a1e">OnPoolReset</a> ()</td></tr>
 <tr class="memdesc:a03bff9c393c6ed0151ff77d66be88a1e"><td class="mdescLeft">&#160;</td><td class="mdescRight">Called when this object is put back into the pool. Use this to reset any values for the next spawn.   <a href="classPurrNet_1_1SyncDictionary.html#a03bff9c393c6ed0151ff77d66be88a1e">More...</a><br /></td></tr>
 <tr class="separator:a03bff9c393c6ed0151ff77d66be88a1e"><td class="memSeparator" colspan="2">&#160;</td></tr>
-<tr class="memitem:a384458472cafdf6d603eadc52cee6066"><td class="memItemLeft" align="right" valign="top">&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="classPurrNet_1_1SyncDictionary.html#a384458472cafdf6d603eadc52cee6066">SyncDictionary</a> (bool <a class="el" href="classPurrNet_1_1SyncDictionary.html#a7b32d24a06e99806e5a706d13683e20e">ownerAuth</a>=false, bool useForceSend=false)</td></tr>
-<tr class="memdesc:a384458472cafdf6d603eadc52cee6066"><td class="mdescLeft">&#160;</td><td class="mdescRight">Creates a new Sync Dictionary   <a href="classPurrNet_1_1SyncDictionary.html#a384458472cafdf6d603eadc52cee6066">More...</a><br /></td></tr>
-<tr class="separator:a384458472cafdf6d603eadc52cee6066"><td class="memSeparator" colspan="2">&#160;</td></tr>
+<tr class="memitem:ada4ef21f9ae132688aca2ab86f78b339"><td class="memItemLeft" align="right" valign="top">&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="classPurrNet_1_1SyncDictionary.html#ada4ef21f9ae132688aca2ab86f78b339">SyncDictionary</a> (bool <a class="el" href="classPurrNet_1_1SyncDictionary.html#a7b32d24a06e99806e5a706d13683e20e">ownerAuth</a>=false, bool useForceSend=false, bool ownerOnly=false)</td></tr>
+<tr class="memdesc:ada4ef21f9ae132688aca2ab86f78b339"><td class="mdescLeft">&#160;</td><td class="mdescRight">Creates a new Sync Dictionary   <a href="classPurrNet_1_1SyncDictionary.html#ada4ef21f9ae132688aca2ab86f78b339">More...</a><br /></td></tr>
+<tr class="separator:ada4ef21f9ae132688aca2ab86f78b339"><td class="memSeparator" colspan="2">&#160;</td></tr>
 <tr class="memitem:acd5605928bc5eb33e1715bd84c4ba0c4"><td class="memItemLeft" align="right" valign="top"><a id="acd5605928bc5eb33e1715bd84c4ba0c4" name="acd5605928bc5eb33e1715bd84c4ba0c4"></a>
 void&#160;</td><td class="memItemRight" valign="bottom"><b>OnBeforeSerialize</b> ()</td></tr>
 <tr class="separator:acd5605928bc5eb33e1715bd84c4ba0c4"><td class="memSeparator" colspan="2">&#160;</td></tr>
@@ -277,6 +277,9 @@ Properties</h2></td></tr>
 bool&#160;</td><td class="memItemRight" valign="bottom"><b>ownerAuth</b><code> [get]</code></td></tr>
 <tr class="memdesc:a7b32d24a06e99806e5a706d13683e20e"><td class="mdescLeft">&#160;</td><td class="mdescRight">Whether it is the owner or the server that has the authority to modify the dictionary  <br /></td></tr>
 <tr class="separator:a7b32d24a06e99806e5a706d13683e20e"><td class="memSeparator" colspan="2">&#160;</td></tr>
+<tr class="memitem:ad027719f3fd5079daef8536f21ab0cca"><td class="memItemLeft" align="right" valign="top"><a id="ad027719f3fd5079daef8536f21ab0cca" name="ad027719f3fd5079daef8536f21ab0cca"></a>
+override bool&#160;</td><td class="memItemRight" valign="bottom"><b>ownerOnly</b><code> [get]</code></td></tr>
+<tr class="separator:ad027719f3fd5079daef8536f21ab0cca"><td class="memSeparator" colspan="2">&#160;</td></tr>
 <tr class="memitem:a3290b818f686dc49ef208ab9f00a02fc"><td class="memItemLeft" align="right" valign="top"><a id="a3290b818f686dc49ef208ab9f00a02fc" name="a3290b818f686dc49ef208ab9f00a02fc"></a>
 float&#160;</td><td class="memItemRight" valign="bottom"><b>sendIntervalInSeconds</b><code> [get, set]</code></td></tr>
 <tr class="separator:a3290b818f686dc49ef208ab9f00a02fc"><td class="memSeparator" colspan="2">&#160;</td></tr>
@@ -345,6 +348,14 @@ bool&#160;</td><td class="memItemRight" valign="bottom"><b>hasConnectedOwner</b>
 <tr class="memitem:ab531a61b7264152615e260f114f9fb23 inherit properties_classPurrNet_1_1NetworkModule"><td class="memItemLeft" align="right" valign="top"><a id="ab531a61b7264152615e260f114f9fb23" name="ab531a61b7264152615e260f114f9fb23"></a>
 <a class="el" href="structPurrNet_1_1PlayerID.html">PlayerID</a>?&#160;</td><td class="memItemRight" valign="bottom"><b>owner</b><code> [get]</code></td></tr>
 <tr class="separator:ab531a61b7264152615e260f114f9fb23 inherit properties_classPurrNet_1_1NetworkModule"><td class="memSeparator" colspan="2">&#160;</td></tr>
+<tr class="memitem:a4e3079e7c0e3aefebf4d28383429ff41 inherit properties_classPurrNet_1_1NetworkModule"><td class="memItemLeft" align="right" valign="top"><a id="a4e3079e7c0e3aefebf4d28383429ff41" name="a4e3079e7c0e3aefebf4d28383429ff41"></a>
+virtual bool&#160;</td><td class="memItemRight" valign="bottom"><b>ownerOnly</b><code> [get]</code></td></tr>
+<tr class="memdesc:a4e3079e7c0e3aefebf4d28383429ff41 inherit properties_classPurrNet_1_1NetworkModule"><td class="mdescLeft">&#160;</td><td class="mdescRight">When true, this module's state is only ever sent to the owner of the parent identity. Non-owner observers still see the object, they just never receive this module's data. Override in your module (or pass ownerOnly: true to a sync type's constructor) to enable.  <br /></td></tr>
+<tr class="separator:a4e3079e7c0e3aefebf4d28383429ff41 inherit properties_classPurrNet_1_1NetworkModule"><td class="memSeparator" colspan="2">&#160;</td></tr>
+<tr class="memitem:a9bc3a60a1dfd5f741ac25ff487873f7c inherit properties_classPurrNet_1_1NetworkModule"><td class="memItemLeft" align="right" valign="top"><a id="a9bc3a60a1dfd5f741ac25ff487873f7c" name="a9bc3a60a1dfd5f741ac25ff487873f7c"></a>
+IReadOnlyList&lt; <a class="el" href="structPurrNet_1_1PlayerID.html">PlayerID</a> &gt;&#160;</td><td class="memItemRight" valign="bottom"><b>observers</b><code> [get]</code></td></tr>
+<tr class="memdesc:a9bc3a60a1dfd5f741ac25ff487873f7c inherit properties_classPurrNet_1_1NetworkModule"><td class="mdescLeft">&#160;</td><td class="mdescRight">The observers this module is allowed to send to. Same as the parent's observer list, unless the module is <a class="el" href="classPurrNet_1_1NetworkModule.html#a4e3079e7c0e3aefebf4d28383429ff41" title="When true, this module&#39;s state is only ever sent to the owner of the parent identity....">ownerOnly</a>, in which case it contains only the owner (or nothing when there is no owner). Server only.  <br /></td></tr>
+<tr class="separator:a9bc3a60a1dfd5f741ac25ff487873f7c inherit properties_classPurrNet_1_1NetworkModule"><td class="memSeparator" colspan="2">&#160;</td></tr>
 <tr class="memitem:a800586ec7553c06f52bb03648203db54 inherit properties_classPurrNet_1_1NetworkModule"><td class="memItemLeft" align="right" valign="top"><a id="a800586ec7553c06f52bb03648203db54" name="a800586ec7553c06f52bb03648203db54"></a>
 bool&#160;</td><td class="memItemRight" valign="bottom"><b>isController</b><code> [get]</code></td></tr>
 <tr class="separator:a800586ec7553c06f52bb03648203db54 inherit properties_classPurrNet_1_1NetworkModule"><td class="memSeparator" colspan="2">&#160;</td></tr>
@@ -383,8 +394,8 @@ static string&#160;</td><td class="memItemRight" valign="bottom"><b>GetPermissio
 <tr class="separator:a97aebd580ff022b5e5df0aad4f3a4bd2 inherit pro_static_methods_classPurrNet_1_1NetworkModule"><td class="memSeparator" colspan="2">&#160;</td></tr>
 </table>
 <h2 class="groupheader">Constructor &amp; Destructor Documentation</h2>
-<a id="a384458472cafdf6d603eadc52cee6066" name="a384458472cafdf6d603eadc52cee6066"></a>
-<h2 class="memtitle"><span class="permalink"><a href="#a384458472cafdf6d603eadc52cee6066">&#9670;&#160;</a></span>SyncDictionary()</h2>
+<a id="ada4ef21f9ae132688aca2ab86f78b339" name="ada4ef21f9ae132688aca2ab86f78b339"></a>
+<h2 class="memtitle"><span class="permalink"><a href="#ada4ef21f9ae132688aca2ab86f78b339">&#9670;&#160;</a></span>SyncDictionary()</h2>
 
 <div class="memitem">
 <div class="memproto">
@@ -399,7 +410,13 @@ static string&#160;</td><td class="memItemRight" valign="bottom"><b>GetPermissio
           <td class="paramkey"></td>
           <td></td>
           <td class="paramtype">bool&#160;</td>
-          <td class="paramname"><em>useForceSend</em> = <code>false</code>&#160;</td>
+          <td class="paramname"><em>useForceSend</em> = <code>false</code>, </td>
+        </tr>
+        <tr>
+          <td class="paramkey"></td>
+          <td></td>
+          <td class="paramtype">bool&#160;</td>
+          <td class="paramname"><em>ownerOnly</em> = <code>false</code>&#160;</td>
         </tr>
         <tr>
           <td></td>

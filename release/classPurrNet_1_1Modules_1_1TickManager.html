@@ -128,6 +128,12 @@ void&#160;</td><td class="memItemRight" valign="bottom"><b>PostPromoteToServerMo
 <tr class="memitem:afc72e93b9d0bc0f64ae34222750cfc38"><td class="memItemLeft" align="right" valign="top"><a id="afc72e93b9d0bc0f64ae34222750cfc38" name="afc72e93b9d0bc0f64ae34222750cfc38"></a>
 void&#160;</td><td class="memItemRight" valign="bottom"><b>Update</b> ()</td></tr>
 <tr class="separator:afc72e93b9d0bc0f64ae34222750cfc38"><td class="memSeparator" colspan="2">&#160;</td></tr>
+<tr class="memitem:a464561b3b3e0271a4063aaa3adbc876a"><td class="memItemLeft" align="right" valign="top"><a id="a464561b3b3e0271a4063aaa3adbc876a" name="a464561b3b3e0271a4063aaa3adbc876a"></a>
+void&#160;</td><td class="memItemRight" valign="bottom"><b>AddTickListener</b> (<a class="el" href="interfacePurrNet_1_1ITickListener.html">ITickListener</a> listener)</td></tr>
+<tr class="separator:a464561b3b3e0271a4063aaa3adbc876a"><td class="memSeparator" colspan="2">&#160;</td></tr>
+<tr class="memitem:a7cb176ea055c3d00d8744b2418b82f08"><td class="memItemLeft" align="right" valign="top"><a id="a7cb176ea055c3d00d8744b2418b82f08" name="a7cb176ea055c3d00d8744b2418b82f08"></a>
+void&#160;</td><td class="memItemRight" valign="bottom"><b>RemoveTickListener</b> (<a class="el" href="interfacePurrNet_1_1ITickListener.html">ITickListener</a> listener)</td></tr>
+<tr class="separator:a7cb176ea055c3d00d8744b2418b82f08"><td class="memSeparator" colspan="2">&#160;</td></tr>
 <tr class="memitem:af8bdc417d9e6d2ed0ef75b9f4f718897"><td class="memItemLeft" align="right" valign="top">float&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="classPurrNet_1_1Modules_1_1TickManager.html#af8bdc417d9e6d2ed0ef75b9f4f718897">TickToTime</a> (uint tick)</td></tr>
 <tr class="memdesc:af8bdc417d9e6d2ed0ef75b9f4f718897"><td class="mdescLeft">&#160;</td><td class="mdescRight">Converts the input tick to float time   <a href="classPurrNet_1_1Modules_1_1TickManager.html#af8bdc417d9e6d2ed0ef75b9f4f718897">More...</a><br /></td></tr>
 <tr class="separator:af8bdc417d9e6d2ed0ef75b9f4f718897"><td class="memSeparator" colspan="2">&#160;</td></tr>
@@ -196,7 +202,7 @@ uint&#160;</td><td class="memItemRight" valign="bottom"><b>syncedTick</b><code> 
 <tr class="separator:ab92243b9733c0b56fb5a2b2d7d04e249"><td class="memSeparator" colspan="2">&#160;</td></tr>
 <tr class="memitem:aefdfde0c5e70ba9ce348a0124153d159"><td class="memItemLeft" align="right" valign="top"><a id="aefdfde0c5e70ba9ce348a0124153d159" name="aefdfde0c5e70ba9ce348a0124153d159"></a>
 double&#160;</td><td class="memItemRight" valign="bottom"><b>rtt</b><code> [get]</code></td></tr>
-<tr class="memdesc:aefdfde0c5e70ba9ce348a0124153d159"><td class="mdescLeft">&#160;</td><td class="mdescRight">This is the round trip time. Local time it takes for the client to get a response from the server. This includes 1 tick for packing and 1 tick for unpacking, meaning you'll have 2 ticks delay calculated into the rtt. For actual ping, utilize the statistics manager, or make up for these 2 ticks delay manually.  <br /></td></tr>
+<tr class="memdesc:aefdfde0c5e70ba9ce348a0124153d159"><td class="mdescLeft">&#160;</td><td class="mdescRight">Round trip time in seconds, measured by the tick-sync ping: local time from sending the request to receiving the server's response. The ping bypasses tick batching on both ends (immediate receive, same-frame send flush), so this is network round trip plus at most a frame of scheduling on each side rather than the tick interval.  <br /></td></tr>
 <tr class="separator:aefdfde0c5e70ba9ce348a0124153d159"><td class="memSeparator" colspan="2">&#160;</td></tr>
 <tr class="memitem:a227da955ded5ed38b90fa6198666e5b2"><td class="memItemLeft" align="right" valign="top"><a id="a227da955ded5ed38b90fa6198666e5b2" name="a227da955ded5ed38b90fa6198666e5b2"></a>
 double&#160;</td><td class="memItemRight" valign="bottom"><b>floatingPoint</b><code> [get]</code></td></tr>

@@ -104,6 +104,7 @@ Public Attributes</h2></td></tr>
 <tr class="separator:aaa0158521863623a2644f40db9e6660b"><td class="memSeparator" colspan="2">&#160;</td></tr>
 <tr class="memitem:a6c4fe03f49b65b0b9bb04cc31eeef131"><td class="memItemLeft" align="right" valign="top"><a id="a6c4fe03f49b65b0b9bb04cc31eeef131" name="a6c4fe03f49b65b0b9bb04cc31eeef131"></a>
 <a class="el" href="structPurrNet_1_1Packing_1_1CompressedVector3.html">CompressedVector3</a>?&#160;</td><td class="memItemRight" valign="bottom"><b>position</b></td></tr>
+<tr class="memdesc:a6c4fe03f49b65b0b9bb04cc31eeef131"><td class="mdescLeft">&#160;</td><td class="mdescRight">Legacy Unity world-space application point, used without an origin converter. <br /></td></tr>
 <tr class="separator:a6c4fe03f49b65b0b9bb04cc31eeef131"><td class="memSeparator" colspan="2">&#160;</td></tr>
 <tr class="memitem:aa31dbe5475a50928a1edda156bf2c185"><td class="memItemLeft" align="right" valign="top"><a id="aa31dbe5475a50928a1edda156bf2c185" name="aa31dbe5475a50928a1edda156bf2c185"></a>
 ForceMode&#160;</td><td class="memItemRight" valign="bottom"><b>mode</b></td></tr>
@@ -111,6 +112,10 @@ ForceMode&#160;</td><td class="memItemRight" valign="bottom"><b>mode</b></td></t
 <tr class="memitem:a338d163bfd87f80ddd33925735ef3fa4"><td class="memItemLeft" align="right" valign="top"><a id="a338d163bfd87f80ddd33925735ef3fa4" name="a338d163bfd87f80ddd33925735ef3fa4"></a>
 bool&#160;</td><td class="memItemRight" valign="bottom"><b>isTorque</b></td></tr>
 <tr class="separator:a338d163bfd87f80ddd33925735ef3fa4"><td class="memSeparator" colspan="2">&#160;</td></tr>
+<tr class="memitem:a1439cb7055ae8b61944428dc6308b2bb"><td class="memItemLeft" align="right" valign="top"><a id="a1439cb7055ae8b61944428dc6308b2bb" name="a1439cb7055ae8b61944428dc6308b2bb"></a>
+double3?&#160;</td><td class="memItemRight" valign="bottom"><b>absolutePosition</b></td></tr>
+<tr class="memdesc:a1439cb7055ae8b61944428dc6308b2bb"><td class="mdescLeft">&#160;</td><td class="mdescRight">Origin-invariant application point. When present, takes precedence over <a class="el" href="structPurrNet_1_1AppliedForce.html#a6c4fe03f49b65b0b9bb04cc31eeef131" title="Legacy Unity world-space application point, used without an origin converter.">position</a> and is decoded using the receiving peer's current origin. <br /></td></tr>
+<tr class="separator:a1439cb7055ae8b61944428dc6308b2bb"><td class="memSeparator" colspan="2">&#160;</td></tr>
 </table>
 <hr/>The documentation for this struct was generated from the following file:<ul>
 <li>Assets/PurrNet/Runtime/Components/NetworkRigidbody/NetworkRigidbody.cs</li>
