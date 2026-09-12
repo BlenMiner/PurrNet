@@ -10,6 +10,9 @@ namespace PurrNet
         readonly Dictionary<int, float> _floatValues = new Dictionary<int, float>();
         readonly Dictionary<int, bool> _boolValues = new Dictionary<int, bool>();
 
+        // keyed by layer index; layer 0 is never tracked since Unity pins its weight to 1
+        readonly Dictionary<int, float> _layerWeights = new Dictionary<int, float>();
+
         private bool _wasController;
         private bool _hasPendingAnimatorParameterState;
 
@@ -103,6 +106,10 @@ namespace PurrNet
                         break;
                 }
             }
+
+            var layerCount = _animator.layerCount;
+            for (var i = 1; i < layerCount; i++)
+                _layerWeights[i] = _animator.GetLayerWeight(i);
         }
 
         private void CheckForParameterChanges()
@@ -184,9 +191,35 @@ namespace PurrNet
                     }
                 }
             }
+
+            CheckForLayerWeightChanges();
         }
 
-        private bool CacheParameterValue(NetAnimatorRPC action)
+        private void CheckForLayerWeightChanges()
+        {
+            var layerCount = _animator.layerCount;
+
+            for (var i = 1; i < layerCount; i++)
+            {
+                var current = _animator.GetLayerWeight(i);
+
+                if (_layerWeights.TryGetValue(i, out var v) && Mathf.Approximately(v, current))
+                    continue;
+
+                _layerWeights[i] = current;
+
+                IfSameReplace(new NetAnimatorRPC(new SetLayerWeight { layerIndex = i, weight = current }),
+                    (a, b) => a._setLayerWeight.layerIndex.value == b._setLayerWeight.layerIndex.value);
+            }
+        }
+
+        private void CacheLayerWeight(int layerIndex, float weight)
+        {
+            if (layerIndex > 0)
+                _layerWeights[layerIndex] = weight;
+        }
+
+        private bool CacheActionState(NetAnimatorRPC action)
         {
             switch (action.type)
             {
@@ -199,15 +232,19 @@ namespace PurrNet
                 case NetAnimatorAction.SetInteger:
                     _intValues[action._integer.nameHash] = action._integer.value;
                     return true;
+                case NetAnimatorAction.SetLayerWeight:
+                    CacheLayerWeight(action._setLayerWeight.layerIndex, action._setLayerWeight.weight);
+                    return true;
                 default:
                     return false;
             }
         }
 
-        private static bool IsParameterAction(NetAnimatorAction action)
+        private static bool IsCachedStateAction(NetAnimatorAction action)
         {
             return action is NetAnimatorAction.SetBool or NetAnimatorAction.SetFloat or
-                NetAnimatorAction.SetInteger or NetAnimatorAction.SetTrigger or NetAnimatorAction.ResetTrigger;
+                NetAnimatorAction.SetInteger or NetAnimatorAction.SetTrigger or
+                NetAnimatorAction.ResetTrigger or NetAnimatorAction.SetLayerWeight;
         }
 
         private static int GetTriggerNameHash(NetAnimatorRPC action)
@@ -259,6 +296,13 @@ namespace PurrNet
                     default:
                         break;
                 }
+            }
+
+            var layerCount = _animator.layerCount;
+            foreach (var (layerIndex, weight) in _layerWeights)
+            {
+                if (layerIndex < layerCount)
+                    _animator.SetLayerWeight(layerIndex, weight);
             }
 
             for (var i = 0; i < _pendingTriggerActions.Count; i++)

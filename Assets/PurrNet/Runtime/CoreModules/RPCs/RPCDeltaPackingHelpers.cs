@@ -1,6 +1,7 @@
 using System;
 using System.Reflection;
 using PurrNet.Packing;
+using PurrNet.Pooling;
 using PurrNet.Transports;
 
 namespace PurrNet.Modules
@@ -34,6 +35,37 @@ namespace PurrNet.Modules
         public static RPCPacketPacker CreateChildWithInfo(NetworkManager manager, ChildRPCPacket context, RPCInfo info)
         {
             return CreateChild(manager, context, info.compileTimeSignature, info.sender);
+        }
+
+        // A missing manager/module falls back to per-player groups, so the per-target loop
+        // below behaves (and fails) exactly as it did before grouping.
+        private static DeltaModule TryGetDeltaModule(NetworkManager manager)
+        {
+            return manager ? manager.deltaModule : null;
+        }
+
+        [UsedByIL]
+        public static DeltaFanoutGrouper BeginFanout(NetworkManager manager, RPCPacket context, RPCSignature signature,
+            DisposableList<PlayerID> players)
+        {
+            return DeltaFanoutGrouper.Begin(TryGetDeltaModule(manager), context,
+                signature.channel == Channel.ReliableOrdered, players);
+        }
+
+        [UsedByIL]
+        public static DeltaFanoutGrouper BeginFanoutStatic(NetworkManager manager, StaticRPCPacket context,
+            RPCSignature signature, DisposableList<PlayerID> players)
+        {
+            return DeltaFanoutGrouper.Begin(TryGetDeltaModule(manager), context,
+                signature.channel == Channel.ReliableOrdered, players);
+        }
+
+        [UsedByIL]
+        public static DeltaFanoutGrouper BeginFanoutChild(NetworkManager manager, ChildRPCPacket context,
+            RPCSignature signature, DisposableList<PlayerID> players)
+        {
+            return DeltaFanoutGrouper.Begin(TryGetDeltaModule(manager), context,
+                signature.channel == Channel.ReliableOrdered, players);
         }
 
         [UsedByIL]

@@ -36,9 +36,9 @@ namespace PurrNet.Modules
                 return false;
             }
 
-            int rootPrefabId = prototype.framework[0].pid.prefabId;
+            var rootPrefabId = prototype.framework[0].pid.prefabId;
 
-            if (!manager.prefabProvider.TryGetPrefabData(rootPrefabId, out var prefabData))
+            if (!manager.prefabResolver.TryGetPrefabData(rootPrefabId, out var prefabData))
             {
                 PurrLogger.LogError($"Prefab with ID {rootPrefabId} not found in prefab provider.");
                 return false;

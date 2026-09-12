@@ -47,6 +47,8 @@ namespace PurrNet
     {
         [SerializeField] private bool _ownerAuth;
 
+        [SerializeField] private bool _ownerOnly;
+
         [SerializeField]
         private SerializableDictionary<TKey, TValue> _serializedDict = new SerializableDictionary<TKey, TValue>();
         [SerializeField, Min(0)] private float _sendIntervalInSeconds;
@@ -69,6 +71,8 @@ namespace PurrNet
         /// Whether it is the owner or the server that has the authority to modify the dictionary
         /// </summary>
         public bool ownerAuth => _ownerAuth;
+
+        public override bool ownerOnly => _ownerOnly;
 
         public float sendIntervalInSeconds
         {
@@ -108,9 +112,10 @@ namespace PurrNet
         /// </summary>
         /// <param name="ownerAuth">Whether the dictionary is owner authed or server auth</param>
         /// <param name="useForceSend">This will send the full state after state syncing. This will be more data heavy, but more consistent</param>
-        public SyncDictionary(bool ownerAuth = false, bool useForceSend = false)
+        public SyncDictionary(bool ownerAuth = false, bool useForceSend = false, bool ownerOnly = false)
         {
             _ownerAuth = ownerAuth;
+            _ownerOnly = ownerOnly;
             _useForceSend = useForceSend;
 
 #if UNITY_EDITOR

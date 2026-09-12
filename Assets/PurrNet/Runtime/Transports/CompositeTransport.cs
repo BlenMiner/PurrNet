@@ -237,6 +237,61 @@ namespace PurrNet.Transports
             return true;
         }
 
+        public override bool isPinging
+        {
+            get
+            {
+                if (base.isPinging)
+                    return true;
+
+                for (int i = 0; i < _transports.Length; i++)
+                {
+                    if (_transports[i] && _transports[i].isPinging)
+                        return true;
+                }
+
+                return false;
+            }
+        }
+
+        private void PropagatePumping()
+        {
+            for (int i = 0; i < _transports.Length; i++)
+            {
+                if (_transports[i])
+                    _transports[i].externalPump = () => isPumpedExternally;
+            }
+        }
+
+        public string clientLinkDescription
+        {
+            get
+            {
+                if (!_clientTransport)
+                    return null;
+                var inner = _clientTransport.transport.clientLinkDescription;
+                var name = _clientTransport.GetType().Name;
+                return string.IsNullOrEmpty(inner) ? name : $"{name} ({inner})";
+            }
+        }
+
+        public bool measuresRoundTripTime => _clientTransport && _clientTransport.transport.measuresRoundTripTime;
+
+        public int GetRoundTripTime(Connection target, bool asServer)
+        {
+            if (asServer)
+            {
+                if (target.connectionId < 0 || target.connectionId >= _rawConnections.Count)
+                    return -1;
+
+                var pair = _rawConnections[target.connectionId];
+                var protocol = _transports[pair.transportIdx];
+                return protocol ? protocol.transport.GetRoundTripTime(pair.originalConnection, true) : -1;
+            }
+
+            return _clientTransport ? _clientTransport.transport.GetRoundTripTime(target, false) : -1;
+        }
+
         public int GetMTU(Connection target, Channel channel, bool asServer)
         {
             if (asServer)
@@ -258,6 +313,8 @@ namespace PurrNet.Transports
                 return;
 
             _wasAwakeCalled = true;
+
+            PropagatePumping();
 
             if (!_clientTransport)
             {
@@ -293,6 +350,21 @@ namespace PurrNet.Transports
                 if (_transports[i])
                     _transports[i].transport.SendMessages(delta);
             }
+        }
+
+        public bool FlushConnection(Connection conn, bool asServer)
+        {
+            if (asServer)
+            {
+                if (!_internalIsListening || conn.connectionId < 0 || conn.connectionId >= _rawConnections.Count)
+                    return false;
+
+                var pair = _rawConnections[conn.connectionId];
+                var protocol = _transports[pair.transportIdx];
+                return protocol && protocol.transport.FlushConnection(pair.originalConnection, true);
+            }
+
+            return _clientTransport && _clientTransport.transport.FlushConnection(conn, false);
         }
 
         public void UnityUpdate(float delta)

@@ -81,6 +81,8 @@ namespace PurrNet
     public class SyncList<T> : NetworkModule, IList<T>, ISerializationCallbackReceiver, ITick
     {
         [SerializeField] private bool _ownerAuth;
+
+        [SerializeField] private bool _ownerOnly;
         [SerializeField, Min(0)] private float _sendIntervalInSeconds;
         [SerializeField] private List<T> _list = new List<T>();
         [SerializeField, HideInInspector] private List<T> _initialList = new List<T>();
@@ -99,6 +101,8 @@ namespace PurrNet
         /// Whether it is the owner or the server that has the authority to modify the list
         /// </summary>
         public bool ownerAuth => _ownerAuth;
+
+        public override bool ownerOnly => _ownerOnly;
 
         public float sendIntervalInSeconds
         {
@@ -128,15 +132,17 @@ namespace PurrNet
             _isDirty = default;
         }
 
-        public SyncList(bool ownerAuth = false)
+        public SyncList(bool ownerAuth = false, bool ownerOnly = false)
         {
             _ownerAuth = ownerAuth;
+            _ownerOnly = ownerOnly;
         }
 
-        public SyncList(List<T> defaultValues, bool ownerAuth = false)
+        public SyncList(List<T> defaultValues, bool ownerAuth = false, bool ownerOnly = false)
         {
             _list = defaultValues;
             _ownerAuth = ownerAuth;
+            _ownerOnly = ownerOnly;
             CacheInitialList();
         }
 

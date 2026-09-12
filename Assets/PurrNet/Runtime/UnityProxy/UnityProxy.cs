@@ -55,7 +55,7 @@ namespace PurrNet
                 return instance;
             }
 
-            if (!HierarchyPool.TryGetPrefabPrototype(prefab, out var prototype))
+            if (!HierarchyPool.TryGetPrefabPrototype(prefabData.prefabId, out var prototype))
             {
                 var instance = instantiateData.Instantiate();
                 if (notifyCreated)
@@ -135,13 +135,13 @@ namespace PurrNet
 
             var manager = NetworkManager.main;
 
-            if (!manager || manager.prefabProvider == null)
+            if (!manager)
             {
                 prefabData = default;
                 return false;
             }
 
-            if (manager.prefabProvider.TryGetPrefabData(prefabGo, out prefabData))
+            if (manager.prefabResolver.TryGetPrefabData(prefabGo, out prefabData))
                 return true;
 
             if (prefabGo.GetComponentInChildren<NetworkIdentity>(true) &&
@@ -446,8 +446,7 @@ namespace PurrNet
 
             var go = GetGameObject(target);
 
-            // if it's not a root object, don't do anything
-            if (go.transform.parent)
+            if (!go || go.transform.parent)
                 return;
 
             bool isNetworked = go.GetComponentInChildren<NetworkIdentity>() != null;

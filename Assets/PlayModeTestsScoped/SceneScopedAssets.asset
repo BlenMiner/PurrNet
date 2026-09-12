@@ -1,0 +1,27 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: d9ac2e59ec50867458fa45964a218963, type: 3}
+  m_Name: SceneScopedAssets
+  m_EditorClassIdentifier: PurrNet.Runtime::PurrNet.NetworkAssets
+  autoGenerate: 0
+  folder: {fileID: 0}
+  searchAllIfNoFolder: 0
+  linkedNetworkAssets: []
+  _enabledTypeNames: []
+  assets:
+  - {fileID: 4900000, guid: 5b1a3e9c7d4f6a0b1c2d3e4f5a6b7c83, type: 3}
+  _availableTypeNames: []
+  _assetGuids:
+  - 5b1a3e9c7d4f6a0b1c2d3e4f5a6b7c83
+  _bakedIds:
+  _bakedAssets: []
+  _bakedPersistentIds: []

@@ -11,6 +11,8 @@ namespace PurrNet
     public class SyncQueue<T> : NetworkModule, IReadOnlyCollection<T>
     {
         [SerializeField] private bool _ownerAuth;
+
+        [SerializeField] private bool _ownerOnly;
         [SerializeField] private SerializableQueue<T> _serializedQueue = new SerializableQueue<T>();
         private Queue<T> _queue = new Queue<T>();
 
@@ -19,6 +21,8 @@ namespace PurrNet
         public event SyncQueueChanged<T> onChanged;
 
         public bool ownerAuth => _ownerAuth;
+
+        public override bool ownerOnly => _ownerOnly;
         public int Count => _queue.Count;
 
         public override void OnPoolReset()
@@ -30,9 +34,10 @@ namespace PurrNet
 #endif
         }
 
-        public SyncQueue(bool ownerAuth = false)
+        public SyncQueue(bool ownerAuth = false, bool ownerOnly = false)
         {
             _ownerAuth = ownerAuth;
+            _ownerOnly = ownerOnly;
 
 #if UNITY_EDITOR
             onChanged += UpdateSerializedQueue;

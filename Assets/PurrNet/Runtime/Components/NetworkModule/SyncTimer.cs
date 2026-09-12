@@ -24,6 +24,9 @@ namespace PurrNet
     public class SyncTimer : NetworkModule, ITick
     {
         private readonly bool _ownerAuth;
+        private readonly bool _ownerOnly;
+
+        public override bool ownerOnly => _ownerOnly;
         private readonly float _reconcileInterval;
 
         [SerializeField, HideInInspector] private TimerState _state;
@@ -43,9 +46,10 @@ namespace PurrNet
         public event Action onTimerPaused;
         public event Action onTimerResumed;
 
-        public SyncTimer(bool ownerAuth = false, float reconcileInterval = 3, bool manualUpdate = false)
+        public SyncTimer(bool ownerAuth = false, float reconcileInterval = 3, bool manualUpdate = false, bool ownerOnly = false)
         {
             _ownerAuth = ownerAuth;
+            _ownerOnly = ownerOnly;
             _reconcileInterval = reconcileInterval;
             _state = TimerState.Stopped;
             _manualUpdate = manualUpdate;

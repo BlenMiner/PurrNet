@@ -1,6 +1,5 @@
 using System;
 using System.Collections.Generic;
-using System.Reflection;
 using JetBrains.Annotations;
 using PurrNet.Logging;
 using PurrNet.Modules;
@@ -20,6 +19,10 @@ namespace PurrNet
 
         [SerializeField, HideInInspector] private int _prefabId = int.MinValue;
 
+        [SerializeField, HideInInspector] private bool _hasPrefabScope;
+
+        [SerializeField, HideInInspector] private ushort _prefabScope;
+
         [SerializeField, HideInInspector] private int _componentIndex = int.MinValue;
 
         [SerializeField, HideInInspector] private bool _shouldBePooled;
@@ -28,7 +31,35 @@ namespace PurrNet
 
         [SerializeField, HideInInspector] private int[] _invertedPathToNearestParent;
 
+        private bool _ownsInvertedPath;
+
         [SerializeField, HideInInspector] private List<NetworkIdentity> _directChildren;
+
+        private NetworkIdentity[] _siblingIdentities;
+
+        internal NetworkIdentity[] siblingIdentities
+        {
+            get
+            {
+                if (_siblingIdentities != null)
+                    return _siblingIdentities;
+
+                var siblings = GetComponents<NetworkIdentity>();
+                for (var i = 0; i < siblings.Length; i++)
+                    siblings[i]._siblingIdentities = siblings;
+                return siblings;
+            }
+        }
+
+        private void InvalidateSiblingIdentities()
+        {
+            var siblings = _siblingIdentities;
+            if (siblings == null)
+                return;
+
+            for (var i = 0; i < siblings.Length; i++)
+                siblings[i]._siblingIdentities = null;
+        }
 
         public event Action<PlayerID> onObserverAdded;
 
@@ -53,10 +84,16 @@ namespace PurrNet
 
         public double rollbackTick => networkManager ? networkManager.tickModule.rollbackTick : 0;
 
-        public int[] invertedPathToNearestParent
+        public ReadOnlySpan<int> invertedPathToNearestParent => _invertedPathToNearestParent;
+
+        internal int[] invertedPathToNearestParentArray
         {
             get => _invertedPathToNearestParent;
-            internal set => _invertedPathToNearestParent = value;
+            set
+            {
+                _invertedPathToNearestParent = value;
+                _ownsInvertedPath = false;
+            }
         }
 
         public IReadOnlyList<NetworkIdentity> directChildren => _directChildren;
@@ -88,13 +125,20 @@ namespace PurrNet
 
         public int prefabId => _prefabId;
 
+        /// <summary>
+        /// The prefab id including its scene scope, if the prefab was registered per scene.
+        /// </summary>
+        public PrefabID scopedPrefabId => _hasPrefabScope
+            ? new PrefabID(_prefabId, new SceneID(_prefabScope))
+            : new PrefabID(_prefabId);
+
         public int componentIndex => _componentIndex;
 
         public bool shouldBePooled => _shouldBePooled;
 
         public bool isSetup => _isSetup;
 
-        public bool skipSceneAutoSpawning { get; set; } = false;
+        public bool skipSceneAutoSpawning { get; set; }
 
         /// <summary>
         /// Used for internal cleanup, avoid using this.
@@ -102,9 +146,15 @@ namespace PurrNet
         public void ResetIsSetup()
         {
             _isSetup = false;
+            InvalidateSiblingIdentities();
         }
 
         public void PreparePrefabInfo(int prefabId, int componentIndex, bool shouldBePooled, bool isSceneObject)
+        {
+            PreparePrefabInfo(new PrefabID(prefabId), componentIndex, shouldBePooled, isSceneObject);
+        }
+
+        public void PreparePrefabInfo(PrefabID prefabId, int componentIndex, bool shouldBePooled, bool isSceneObject)
         {
             if (isSceneObject && skipSceneAutoSpawning)
                 return;
@@ -116,7 +166,9 @@ namespace PurrNet
 
             this.isSceneObject = isSceneObject;
 
-            this._prefabId = prefabId;
+            this._prefabId = (int)prefabId;
+            this._hasPrefabScope = prefabId.scope.HasValue;
+            this._prefabScope = prefabId.scope.HasValue ? (ushort)prefabId.scope.Value.id.value : (ushort)0;
             this._componentIndex = componentIndex;
             this._shouldBePooled = shouldBePooled;
 
@@ -125,9 +177,15 @@ namespace PurrNet
             RecalculateNearestPath();
 
             var firstIdentity = GetComponent<NetworkIdentity>();
+            // Preparing a newly added component must also invalidate the existing siblings.
+            firstIdentity.InvalidateSiblingIdentities();
 
             if (firstIdentity != this)
-                _directChildren = new List<NetworkIdentity>();
+            {
+                if (_directChildren == null)
+                    _directChildren = new List<NetworkIdentity>();
+                else _directChildren.Clear();
+            }
             else RecalculateDirectChildren();
         }
 
@@ -175,17 +233,26 @@ namespace PurrNet
             {
                 using var invPath = HierarchyPool.GetInvPath(_parent.transform, transform);
 
-                if (_invertedPathToNearestParent == null)
-                    _invertedPathToNearestParent = new int[invPath.Count];
-                else if (_invertedPathToNearestParent.Length != invPath.Count)
-                    _invertedPathToNearestParent = new int[invPath.Count];
+                if (HierarchyPool.TryInternPath(invPath, out var interned))
+                {
+                    _invertedPathToNearestParent = interned;
+                    _ownsInvertedPath = false;
+                    return;
+                }
 
-                for (int i = 0; i < invPath.Count; i++)
+                if (!_ownsInvertedPath || _invertedPathToNearestParent.Length != invPath.Count)
+                {
+                    _invertedPathToNearestParent = new int[invPath.Count];
+                    _ownsInvertedPath = true;
+                }
+
+                for (var i = 0; i < invPath.Count; i++)
                     _invertedPathToNearestParent[i] = invPath[i];
             }
             else
             {
                 _invertedPathToNearestParent = Array.Empty<int>();
+                _ownsInvertedPath = false;
             }
         }
 
@@ -394,15 +461,15 @@ namespace PurrNet
             if (_pendingObservers == null)
                 return;
 
-            var pendingObservers = _pendingObservers;
+            var cached = _pendingObservers;
             _pendingObservers = null;
-            ListPool<PlayerID>.Destroy(pendingObservers);
+            ListPool<PlayerID>.Destroy(cached);
         }
 
-        [UsedByIL]
+        [UsedByIL, UsedImplicitly]
         public virtual void OnReceivedRpc(int id, RPCPacket packet, RPCInfo info, bool asServer) { }
 
-        [UsedByIL]
+        [UsedByIL, UsedImplicitly]
         public static void OnReceivedRpc(int id, StaticRPCPacket packet, RPCInfo info, bool asServer) { }
 
         [UsedImplicitly]
@@ -512,6 +579,8 @@ namespace PurrNet
 
         private int _tickRegisteredServer;
         private int _tickRegisteredClient;
+        private int _serverTickHandle = PurrAction<NetworkIdentity>.InvalidHandle;
+        private int _clientTickHandle = PurrAction<NetworkIdentity>.InvalidHandle;
 
         private void RegisterTickEvent(bool asServer)
         {
@@ -521,7 +590,7 @@ namespace PurrNet
                     return;
 
                 _serverTickManager = networkManager.GetModule<TickManager>(true);
-                _serverTickManager.onTick += ServerTick;
+                _serverTickHandle = _serverTickManager.AddIdentityTick(this);
             }
             else
             {
@@ -529,7 +598,7 @@ namespace PurrNet
                     return;
 
                 _clientTickManager = networkManager.GetModule<TickManager>(false);
-                _clientTickManager.onTick += ClientTick;
+                _clientTickHandle = _clientTickManager.AddIdentityTick(this);
             }
         }
 
@@ -564,13 +633,15 @@ namespace PurrNet
                 if (--_tickRegisteredServer <= 0)
                 {
                     if (_serverTickManager != null)
-                        _serverTickManager.onTick -= ServerTick;
+                        _serverTickManager.RemoveIdentityTick(_serverTickHandle, this);
+                    _serverTickHandle = PurrAction<NetworkIdentity>.InvalidHandle;
                 }
             }
             else if (--_tickRegisteredClient <= 0)
             {
                 if (_clientTickManager != null)
-                    _clientTickManager.onTick -= ClientTick;
+                    _clientTickManager.RemoveIdentityTick(_clientTickHandle, this);
+                _clientTickHandle = PurrAction<NetworkIdentity>.InvalidHandle;
             }
         }
 
@@ -586,7 +657,7 @@ namespace PurrNet
                 _serverSceneEvents?.OnPlayerUnloadedScene(player);
         }
 
-        private void ClientTick()
+        internal void ClientTick()
         {
             InternalTick();
 
@@ -613,7 +684,7 @@ namespace PurrNet
             }
         }
 
-        private void ServerTick()
+        internal void ServerTick()
         {
             if (_tickRegisteredClient <= 0)
             {
@@ -854,30 +925,8 @@ namespace PurrNet
         {
         }
 
-        static readonly Dictionary<Type, List<MethodInfo>> _methodCache = new();
-
-        private void CallInitMethods()
-        {
-            if (!_methodCache.TryGetValue(GetType(), out var cached))
-            {
-                var type = GetType();
-                var methods = type.GetMethods(BindingFlags.Instance | BindingFlags.Public);
-                cached = new List<MethodInfo>(methods.Length);
-
-                for (int i = 0; i < methods.Length; i++)
-                {
-                    var m = methods[i];
-                    if (m.Name.EndsWith("_CodeGen_Initialize"))
-                        cached.Add(m);
-                }
-
-                _methodCache[type] = cached;
-            }
-
-            int count = cached.Count;
-            for (var i = 0; i < count; i++)
-                cached[i].Invoke(this, Array.Empty<object>());
-        }
+        [UsedByIL, UsedImplicitly]
+        public virtual void CallGeneratedInitMethods() { }
 
         /// <summary>
         /// The layer of this object. Avoids gameObject.layer.
@@ -1008,7 +1057,7 @@ namespace PurrNet
                 _moduleId = 0;
 
                 OnInitializeModules();
-                CallInitMethods();
+                CallGeneratedInitMethods();
 
                 foreach (var module in _externalModulesView)
                     module.OnInitializeModules();
@@ -1230,6 +1279,7 @@ namespace PurrNet
             }
             finally
             {
+                InvalidateSiblingIdentities();
                 ReleasePendingObservers();
             }
         }
@@ -1550,6 +1600,44 @@ namespace PurrNet
                     Debug.LogException(e);
                 }
             }
+
+            // ownerOnly modules scope visibility by ownership, but the identity observer set doesn't
+            // change on transfer, so no add/remove fires. Emulate it so their catch-up logic runs.
+            if (asServer && !isSpawner)
+            {
+                for (int i = 0; i < _externalModulesView.Count; i++)
+                {
+                    var module = _externalModulesView[i];
+
+                    if (!module.ownerOnly)
+                        continue;
+
+                    if (oldOwner.HasValue && IsObserver(oldOwner.Value))
+                    {
+                        try
+                        {
+                            module.OnObserverRemoved(oldOwner.Value);
+                        }
+                        catch (Exception e)
+                        {
+                            Debug.LogException(e);
+                        }
+                    }
+
+                    if (newOwner.HasValue && IsObserver(newOwner.Value))
+                    {
+                        try
+                        {
+                            module.OnObserverAdded(newOwner.Value);
+                            module.OnObserverAdded(newOwner.Value, false);
+                        }
+                        catch (Exception e)
+                        {
+                            Debug.LogException(e);
+                        }
+                    }
+                }
+            }
         }
 
         internal void TriggerOnOwnerDisconnected(PlayerID ownerId)
@@ -1626,9 +1714,14 @@ namespace PurrNet
 
             for (int i = 0; i < _externalModulesView.Count; i++)
             {
+                var module = _externalModulesView[i];
+
+                if (module.ownerOnly && target != owner)
+                    continue;
+
                 try
                 {
-                    _externalModulesView[i].OnPreObserverAdded(target);
+                    module.OnPreObserverAdded(target);
                 }
                 catch (Exception e)
                 {
@@ -1637,7 +1730,7 @@ namespace PurrNet
 
                 try
                 {
-                    _externalModulesView[i].OnPreObserverAdded(target, isSpawner);
+                    module.OnPreObserverAdded(target, isSpawner);
                 }
                 catch (Exception e)
                 {
@@ -1646,7 +1739,43 @@ namespace PurrNet
             }
         }
 
+        /// <summary>
+        /// Called for every observer add with all the players that were added together, one or
+        /// more, before the per-player <see cref="OnObserverAdded(PlayerID)"/> callbacks run for
+        /// each of them. Lets a component send one message to all of them instead of one per player.
+        /// </summary>
+        protected virtual void OnObserversAdded(IReadOnlyList<PlayerID> players, bool isSpawner) { }
+
+        public void TriggerOnObserversAdded(IReadOnlyList<PlayerID> players, bool isSpawner)
+        {
+            try
+            {
+                OnObserversAdded(players, isSpawner);
+            }
+            catch (Exception e)
+            {
+                Debug.LogException(e);
+            }
+
+            for (int i = 0; i < players.Count; i++)
+                TriggerOnObserverAddedCore(players[i], isSpawner);
+        }
+
         public void TriggerOnObserverAdded(PlayerID target, bool isSpawner)
+        {
+            var single = ListPool<PlayerID>.Instantiate();
+            single.Add(target);
+            try
+            {
+                TriggerOnObserversAdded(single, isSpawner);
+            }
+            finally
+            {
+                ListPool<PlayerID>.Destroy(single);
+            }
+        }
+
+        private void TriggerOnObserverAddedCore(PlayerID target, bool isSpawner)
         {
             try
             {
@@ -1668,9 +1797,14 @@ namespace PurrNet
 
             for (int i = 0; i < _externalModulesView.Count; i++)
             {
+                var module = _externalModulesView[i];
+
+                if (module.ownerOnly && target != owner)
+                    continue;
+
                 try
                 {
-                    _externalModulesView[i].OnObserverAdded(target);
+                    module.OnObserverAdded(target);
                 }
                 catch (Exception e)
                 {
@@ -1679,7 +1813,7 @@ namespace PurrNet
 
                 try
                 {
-                    _externalModulesView[i].OnObserverAdded(target, isSpawner);
+                    module.OnObserverAdded(target, isSpawner);
                 }
                 catch (Exception e)
                 {

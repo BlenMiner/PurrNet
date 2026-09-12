@@ -10,11 +10,72 @@ using PurrNet.Utils;
 /// </summary>
 public class PurrEqualityTests
 {
+    public struct CustomEquatableValue : IPurrEquatable<CustomEquatableValue>
+    {
+        public int key;
+        // Keep a reference field so equality uses the comparer rather than MemEquals.
+        public string ignored;
+
+        public bool PurrEquals(CustomEquatableValue other) => key == other.key;
+    }
+
+    public sealed class CustomEquatableReference : IPurrEquatable<CustomEquatableReference>
+    {
+        public int key;
+
+        public bool PurrEquals(CustomEquatableReference other) => key == other.key;
+    }
+
     [SetUp]
     public void Setup()
     {
         Hasher.ClearState();
         NetworkManager.CallAllRegisters();
+    }
+
+    [Test]
+    public void PurrEquality_CustomValue_PreservesPurrEqualsWithReferenceFields()
+    {
+        var previous = PurrEquality<CustomEquatableValue>.Default;
+        try
+        {
+            PurrEquality.Override<CustomEquatableValue>();
+            var value = new CustomEquatableValue { key = 7, ignored = "left" };
+
+            Assert.IsTrue(PurrEquality<CustomEquatableValue>.Equals(value,
+                new CustomEquatableValue { key = 7, ignored = "right" }));
+            Assert.IsTrue(PurrEquality<CustomEquatableValue>.Equals(value,
+                new CustomEquatableValue { key = 7, ignored = null }));
+            Assert.IsFalse(PurrEquality<CustomEquatableValue>.Equals(value,
+                new CustomEquatableValue { key = 8, ignored = "left" }));
+        }
+        finally
+        {
+            PurrEquality<CustomEquatableValue>.OverrideDefault(previous);
+        }
+    }
+
+    [Test]
+    public void PurrEquality_CustomReference_PreservesEqualityAndNullGuards()
+    {
+        var previous = PurrEquality<CustomEquatableReference>.Default;
+        try
+        {
+            PurrEquality.Override<CustomEquatableReference>();
+            var value = new CustomEquatableReference { key = 7 };
+
+            Assert.IsTrue(PurrEquality<CustomEquatableReference>.Equals(null, null));
+            Assert.IsFalse(PurrEquality<CustomEquatableReference>.Equals(null, value));
+            Assert.IsFalse(PurrEquality<CustomEquatableReference>.Equals(value, null));
+            Assert.IsTrue(PurrEquality<CustomEquatableReference>.Equals(value,
+                new CustomEquatableReference { key = 7 }));
+            Assert.IsFalse(PurrEquality<CustomEquatableReference>.Equals(value,
+                new CustomEquatableReference { key = 8 }));
+        }
+        finally
+        {
+            PurrEquality<CustomEquatableReference>.OverrideDefault(previous);
+        }
     }
 
     [Test]

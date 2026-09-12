@@ -59,6 +59,14 @@ namespace PurrNet.Modules
         public NetworkID id;
     }
 
+    internal struct NetworkTransformInitialState : IPackedAuto
+    {
+        public SceneID scene;
+        public NetworkID id;
+        public NetworkTransformState state;
+        public byte gen;
+    }
+
     internal struct NTUnreliableEntry
     {
         public NetworkID nid;
@@ -70,10 +78,44 @@ namespace PurrNet.Modules
         public uint genEpoch;
         // Send-side only: revision of the captured state, used for a cheap unchanged check.
         public uint revision;
+        // Send-side only: the transform that wrote this entry, so ack adoption skips the registry search.
+        public NetworkTransform transform;
     }
 
-    internal struct NTUnreliableBaseline
+    internal sealed class NTSharedEntries : List<NTUnreliableEntry>
     {
+        public int refs;
+
+        private static readonly Stack<NTSharedEntries> _pool = new();
+
+        public static NTSharedEntries Rent() => _pool.Count > 0 ? _pool.Pop() : new NTSharedEntries();
+
+        public static void Retain(List<NTUnreliableEntry> entries)
+        {
+            if (entries is NTSharedEntries shared)
+                shared.refs++;
+        }
+
+        public static void Release(List<NTUnreliableEntry> entries)
+        {
+            if (entries is not NTSharedEntries shared)
+            {
+                ListPool<NTUnreliableEntry>.Destroy(entries);
+                return;
+            }
+
+            if (--shared.refs > 0)
+                return;
+
+            shared.refs = 0;
+            shared.Clear();
+            _pool.Push(shared);
+        }
+    }
+
+    internal struct NTBaselineSlot
+    {
+        public bool has;
         public NetworkTransformState state;
         public NetworkTransformVelocity velocity;
         public ushort tick;
@@ -105,6 +147,48 @@ namespace PurrNet.Modules
         public bool hasPrevPrev;
         public bool restConfirmed;
         public byte redundancy;
+        public int refs;
+
+        private static readonly Stack<NTLastAdaptiveWrite> _pool = new();
+
+        public static NTLastAdaptiveWrite Rent() => _pool.Count > 0 ? _pool.Pop() : new NTLastAdaptiveWrite();
+
+        public static void Release(NTLastAdaptiveWrite write)
+        {
+            if (write == null || --write.refs > 0)
+                return;
+
+            write.tick = 0;
+            write.prevTick = 0;
+            write.prevPrevTick = 0;
+            write.revision = 0;
+            write.state = default;
+            write.prevState = default;
+            write.prevPrevState = default;
+            write.refreshInterval = 0;
+            write.hasPrev = false;
+            write.hasPrevPrev = false;
+            write.restConfirmed = false;
+            write.redundancy = 0;
+            write.refs = 0;
+            _pool.Push(write);
+        }
+
+        public void CopyFrom(NTLastAdaptiveWrite other)
+        {
+            tick = other.tick;
+            prevTick = other.prevTick;
+            prevPrevTick = other.prevPrevTick;
+            revision = other.revision;
+            state = other.state;
+            prevState = other.prevState;
+            prevPrevState = other.prevPrevState;
+            refreshInterval = other.refreshInterval;
+            hasPrev = other.hasPrev;
+            hasPrevPrev = other.hasPrevPrev;
+            restConfirmed = other.restConfirmed;
+            redundancy = other.redundancy;
+        }
     }
 
     internal struct NTUnreliableGeneration
@@ -117,6 +201,7 @@ namespace PurrNet.Modules
     {
         public bool used;
         public bool acked;
+        public bool anchor;
         public ushort seq;
         public uint order;
         public List<NTUnreliableEntry> entries;
@@ -124,6 +209,7 @@ namespace PurrNet.Modules
 
     internal class NTUnreliableSendStream
     {
+        public bool asServer;
         public ushort nextSeq = 1;
         public uint nextOrder = 1;
         public long budgetBits;
@@ -134,8 +220,65 @@ namespace PurrNet.Modules
         // NACK barrier: only packets written AFTER the NACK may re-establish a baseline,
         // else the ack covering the NACKed packet resurrects the phantom (acks are cumulative).
         public readonly Dictionary<NetworkID, uint> nackFloor = new();
-        public readonly Dictionary<NetworkID, NTUnreliableBaseline> acked = new();
-        public readonly Dictionary<NetworkID, NTLastAdaptiveWrite> lastAdaptiveWrite = new();
+        public NTBaselineSlot[] baselines = System.Array.Empty<NTBaselineSlot>();
+        public bool[] pendingByIndex = System.Array.Empty<bool>();
+        public bool[] ackCompleted = System.Array.Empty<bool>();
+        public NTLastAdaptiveWrite[] adaptiveByIndex = System.Array.Empty<NTLastAdaptiveWrite>();
+
+        public void EnsureBaselineCapacity(int count)
+        {
+            if (baselines.Length >= count)
+                return;
+            int size = System.Math.Max(count, System.Math.Max(16, baselines.Length * 2));
+            System.Array.Resize(ref baselines, size);
+            System.Array.Resize(ref pendingByIndex, size);
+            System.Array.Resize(ref ackCompleted, size);
+            System.Array.Resize(ref adaptiveByIndex, size);
+        }
+
+        public NTLastAdaptiveWrite GetAdaptive(NetworkTransform nt)
+        {
+            int index = nt.GetNTIndex(asServer);
+            return index >= 0 && index < adaptiveByIndex.Length ? adaptiveByIndex[index] : null;
+        }
+
+        public void SetAdaptive(NetworkTransform nt, NTLastAdaptiveWrite value)
+        {
+            int index = nt.GetNTIndex(asServer);
+            if (index >= 0 && index < adaptiveByIndex.Length)
+                SetAdaptiveAt(index, value);
+        }
+
+        public void SetAdaptiveAt(int index, NTLastAdaptiveWrite value)
+        {
+            var current = adaptiveByIndex[index];
+            if (ReferenceEquals(current, value))
+                return;
+
+            if (value != null)
+                value.refs++;
+            adaptiveByIndex[index] = value;
+            NTLastAdaptiveWrite.Release(current);
+        }
+
+        public void ReleaseAdaptive()
+        {
+            for (int i = 0; i < adaptiveByIndex.Length; i++)
+                SetAdaptiveAt(i, null);
+        }
+
+        public bool IsPending(NetworkTransform nt)
+        {
+            int index = nt.GetNTIndex(asServer);
+            return index >= 0 && index < pendingByIndex.Length && pendingByIndex[index];
+        }
+
+        public void SetPending(NetworkTransform nt, bool value)
+        {
+            int index = nt.GetNTIndex(asServer);
+            if (index >= 0 && index < pendingByIndex.Length)
+                pendingByIndex[index] = value;
+        }
         // A targeted reliable reset advances the NetworkTransform's global generation, while
         // unaffected peers remain on their existing wire generation until the next global reset.
         public readonly Dictionary<NetworkID, NTUnreliableGeneration> generationOverrides = new();
@@ -176,6 +319,17 @@ namespace PurrNet.Modules
         // streams flush before the 32-packet selective-ACK window can leave a permanent blind spot.
         public const int ACK_INTERVAL_TICKS = 4;
         public const int ACK_PACKET_THRESHOLD = 24;
+
+        /// <summary>
+        /// Packets sent on ticks that are a multiple of this become the only ones that move a
+        /// peer's delta baseline forward once it has one. Every peer therefore converges on the
+        /// same baseline packet for every transform, so the per-peer share keys match and one
+        /// encode serves the whole audience instead of one encode per peer. Acks arrive at
+        /// most one ack interval after an anchor, so this equals the ack cadence.
+        /// </summary>
+        public const int BASELINE_ANCHOR_TICKS = ACK_INTERVAL_TICKS;
+
+        public static bool IsAnchorTick(ushort tick) => tick % BASELINE_ANCHOR_TICKS == 0;
 
         public const int ADAPTIVE_MAX_BACKFILL = 34;
         public const int ADAPTIVE_POS_TOLERANCE = 2;
@@ -266,7 +420,7 @@ namespace PurrNet.Modules
             for (int i = 0; i < ring.Length; i++)
             {
                 if (ring[i].entries != null)
-                    ListPool<NTUnreliableEntry>.Destroy(ring[i].entries);
+                    NTSharedEntries.Release(ring[i].entries);
                 ring[i] = default;
             }
         }

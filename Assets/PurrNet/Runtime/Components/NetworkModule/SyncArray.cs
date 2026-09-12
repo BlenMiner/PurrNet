@@ -60,6 +60,8 @@ namespace PurrNet
     public class SyncArray<T> : NetworkModule, IList<T>, ISerializationCallbackReceiver, ITick
     {
         [SerializeField] private bool _ownerAuth;
+
+        [SerializeField] private bool _ownerOnly;
         [SerializeField] private List<T> _serializedItems;
         [SerializeField] private int _length;
         [SerializeField, Min(0)] private float _sendIntervalInSeconds;
@@ -71,6 +73,8 @@ namespace PurrNet
         public event SyncArrayChanged<T> onChanged;
 
         public bool ownerAuth => _ownerAuth;
+
+        public override bool ownerOnly => _ownerOnly;
 
         public float sendIntervalInSeconds
         {
@@ -112,9 +116,10 @@ namespace PurrNet
         private bool _isDirty;
         private bool _wasLastDirty;
 
-        public SyncArray(int length = 0, bool ownerAuth = false)
+        public SyncArray(int length = 0, bool ownerAuth = false, bool ownerOnly = false)
         {
             _ownerAuth = ownerAuth;
+            _ownerOnly = ownerOnly;
             _length = length;
             _array = new T[length];
             _serializedItems = new List<T>(length);

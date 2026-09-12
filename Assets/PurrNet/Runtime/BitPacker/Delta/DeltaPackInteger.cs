@@ -4,6 +4,26 @@ namespace PurrNet.Packing
 {
     public static class DeltaPackInteger
     {
+        static readonly byte[] buckets8 = { 2, 4, 6, 8 };
+        static readonly byte[] buckets16 = { 4, 8, 12, 16 };
+        static readonly byte[] buckets32 = { 4, 8, 16, 32 };
+        static readonly byte[] buckets64 = { 4, 8, 24, 64 };
+
+        static void WriteDiff(BitPacker packer, ulong zigzag, byte[] buckets)
+        {
+            int bits = 64 - PackingIntegers.CountLeadingZeroBits(zigzag);
+            int selector = 0;
+            while (bits > buckets[selector]) selector++;
+            packer.WriteBits((ulong)selector, 2);
+            packer.WriteBits(zigzag, buckets[selector]);
+        }
+
+        static ulong ReadDiff(BitPacker packer, byte[] buckets)
+        {
+            int selector = (int)packer.ReadBits(2);
+            return packer.ReadBits(buckets[selector]);
+        }
+
         [UsedByIL]
         public static bool WriteBool(BitPacker packer, bool oldvalue, bool newvalue)
         {
@@ -22,28 +42,24 @@ namespace PurrNet.Packing
         [UsedByIL]
         public static bool WriteInt8(BitPacker packer, sbyte oldvalue, sbyte newvalue)
         {
-            bool hasChanged = oldvalue != newvalue;
-            packer.WriteBit(hasChanged);
-
-            if (hasChanged)
+            if (oldvalue == newvalue)
             {
-                short diff = (short)(newvalue - oldvalue);
-                Packer<PackedShort>.Write(packer, diff);
+                packer.WriteBit(false);
+                return false;
             }
 
-            return hasChanged;
+            packer.WriteBit(true);
+            WriteDiff(packer, PackingIntegers.ZigzagEncode((sbyte)(newvalue - oldvalue)), buckets8);
+            return true;
         }
 
         [UsedByIL]
         public static void ReadInt8(BitPacker packer, sbyte oldvalue, ref sbyte value)
         {
-            bool hasChanged = packer.ReadBit();
-
-            if (hasChanged)
+            if (packer.ReadBit())
             {
-                PackedShort packed = default;
-                Packer<PackedShort>.Read(packer, ref packed);
-                value = (sbyte)(oldvalue + packed.value);
+                sbyte diff = PackingIntegers.ZigzagDecode((byte)ReadDiff(packer, buckets8));
+                value = (sbyte)(oldvalue + diff);
             }
             else value = oldvalue;
         }
@@ -51,28 +67,24 @@ namespace PurrNet.Packing
         [UsedByIL]
         public static bool WriteUInt8(BitPacker packer, byte oldvalue, byte newvalue)
         {
-            bool hasChanged = oldvalue != newvalue;
-            packer.WriteBit(hasChanged);
-
-            if (hasChanged)
+            if (oldvalue == newvalue)
             {
-                short diff = (short)(newvalue - oldvalue);
-                Packer<PackedShort>.Write(packer, diff);
+                packer.WriteBit(false);
+                return false;
             }
 
-            return hasChanged;
+            packer.WriteBit(true);
+            WriteDiff(packer, PackingIntegers.ZigzagEncode((sbyte)(newvalue - oldvalue)), buckets8);
+            return true;
         }
 
         [UsedByIL]
         public static void ReadUInt8(BitPacker packer, byte oldvalue, ref byte value)
         {
-            bool hasChanged = packer.ReadBit();
-
-            if (hasChanged)
+            if (packer.ReadBit())
             {
-                PackedShort packed = default;
-                Packer<PackedShort>.Read(packer, ref packed);
-                value = (byte)(oldvalue + packed.value);
+                sbyte diff = PackingIntegers.ZigzagDecode((byte)ReadDiff(packer, buckets8));
+                value = (byte)(oldvalue + diff);
             }
             else value = oldvalue;
         }
@@ -80,28 +92,24 @@ namespace PurrNet.Packing
         [UsedByIL]
         public static bool WriteInt16(BitPacker packer, short oldvalue, short newvalue)
         {
-            bool hasChanged = oldvalue != newvalue;
-            packer.WriteBit(hasChanged);
-
-            if (hasChanged)
+            if (oldvalue == newvalue)
             {
-                int diff = newvalue - oldvalue;
-                Packer<PackedInt>.Write(packer, diff);
+                packer.WriteBit(false);
+                return false;
             }
 
-            return hasChanged;
+            packer.WriteBit(true);
+            WriteDiff(packer, PackingIntegers.ZigzagEncode((short)(newvalue - oldvalue)), buckets16);
+            return true;
         }
 
         [UsedByIL]
         public static void ReadInt16(BitPacker packer, short oldvalue, ref short value)
         {
-            bool hasChanged = packer.ReadBit();
-
-            if (hasChanged)
+            if (packer.ReadBit())
             {
-                PackedInt packed = default;
-                Packer<PackedInt>.Read(packer, ref packed);
-                value = (short)(oldvalue + packed.value);
+                short diff = PackingIntegers.ZigzagDecode((ushort)ReadDiff(packer, buckets16));
+                value = (short)(oldvalue + diff);
             }
             else value = oldvalue;
         }
@@ -109,57 +117,24 @@ namespace PurrNet.Packing
         [UsedByIL]
         public static bool WriteUInt16(BitPacker packer, ushort oldvalue, ushort newvalue)
         {
-            bool hasChanged = oldvalue != newvalue;
-            packer.WriteBit(hasChanged);
-
-            if (hasChanged)
+            if (oldvalue == newvalue)
             {
-                int diff = (int)((uint)newvalue - oldvalue);
-                Packer<PackedInt>.Write(packer, diff);
+                packer.WriteBit(false);
+                return false;
             }
 
-            return hasChanged;
+            packer.WriteBit(true);
+            WriteDiff(packer, PackingIntegers.ZigzagEncode((short)(newvalue - oldvalue)), buckets16);
+            return true;
         }
 
         [UsedByIL]
         public static void ReadUInt16(BitPacker packer, ushort oldvalue, ref ushort value)
         {
-            bool hasChanged = packer.ReadBit();
-
-            if (hasChanged)
+            if (packer.ReadBit())
             {
-                PackedInt packed = default;
-                Packer<PackedInt>.Read(packer, ref packed);
-                value = (ushort)(oldvalue + packed.value);
-            }
-            else value = oldvalue;
-        }
-
-        [UsedByIL]
-        public static bool WriteUInt32(BitPacker packer, uint oldvalue, uint newvalue)
-        {
-            bool hasChanged = oldvalue != newvalue;
-            packer.WriteBit(hasChanged);
-
-            if (hasChanged)
-            {
-                long diff = newvalue - (long)oldvalue;
-                Packer<PackedLong>.Write(packer, diff);
-            }
-
-            return hasChanged;
-        }
-
-        [UsedByIL]
-        public static void ReadUInt32(BitPacker packer, uint oldvalue, ref uint value)
-        {
-            bool hasChanged = packer.ReadBit();
-
-            if (hasChanged)
-            {
-                PackedLong packed = default;
-                Packer<PackedLong>.Read(packer, ref packed);
-                value = (uint)(oldvalue + packed.value);
+                short diff = PackingIntegers.ZigzagDecode((ushort)ReadDiff(packer, buckets16));
+                value = (ushort)(oldvalue + diff);
             }
             else value = oldvalue;
         }
@@ -167,28 +142,49 @@ namespace PurrNet.Packing
         [UsedByIL]
         public static bool WriteInt32(BitPacker packer, int oldvalue, int newvalue)
         {
-            bool hasChanged = oldvalue != newvalue;
-            packer.WriteBit(hasChanged);
-
-            if (hasChanged)
+            if (oldvalue == newvalue)
             {
-                long diff = newvalue - (long)oldvalue;
-                Packer<PackedLong>.Write(packer, diff);
+                packer.WriteBit(false);
+                return false;
             }
 
-            return hasChanged;
+            packer.WriteBit(true);
+            WriteDiff(packer, PackingIntegers.ZigzagEncode(newvalue - oldvalue), buckets32);
+            return true;
         }
 
         [UsedByIL]
         public static void ReadInt32(BitPacker packer, int oldvalue, ref int value)
         {
-            bool hasChanged = packer.ReadBit();
-
-            if (hasChanged)
+            if (packer.ReadBit())
             {
-                PackedLong packed = default;
-                Packer<PackedLong>.Read(packer, ref packed);
-                value = (int)(oldvalue + packed.value);
+                int diff = PackingIntegers.ZigzagDecode((uint)ReadDiff(packer, buckets32));
+                value = oldvalue + diff;
+            }
+            else value = oldvalue;
+        }
+
+        [UsedByIL]
+        public static bool WriteUInt32(BitPacker packer, uint oldvalue, uint newvalue)
+        {
+            if (oldvalue == newvalue)
+            {
+                packer.WriteBit(false);
+                return false;
+            }
+
+            packer.WriteBit(true);
+            WriteDiff(packer, PackingIntegers.ZigzagEncode((int)(newvalue - oldvalue)), buckets32);
+            return true;
+        }
+
+        [UsedByIL]
+        public static void ReadUInt32(BitPacker packer, uint oldvalue, ref uint value)
+        {
+            if (packer.ReadBit())
+            {
+                int diff = PackingIntegers.ZigzagDecode((uint)ReadDiff(packer, buckets32));
+                value = (uint)(oldvalue + diff);
             }
             else value = oldvalue;
         }
@@ -196,28 +192,24 @@ namespace PurrNet.Packing
         [UsedByIL]
         public static bool WriteInt64(BitPacker packer, long oldvalue, long newvalue)
         {
-            bool hasChanged = oldvalue != newvalue;
-            packer.WriteBit(hasChanged);
-
-            if (hasChanged)
+            if (oldvalue == newvalue)
             {
-                long diff = newvalue - oldvalue;
-                Packer<PackedLong>.Write(packer, diff);
+                packer.WriteBit(false);
+                return false;
             }
 
-            return hasChanged;
+            packer.WriteBit(true);
+            WriteDiff(packer, PackingIntegers.ZigzagEncode(newvalue - oldvalue), buckets64);
+            return true;
         }
 
         [UsedByIL]
         public static void ReadInt64(BitPacker packer, long oldvalue, ref long value)
         {
-            bool hasChanged = packer.ReadBit();
-
-            if (hasChanged)
+            if (packer.ReadBit())
             {
-                PackedLong packed = default;
-                Packer<PackedLong>.Read(packer, ref packed);
-                value = oldvalue + packed.value;
+                long diff = PackingIntegers.ZigzagDecode(ReadDiff(packer, buckets64));
+                value = oldvalue + diff;
             }
             else value = oldvalue;
         }
@@ -225,157 +217,86 @@ namespace PurrNet.Packing
         [UsedByIL]
         public static bool WriteUInt64(BitPacker packer, ulong oldvalue, ulong newvalue)
         {
-            bool hasChanged = oldvalue != newvalue;
-            packer.WriteBit(hasChanged);
-
-            if (hasChanged)
+            if (oldvalue == newvalue)
             {
-                PackedLong diff = (long)newvalue - (long)oldvalue;
-                Packer<PackedLong>.Write(packer, diff);
+                packer.WriteBit(false);
+                return false;
             }
 
-            return hasChanged;
+            packer.WriteBit(true);
+            WriteDiff(packer, PackingIntegers.ZigzagEncode((long)(newvalue - oldvalue)), buckets64);
+            return true;
         }
 
         [UsedByIL]
         public static void ReadUInt64(BitPacker packer, ulong oldvalue, ref ulong value)
         {
-            bool hasChanged = packer.ReadBit();
-
-            if (hasChanged)
+            if (packer.ReadBit())
             {
-                PackedLong packed = default;
-                Packer<PackedLong>.Read(packer, ref packed);
-                value = (ulong)((long)oldvalue + packed.value);
+                long diff = PackingIntegers.ZigzagDecode(ReadDiff(packer, buckets64));
+                value = (ulong)((long)oldvalue + diff);
             }
             else value = oldvalue;
         }
 
-
         [UsedByIL]
         public static bool WriteUInt32(BitPacker packer, PackedUInt oldvalue, PackedUInt newvalue)
         {
-            bool hasChanged = oldvalue != newvalue;
-            packer.WriteBit(hasChanged);
-
-            if (hasChanged)
-            {
-                long diff = newvalue - (long)oldvalue;
-                Packer<PackedLong>.Write(packer, diff);
-            }
-
-            return hasChanged;
+            return WriteUInt32(packer, oldvalue.value, newvalue.value);
         }
 
         [UsedByIL]
         public static void ReadUInt32(BitPacker packer, PackedUInt oldvalue, ref PackedUInt value)
         {
-            bool hasChanged = packer.ReadBit();
-
-            if (hasChanged)
-            {
-                PackedLong packed = default;
-                Packer<PackedLong>.Read(packer, ref packed);
-                value = (uint)(oldvalue + packed.value);
-            }
-            else value = oldvalue;
+            ReadUInt32(packer, oldvalue.value, ref value.value);
         }
 
         [UsedByIL]
         public static bool WriteInt64(BitPacker packer, PackedLong oldvalue, PackedLong newvalue)
         {
-            return DeltaPacker<long>.Write(packer, oldvalue.value, newvalue.value);
+            return WriteInt64(packer, oldvalue.value, newvalue.value);
         }
 
         [UsedByIL]
         public static void ReadInt64(BitPacker packer, PackedLong oldvalue, ref PackedLong value)
         {
-            DeltaPacker<long>.Read(packer, oldvalue.value, ref value.value);
+            ReadInt64(packer, oldvalue.value, ref value.value);
         }
 
         [UsedByIL]
         public static bool WriteIndex(BitPacker packer, Size oldvalue, Size newvalue)
         {
-            bool hasChanged = oldvalue.value != newvalue.value;
-            packer.WriteBit(hasChanged);
-
-            if (hasChanged)
-            {
-                long diff = newvalue.value - oldvalue.value;
-                Packer<PackedLong>.Write(packer, diff);
-            }
-
-            return hasChanged;
+            return WriteUInt32(packer, oldvalue.value, newvalue.value);
         }
 
         [UsedByIL]
         public static void ReadIndex(BitPacker packer, Size oldvalue, ref Size value)
         {
-            if (packer.ReadBit())
-            {
-                PackedLong packed = default;
-                Packer<PackedLong>.Read(packer, ref packed);
-                value.value = (uint)(oldvalue.value + packed.value);
-            }
-            else value = oldvalue;
+            ReadUInt32(packer, oldvalue.value, ref value.value);
         }
 
         [UsedByIL]
         public static bool WriteUInt64(BitPacker packer, PackedULong oldvalue, PackedULong newvalue)
         {
-            bool hasChanged = oldvalue.value != newvalue.value;
-            packer.WriteBit(hasChanged);
-
-            if (hasChanged)
-            {
-                ulong diff = newvalue.value - oldvalue.value;
-                Packer<PackedULong>.Write(packer, diff);
-            }
-
-            return hasChanged;
+            return WriteUInt64(packer, oldvalue.value, newvalue.value);
         }
 
         [UsedByIL]
         public static void ReadUInt64(BitPacker packer, PackedULong oldvalue, ref PackedULong value)
         {
-            bool hasChanged = packer.ReadBit();
-
-            if (hasChanged)
-            {
-                PackedULong packed = default;
-                Packer<PackedULong>.Read(packer, ref packed);
-                value.value = oldvalue.value + packed.value;
-            }
-            else value = oldvalue;
+            ReadUInt64(packer, oldvalue.value, ref value.value);
         }
 
         [UsedByIL]
         public static bool WriteUInt16(BitPacker packer, PackedUShort oldvalue, PackedUShort newvalue)
         {
-            bool hasChanged = oldvalue != newvalue;
-            packer.WriteBit(hasChanged);
-
-            if (hasChanged)
-            {
-                PackedInt diff = newvalue - oldvalue;
-                Packer<PackedInt>.Write(packer, diff);
-            }
-
-            return hasChanged;
+            return WriteUInt16(packer, oldvalue.value, newvalue.value);
         }
 
         [UsedByIL]
         public static void ReadUInt16(BitPacker packer, PackedUShort oldvalue, ref PackedUShort value)
         {
-            bool hasChanged = packer.ReadBit();
-
-            if (hasChanged)
-            {
-                PackedInt packed = default;
-                Packer<PackedInt>.Read(packer, ref packed);
-                value = (PackedUShort)(oldvalue + packed.value);
-            }
-            else value = oldvalue;
+            ReadUInt16(packer, oldvalue.value, ref value.value);
         }
     }
 }

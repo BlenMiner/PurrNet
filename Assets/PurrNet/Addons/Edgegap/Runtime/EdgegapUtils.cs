@@ -1,6 +1,5 @@
 using System;
 using System.Collections;
-using Newtonsoft.Json;
 using UnityEngine;
 
 namespace PurrNet.Edgegap.Runtime
@@ -25,9 +24,7 @@ namespace PurrNet.Edgegap.Runtime
 
                 if (envKey.Contains("PORTS_MAPPING"))
                 {
-                    res.arbitriumPortsMapping = JsonConvert.DeserializeObject<ArbitriumPortsMapping>(
-                        envValue
-                    );
+                    res.arbitriumPortsMapping = ArbitriumPortsMapping.Parse(envValue);
                     break;
                 }
             }

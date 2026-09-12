@@ -9,6 +9,12 @@ using UnityEngine;
 
 public class NetworkTransformProtocolTests
 {
+    [OneTimeSetUp]
+    public void RegisterSerializers()
+    {
+        NetworkManager.CallAllRegisters();
+    }
+
     [Test]
     public void PerTransformOrderSurvivesContinuousSequenceHalfRange()
     {
@@ -457,6 +463,126 @@ public class NetworkTransformProtocolTests
     }
 
     [Test]
+    public void HostDespawnUnregistersTransformFromClientAndServerModulesWithoutThrowing()
+    {
+        var objects = new List<GameObject>();
+        var serverModule = new NetworkTransformModule(null, null, null, default, null);
+        var clientModule = new NetworkTransformModule(null, null, null, default, null);
+        var serverOnly = CreateNetworkTransform(5, objects);
+        var nt = CreateNetworkTransform(10, objects);
+
+        try
+        {
+            // A host registers the same NetworkTransform with distinct server and client modules.
+            serverModule.PromoteToServerModule();
+            serverModule.Register(serverOnly);
+            serverModule.Register(nt);
+            clientModule.Register(nt);
+
+            Assert.That(nt.ntServerIndex, Is.EqualTo(1));
+            Assert.That(nt.ntIndex, Is.EqualTo(0));
+
+            var serverStream = serverModule.GetSendStream(new PlayerID(1, false));
+            var clientStream = clientModule.GetSendStream(PlayerID.Server);
+            Assert.That(serverStream.baselines.Length, Is.GreaterThan(nt.ntServerIndex));
+            Assert.That(clientStream.baselines.Length, Is.GreaterThan(nt.ntIndex));
+
+            nt.CaptureUnreliableState();
+            NetworkTransformModule.AddPending(serverStream, nt);
+            const ushort seq = 1;
+            serverStream.ring[seq % NTUnreliable.RING_SIZE] = SlotWith(nt, seq, nt.capturedRevision);
+            Assert.DoesNotThrow(() => serverModule.ProcessAck(serverStream, seq, 0));
+            Assert.That(serverStream.baselines[nt.ntServerIndex].has, Is.True);
+
+            Assert.DoesNotThrow(() => clientModule.Unregister(nt));
+            Assert.That(nt.ntIndex, Is.EqualTo(-1));
+            Assert.That(nt.ntServerIndex, Is.EqualTo(1));
+            Assert.That(nt.ntRegistered, Is.True);
+            Assert.That(serverStream.baselines[nt.ntServerIndex].has, Is.True);
+
+            Assert.DoesNotThrow(() => serverModule.Unregister(nt));
+            Assert.That(nt.ntServerIndex, Is.EqualTo(-1));
+            Assert.That(nt.ntRegistered, Is.False);
+            serverModule.Unregister(serverOnly);
+        }
+        finally
+        {
+            for (int i = 0; i < objects.Count; i++)
+                Object.DestroyImmediate(objects[i]);
+        }
+    }
+
+    [Test]
+    public void PromotedClientModuleKeepsItsTransformRegistration()
+    {
+        var objects = new List<GameObject>();
+        var module = new NetworkTransformModule(null, null, null, default, null);
+        var nt = CreateNetworkTransform(10, objects);
+
+        try
+        {
+            module.Register(nt);
+            int index = nt.ntIndex;
+
+            module.PromoteToServerModule();
+
+            Assert.That(nt.ntIndex, Is.EqualTo(-1));
+            Assert.That(nt.ntServerIndex, Is.EqualTo(index));
+            Assert.That(module.GetSendStream(new PlayerID(1, false)).baselines.Length,
+                Is.GreaterThan(nt.ntServerIndex));
+            Assert.DoesNotThrow(() => module.Unregister(nt));
+            Assert.That(nt.ntRegistered, Is.False);
+        }
+        finally
+        {
+            for (int i = 0; i < objects.Count; i++)
+                Object.DestroyImmediate(objects[i]);
+        }
+    }
+
+    [Test]
+    public void OnlyAnchorPacketsMoveAnEstablishedBaseline()
+    {
+        var objects = new List<GameObject>();
+        var module = new NetworkTransformModule(null, null, null, default, null);
+        var nt = CreateNetworkTransform(10, objects);
+
+        try
+        {
+            module.Register(nt);
+            var stream = module.GetSendStream(new PlayerID(1, false));
+            int index = nt.ntIndex;
+
+            nt.CaptureUnreliableState();
+            NetworkTransformModule.AddPending(stream, nt);
+
+            stream.ring[1] = SlotWith(nt, 1, nt.capturedRevision - 2, anchor: false);
+            module.ProcessAck(stream, 1, 0);
+            Assert.That(stream.baselines[index].has, Is.True, "first ack establishes a baseline even off-anchor");
+            Assert.That(stream.baselines[index].order, Is.EqualTo(1));
+
+            stream.ring[2] = SlotWith(nt, 2, nt.capturedRevision - 1, anchor: false);
+            module.ProcessAck(stream, 2, 0);
+            Assert.That(stream.baselines[index].order, Is.EqualTo(1), "off-anchor ack must not move the baseline");
+            Assert.That(stream.IsPending(nt), Is.True);
+
+            stream.ring[3] = SlotWith(nt, 3, nt.capturedRevision - 1, anchor: true);
+            module.ProcessAck(stream, 3, 0);
+            Assert.That(stream.baselines[index].order, Is.EqualTo(3), "anchor ack moves the baseline");
+
+            stream.ring[4] = SlotWith(nt, 4, nt.capturedRevision, anchor: false);
+            module.ProcessAck(stream, 4, 0);
+            Assert.That(stream.baselines[index].order, Is.EqualTo(4), "an ack of the current revision completes off-anchor");
+            Assert.That(stream.IsPending(nt), Is.False);
+        }
+        finally
+        {
+            for (int i = 0; i < objects.Count; i++)
+                Object.DestroyImmediate(objects[i]);
+        }
+    }
+
+    [Test]
     public void AckOnlyRemovesPendingCurrentRevision()
     {
         var objects = new List<GameObject>();
@@ -501,28 +627,40 @@ public class NetworkTransformProtocolTests
     [Test]
     public void TargetedResetInvalidatesOnlyTheTargetBaseline()
     {
+        var objects = new List<GameObject>();
         var module = new NetworkTransformModule(null, null, null, default, null);
         var target = new PlayerID(1, false);
         var other = new PlayerID(2, false);
-        var nid = new NetworkID(10);
+        var nt = CreateNetworkTransform(10, objects);
+        var nid = nt.id!.Value;
+        module.Register(nt);
         var targetStream = module.GetSendStream(target);
         var otherStream = module.GetSendStream(other);
 
-        targetStream.acked[nid] = new NTUnreliableBaseline { gen = 1, genEpoch = 1 };
-        otherStream.acked[nid] = new NTUnreliableBaseline { gen = 1, genEpoch = 1 };
-        targetStream.ring[0] = SlotWith(nid, 1);
-        otherStream.ring[0] = SlotWith(nid, 1);
+        try
+        {
+            targetStream.baselines[nt.ntIndex] = new NTBaselineSlot { has = true, gen = 1, genEpoch = 1 };
+            otherStream.baselines[nt.ntIndex] = new NTBaselineSlot { has = true, gen = 1, genEpoch = 1 };
+            targetStream.ring[0] = SlotWith(nid, 1);
+            otherStream.ring[0] = SlotWith(nid, 1);
 
-        module.PrepareTargetedReset(target, nid, 1, 1);
+            module.PrepareTargetedReset(target, nid, 1, 1);
 
-        Assert.That(targetStream.acked.ContainsKey(nid), Is.False);
-        Assert.That(targetStream.ring[0].entries, Is.Empty);
-        Assert.That(targetStream.generationOverrides.ContainsKey(nid), Is.False);
-        Assert.That(otherStream.acked[nid].gen, Is.EqualTo(1));
-        Assert.That(otherStream.acked[nid].genEpoch, Is.EqualTo(1));
-        Assert.That(otherStream.ring[0].entries[0].genEpoch, Is.EqualTo(1));
-        Assert.That(otherStream.generationOverrides[nid].gen, Is.EqualTo(1));
-        Assert.That(otherStream.generationOverrides[nid].epoch, Is.EqualTo(1));
+            Assert.That(targetStream.baselines[nt.ntIndex].has, Is.False);
+            Assert.That(targetStream.ring[0].entries, Is.Empty);
+            Assert.That(targetStream.generationOverrides.ContainsKey(nid), Is.False);
+            Assert.That(otherStream.baselines[nt.ntIndex].has, Is.True);
+            Assert.That(otherStream.baselines[nt.ntIndex].gen, Is.EqualTo(1));
+            Assert.That(otherStream.baselines[nt.ntIndex].genEpoch, Is.EqualTo(1));
+            Assert.That(otherStream.ring[0].entries[0].genEpoch, Is.EqualTo(1));
+            Assert.That(otherStream.generationOverrides[nid].gen, Is.EqualTo(1));
+            Assert.That(otherStream.generationOverrides[nid].epoch, Is.EqualTo(1));
+        }
+        finally
+        {
+            for (int i = 0; i < objects.Count; i++)
+                Object.DestroyImmediate(objects[i]);
+        }
 
         module.ClearGenerationOverrides(nid);
         Assert.That(otherStream.generationOverrides.ContainsKey(nid), Is.False);
@@ -666,11 +804,99 @@ public class NetworkTransformProtocolTests
         }
     }
 
+    [Test]
+    public void SharedEntriesOutliveAcksOfOtherPeers()
+    {
+        var objects = new List<GameObject>();
+        var module = new NetworkTransformModule(null, null, null, default, null);
+        var nt = CreateNetworkTransform(10, objects);
+
+        try
+        {
+            module.Register(nt);
+            var first = module.GetSendStream(new PlayerID(1, false));
+            var second = module.GetSendStream(new PlayerID(2, false));
+            int index = nt.ntIndex;
+            nt.CaptureUnreliableState();
+
+            var shared = NTSharedEntries.Rent();
+            shared.Add(new NTUnreliableEntry
+            {
+                nid = nt.id!.Value,
+                state = nt.capturedState,
+                gen = nt.sendGen,
+                genEpoch = nt.sendGenEpoch,
+                revision = nt.capturedRevision,
+                transform = nt
+            });
+            NTSharedEntries.Retain(shared);
+            NTSharedEntries.Retain(shared);
+            first.ring[1] = new NTUnreliableSlot { used = true, anchor = true, seq = 1, order = 1, entries = shared };
+            second.ring[1] = new NTUnreliableSlot { used = true, anchor = true, seq = 1, order = 1, entries = shared };
+
+            module.ProcessAck(first, 1, 0);
+            Assert.That(first.baselines[index].has, Is.True);
+            Assert.That(first.ring[1].entries, Is.Null);
+            Assert.That(second.ring[1].entries, Is.SameAs(shared));
+            Assert.That(shared, Has.Count.EqualTo(1), "the other peer's slot still holds the shared list");
+
+            module.ProcessAck(second, 1, 0);
+            Assert.That(second.baselines[index].has, Is.True);
+            Assert.That(second.ring[1].entries, Is.Null);
+            Assert.That(shared, Is.Empty, "the last release returns the list to the pool");
+        }
+        finally
+        {
+            for (int i = 0; i < objects.Count; i++)
+                Object.DestroyImmediate(objects[i]);
+        }
+    }
+
+    [Test]
+    public void SharedAdaptiveWriteIsCopiedBeforeOnePeerMutatesIt()
+    {
+        var objects = new List<GameObject>();
+        var module = new NetworkTransformModule(null, null, null, default, null);
+        var nt = CreateNetworkTransform(10, objects);
+
+        try
+        {
+            module.Register(nt);
+            var first = module.GetSendStream(new PlayerID(1, false));
+            var second = module.GetSendStream(new PlayerID(2, false));
+            int index = nt.ntIndex;
+
+            var write = NTLastAdaptiveWrite.Rent();
+            write.tick = 7;
+            first.SetAdaptiveAt(index, write);
+            second.SetAdaptiveAt(index, write);
+            Assert.That(write.refs, Is.EqualTo(2));
+
+            var owned = NetworkTransformModule.Own(first, nt, write);
+            Assert.That(owned, Is.Not.SameAs(write));
+            Assert.That(owned.tick, Is.EqualTo(7));
+            Assert.That(first.GetAdaptive(nt), Is.SameAs(owned));
+            Assert.That(second.GetAdaptive(nt), Is.SameAs(write));
+            Assert.That(write.refs, Is.EqualTo(1));
+            Assert.That(NetworkTransformModule.Own(second, nt, write), Is.SameAs(write), "a sole holder mutates in place");
+
+            second.SetAdaptiveAt(index, null);
+            Assert.That(write.refs, Is.EqualTo(0));
+            Assert.That(write.tick, Is.EqualTo(0), "a released write is reset before reuse");
+        }
+        finally
+        {
+            for (int i = 0; i < objects.Count; i++)
+                Object.DestroyImmediate(objects[i]);
+        }
+    }
+
     private static NTUnreliableSlot SlotWith(NetworkID nid, uint genEpoch)
     {
         return new NTUnreliableSlot
         {
             used = true,
+            anchor = true,
             entries = new List<NTUnreliableEntry>
             {
                 new() { nid = nid, gen = 1, genEpoch = genEpoch }
@@ -678,11 +904,12 @@ public class NetworkTransformProtocolTests
         };
     }
 
-    private static NTUnreliableSlot SlotWith(NetworkTransform nt, ushort seq, uint revision)
+    private static NTUnreliableSlot SlotWith(NetworkTransform nt, ushort seq, uint revision, bool anchor = true)
     {
         return new NTUnreliableSlot
         {
             used = true,
+            anchor = anchor,
             seq = seq,
             order = seq,
             entries = new List<NTUnreliableEntry>

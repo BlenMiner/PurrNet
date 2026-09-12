@@ -1,7 +1,6 @@
 ﻿using System.Collections.Generic;
 #if UNITY_EDITOR
 using System.IO;
-using Newtonsoft.Json.Linq;
 #else
 using UnityEngine;
 using UnityEngine.Scripting;
@@ -30,23 +29,12 @@ namespace PurrNet.Utils
             if (!File.Exists(SAVE_PATH))
                 return;
 
-            string jsonString = File.ReadAllText(SAVE_PATH);
-            var json = JObject.Parse(jsonString);
-
-            foreach (var (key, val) in json)
-            {
-                if (val == null)
-                    continue;
-                _constants[key] = val.ToString();
-            }
+            PurrJson.ReadStringMap(File.ReadAllText(SAVE_PATH), _constants);
         }
 
         private static void SaveChanges()
         {
-            var json = new JObject();
-            foreach (var pair in _constants)
-                json[pair.Key] = pair.Value;
-            File.WriteAllText(SAVE_PATH, json.ToString());
+            File.WriteAllText(SAVE_PATH, PurrJson.WriteStringMap(_constants));
         }
 #else
         [RuntimeInitializeOnLoadMethod(RuntimeInitializeLoadType.SubsystemRegistration), Preserve]

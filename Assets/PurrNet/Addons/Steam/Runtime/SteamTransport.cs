@@ -58,6 +58,15 @@ namespace PurrNet.Steam
             return false;
         }
 
+        public bool measuresRoundTripTime => true;
+
+        public int GetRoundTripTime(Connection conn, bool asServer)
+        {
+            if (asServer)
+                return _server?.GetRoundTripTime(conn.connectionId) ?? -1;
+            return _client?.GetRoundTripTime() ?? -1;
+        }
+
         public int GetMTU(Connection target, Channel channel, bool asServer)
         {
             return channel switch
@@ -287,6 +296,24 @@ namespace PurrNet.Steam
         {
             _server?.SendMessages();
             _client?.SendMessages();
+        }
+
+        public bool FlushConnection(Connection conn, bool asServer)
+        {
+            if (asServer)
+            {
+                if (_server == null || listenerState is not PurrConnectionState.Connected)
+                    return false;
+
+                _server.FlushConnection(conn.connectionId);
+                return true;
+            }
+
+            if (_client == null)
+                return false;
+
+            _client.SendMessages();
+            return true;
         }
         
         public ulong GetSteamID(Connection conn)

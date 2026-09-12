@@ -43,7 +43,7 @@ namespace PurrNet
         {
             EditorGUILayout.LabelField("Generation Settings", EditorStyles.boldLabel);
             EditorGUI.BeginChangeCheck();
-            EditorGUILayout.PropertyField(folderProp, new GUIContent("Folder"));
+            EditorGUILayout.PropertyField(folderProp, new GUIContent("Folder / Scene"));
             if (EditorGUI.EndChangeCheck())
             {
                 EditorUtility.SetDirty(dirtyTarget);

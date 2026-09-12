@@ -104,6 +104,11 @@ namespace PurrNet.Analyzers
             "NetworkModule member is assigned after module initialization",
             "Assign NetworkModule member '{0}' in an initializer, constructor, Awake, or OnInitializeModules so it is registered correctly");
 
+        public static readonly DiagnosticDescriptor ObserversBypassesOwnerOnly = Warning(
+            "PN0109",
+            "parent.observers bypasses owner-only scoping",
+            "'{0}' reads parent.observers directly; use the module's own 'observers' so [OwnerOnly] is honoured");
+
         public static readonly DiagnosticDescriptor MtuOverrideOnSequencedChannel = Warning(
             "PN0106",
             "mtuExceeded override is ignored on UnreliableSequenced",

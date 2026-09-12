@@ -145,14 +145,14 @@ Light:
   m_PrefabAsset: {fileID: 0}
   m_GameObject: {fileID: 358453800}
   m_Enabled: 1
-  serializedVersion: 11
+  serializedVersion: 13
   m_Type: 1
   m_Color: {r: 1, g: 1, b: 1, a: 1}
   m_Intensity: 2.5
   m_Range: 10
   m_SpotAngle: 30
   m_InnerSpotAngle: 21.80208
-  m_CookieSize: 10
+  m_CookieSize2D: {x: 10, y: 10}
   m_Shadows:
     m_Type: 2
     m_Resolution: -1
@@ -197,7 +197,7 @@ Light:
   m_UseBoundingSphereOverride: 0
   m_UseViewFrustumForShadowCasterCull: 1
   m_ForceVisible: 0
-  m_ShadowRadius: 0
+  m_ShapeRadius: 0
   m_ShadowAngle: 0
   m_LightUnit: 1
   m_LuxAtDistance: 1
@@ -415,10 +415,19 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: fc64ff707d914a64e95f2ac0bf554c09, type: 3}
   m_Name: 
   m_EditorClassIdentifier: 
+  _automaticCloudSetups:
+    _adaptToEdgegap: 1
   _serverPort: 5000
   _maxConnections: 100
   _address: 127.0.0.1
   _timeoutInSeconds: 5
+  _networkSimulation:
+    includeInBuild: 0
+    simulateLatency: 0
+    minLatency: 30
+    maxLatency: 100
+    simulatePacketLoss: 0
+    packetLossChance: 10
 --- !u!114 &1216416897
 MonoBehaviour:
   m_ObjectHideFlags: 0
@@ -438,11 +447,13 @@ MonoBehaviour:
   _dontDestroyOnLoad: 0
   _transport: {fileID: 1216416896}
   _networkPrefabs: {fileID: 0}
+  _addressableNetworkPrefabs: {fileID: 0}
   _networkAssets: {fileID: 0}
   _networkRules: {fileID: 11400000, guid: 9414661460fa4574680ff123bbb2124a, type: 2}
   _visibilityRules: {fileID: 11400000, guid: 8f014a5bd8dc68646a2a3c0b18c5bbd8, type: 2}
   _authenticator: {fileID: 0}
-  _tickRate: 5
+  _tickRate: 20
+  _mtuExceededBehaviour: 2
   _patchLingeringProcessBug: 0
 --- !u!4 &1216416898
 Transform:
@@ -474,8 +485,17 @@ MonoBehaviour:
   checkInterval: 0.33
   placement: 1
   _displayType: 3
+  _displayTarget: 6
   fontSize: 13
   textColor: {r: 1, g: 1, b: 1, a: 1}
+  _highPingThreshold: 250
+  _highPingRecoveryThreshold: 180
+  _highJitterThreshold: 80
+  _highJitterRecoveryThreshold: 50
+  _highPacketLossThreshold: 10
+  _highPacketLossRecoveryThreshold: 5
+  _qualityChangeDuration: 2
+  _connectionStallThreshold: 2
 --- !u!114 &1216416900
 MonoBehaviour:
   m_ObjectHideFlags: 0
@@ -488,7 +508,6 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 4b3aee62cf1b70642938541d829fb394, type: 3}
   m_Name: 
   m_EditorClassIdentifier: PurrNet.Issues.RpcIssue::Reconnect
-  _manager: {fileID: 1216416897}
 --- !u!1 &1326095568
 GameObject:
   m_ObjectHideFlags: 0
@@ -592,6 +611,7 @@ MeshRenderer:
   m_SortingLayerID: 0
   m_SortingLayer: 0
   m_SortingOrder: 0
+  m_MaskInteraction: 0
   m_AdditionalVertexStreams: {fileID: 0}
 --- !u!33 &1326095572
 MeshFilter:
@@ -1207,6 +1227,7 @@ SkinnedMeshRenderer:
   m_SortingLayerID: 0
   m_SortingLayer: 0
   m_SortingOrder: 0
+  m_MaskInteraction: 0
   serializedVersion: 2
   m_Quality: 0
   m_UpdateWhenOffscreen: 0
@@ -2002,9 +2023,11 @@ MonoBehaviour:
   m_GameObject: {fileID: 5548725352732181327}
   m_Enabled: 1
   m_EditorHideFlags: 0
-  m_Script: {fileID: 11500000, guid: 2b2213188c66e534489205d559c59594, type: 3}
+  m_Script: {fileID: 11500000, guid: e7b598b9d8509d64abb9fdaf07fa3f6e, type: 3}
   m_Name: 
-  m_EditorClassIdentifier: PurrNet.Runtime::PurrNet.NetworkBones
+  m_EditorClassIdentifier: PurrNet.Runtime::PurrNet.NetworkAnimator
+  _networkRules: {fileID: 0}
+  _visitiblityRules: {fileID: 0}
   _isSetup: 0
   _prefabId: -2147483648
   _componentIndex: -2147483648
@@ -2012,15 +2035,10 @@ MonoBehaviour:
   _parent: {fileID: 0}
   _invertedPathToNearestParent: 
   _directChildren: []
-  _networkRules: {fileID: 0}
-  _visitiblityRules: {fileID: 0}
+  _animator: {fileID: 5672926956231318123}
   _ownerAuth: 1
-  _sendRatePerSecond: 10
-  _positionAccuracy: 0.001
-  _angleAccuracy: 0.3
-  _scaleAccuracy: 1
-  _minBufferSize: 2
-  _maxBufferSize: 3
+  _autoSyncParameters: 1
+  _dontSyncParameters: []
 --- !u!4 &5748309736742377897
 Transform:
   m_ObjectHideFlags: 0

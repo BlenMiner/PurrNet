@@ -246,6 +246,14 @@ namespace PurrNet
         {
             if (_observers.Contains(player) || _pendingObservers?.Contains(player) == true)
                 return false;
+
+            if (_observers.Count == 0 && networkManager)
+            {
+                int players = networkManager.playerCount;
+                if (_observers.Capacity < players)
+                    _observers.Capacity = players;
+            }
+
             _observers.Add(player);
             return true;
         }

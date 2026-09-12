@@ -247,7 +247,9 @@ namespace PurrNet
             _generating = true;
             try
             {
-                var found = AssetScannerUtility.ScanPrefabs(target.folder, true, target.searchAllIfNoFolder);
+                var found = target.folder is SceneAsset
+                    ? AssetScannerUtility.ScanScenePrefabs(AssetDatabase.GetAssetPath(target.folder), true)
+                    : AssetScannerUtility.ScanPrefabs(target.folder, true, target.searchAllIfNoFolder);
                 var linkedGuids = AssetScannerUtility.CollectLinkedAddressablePrefabGuids(target);
                 if (linkedGuids.Count > 0)
                     found.RemoveAll(scan => linkedGuids.Contains(scan.guid));

@@ -146,6 +146,8 @@ namespace PurrNet.Modules
             if (!asServer)
                 return;
 
+            RemoveFromWaitingList(conn);
+
             for (int i = _pendingDenialAcks.Count - 1; i >= 0; i--)
             {
                 if (_pendingDenialAcks[i].conn == conn)

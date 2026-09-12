@@ -101,13 +101,25 @@ namespace PurrNet.Modules
         }
 
         /// <summary>
-        /// Marks a broadcast type as immediate: while the defer window is active,
-        /// messages of this type dispatch on arrival while everything else is queued
-        /// for the next fixed receive phase.
+        /// Marks a broadcast type as immediate in both directions: incoming messages of this
+        /// type dispatch on arrival instead of waiting for the next fixed receive phase, and
+        /// sending one requests a transport flush this frame instead of waiting for the tick.
         /// </summary>
         public void RegisterImmediateType<T>()
         {
             _immediateTypeIds.Add(BroadcastType<T>.id);
+        }
+
+        private void OnSent<T>()
+        {
+            if (_immediateTypeIds.Contains(BroadcastType<T>.id))
+                _networkManager.RequestSendFlushThisFrame();
+        }
+
+        private void OnSent<T>(Connection conn)
+        {
+            if (_immediateTypeIds.Contains(BroadcastType<T>.id))
+                _networkManager.RequestSendFlushThisFrame(conn, _asServer);
         }
 
         public void UnregisterImmediateType<T>()
@@ -358,6 +370,8 @@ namespace PurrNet.Modules
                     continue;
                 _transport.SendToClient(conn, byteData, connMethod);
             }
+
+            OnSent<T>();
         }
 
         public void Send<T>(Connection conn, T data, Channel method = Channel.ReliableOrdered,
@@ -374,6 +388,7 @@ namespace PurrNet.Modules
             if (!HandleMTUExceeded<T>(conn, byteData, ref method, mtuOverride))
                 return;
             _transport.SendToClient(conn, byteData, method);
+            OnSent<T>(conn);
         }
 
         public void Send<T>(IReadOnlyList<Connection> conn, T data, Channel method = Channel.ReliableOrdered,
@@ -399,6 +414,9 @@ namespace PurrNet.Modules
                     continue;
                 _transport.SendToClient(connection, byteData, connMethod);
             }
+
+            for (var i = 0; i < conn.Count; i++)
+                OnSent<T>(conn[i]);
         }
 
         public void SendToServer<T>(T data, Channel method = Channel.ReliableOrdered,
@@ -416,6 +434,7 @@ namespace PurrNet.Modules
             if (!HandleMTUExceeded<T>(default, byteData, ref method, mtuOverride))
                 return;
             _transport.SendToServer(byteData, method);
+            OnSent<T>(default);
         }
 
         public void OnDataReceived(Connection conn, ByteData data, bool asServer)

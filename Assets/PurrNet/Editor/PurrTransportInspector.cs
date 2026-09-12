@@ -8,13 +8,17 @@ namespace PurrNet.Editor
     [CustomEditor(typeof(PurrTransport), true)]
     public class PurrTransportInspector : UnityEditor.Editor
     {
+        private static readonly GUIContent _hostRelayLabel = new("Host relay", "This host's connection to the relay.");
+
         private SerializedProperty _masterServer;
         private SerializedProperty _roomName;
         private SerializedProperty _region;
         private SerializedProperty _host;
         private SerializedProperty _timeoutInSeconds;
-        private SerializedProperty _useNat;
+        private SerializedProperty _attemptDirectConnection;
         private SerializedProperty _natResolveTimeout;
+        private SerializedProperty _webRtcStunServer;
+        private bool _showDirectConnectionSettings;
         private SerializedProperty _networkSimulation;
 
         private bool _lookingForBestRegion;
@@ -28,8 +32,9 @@ namespace PurrNet.Editor
             _region = serializedObject.FindProperty("_region");
             _host = serializedObject.FindProperty("_host");
             _timeoutInSeconds = serializedObject.FindProperty("_timeoutInSeconds");
-            _useNat = serializedObject.FindProperty("_useNat");
+            _attemptDirectConnection = serializedObject.FindProperty("_useNat");
             _natResolveTimeout = serializedObject.FindProperty("_natResolveTimeout");
+            _webRtcStunServer = serializedObject.FindProperty("_webRtcStunServer");
             _networkSimulation = serializedObject.FindProperty("_networkSimulation");
 
             if (!EditorApplication.isPlayingOrWillChangePlaymode)
@@ -183,19 +188,27 @@ namespace PurrNet.Editor
             EditorGUILayout.EndHorizontal();
 
             EditorGUILayout.PropertyField(_timeoutInSeconds);
-            EditorGUILayout.PropertyField(_useNat, new GUIContent("Use NAT",
-                "Attempt a direct P2P link via NAT hole-punching. Fully transparent to the " +
-                "game: traffic falls back to the relay automatically when P2P is unavailable."));
+            EditorGUILayout.PropertyField(_attemptDirectConnection, new GUIContent("Connect Players Directly (P2P)",
+                "Connect players straight to the host when possible, so game traffic skips the relay. " +
+                "If a direct connection cannot be made, use the relay automatically. " +
+                "Enable on both host and clients before connecting. " +
+                "If an established direct connection is lost, that player disconnects."));
 
-            if (_useNat.boolValue)
+            if (_attemptDirectConnection.boolValue)
             {
                 EditorGUI.indentLevel++;
-                EditorGUILayout.PropertyField(_natResolveTimeout, new GUIContent("NAT Resolve Timeout",
-                    "Seconds to wait for a NAT punch to establish a direct P2P link before " +
-                    "falling back to the relay. Keep this comfortably below your connection/" +
-                    "auth timeout so a failed punch still falls back in time."));
-                if (_natResolveTimeout.floatValue < 1f)
-                    _natResolveTimeout.floatValue = 1f;
+                _showDirectConnectionSettings = EditorGUILayout.Foldout(_showDirectConnectionSettings,
+                    "Advanced Direct Connection Settings", true);
+                if (_showDirectConnectionSettings)
+                {
+                    EditorGUILayout.PropertyField(_natResolveTimeout, new GUIContent("UDP Connection Timeout",
+                        "Seconds to attempt a direct UDP connection before using the relay. " +
+                        "Keep this below the game's connection/authentication timeout."));
+                    if (_natResolveTimeout.floatValue < 1f)
+                        _natResolveTimeout.floatValue = 1f;
+                    EditorGUILayout.PropertyField(_webRtcStunServer, new GUIContent("STUN Server",
+                        "Helps WebRTC peers behind routers find a direct route. Leave empty for local-network discovery only."));
+                }
                 EditorGUI.indentLevel--;
             }
 
@@ -217,35 +230,33 @@ namespace PurrNet.Editor
             if (!Application.isPlaying)
                 return;
 
-            var link = transport.clientSessionLink;
-            string clientLine = link switch
-            {
-                PurrTransport.SessionLink.P2P => "Direct P2P (NAT)",
-                PurrTransport.SessionLink.Relay => "Relay",
-                PurrTransport.SessionLink.Resolving => "resolving NAT punch…",
-                _ => null
-            };
+            var clientLine = transport.clientLinkDescription;
+            var hostLine = transport.hostLinkDescription;
 
             int total = transport.connections.Count;
-            bool hasHost = total > 0;
 
-            if (clientLine == null && !hasHost)
+            if (clientLine == null && hostLine == null && total == 0)
                 return;
 
             EditorGUILayout.Space(4);
 
             if (clientLine != null)
-                EditorGUILayout.LabelField("Client session", clientLine);
+                EditorGUILayout.LabelField("Client session", clientLine, EditorStyles.wordWrappedLabel);
 
-            if (hasHost)
+            if (hostLine != null)
+                EditorGUILayout.LabelField(_hostRelayLabel,
+                    new GUIContent(hostLine), EditorStyles.wordWrappedLabel);
+
+            if (total > 0)
             {
                 EditorGUILayout.LabelField("Host links",
                     $"{transport.p2pConnectionCount} P2P / {total - transport.p2pConnectionCount} relay");
 
                 foreach (var conn in transport.connections)
                 {
-                    var isP2p = transport.GetP2pEndpoint(conn) != null;
-                    EditorGUILayout.LabelField($"    conn {conn.connectionId}", isP2p ? "P2P" : "Relay");
+                    var isP2p = transport.GetSessionLink(conn) == PurrTransport.SessionLink.P2P;
+                    EditorGUILayout.LabelField($"    conn {conn.connectionId}",
+                        isP2p ? $"P2P ({transport.GetConnectionProtocol(conn)})" : "Relay");
                 }
             }
         }

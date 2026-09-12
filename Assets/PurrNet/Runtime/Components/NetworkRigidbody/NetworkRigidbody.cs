@@ -50,9 +50,13 @@ namespace PurrNet
     public struct AppliedForce
     {
         public HalfVector3 force;
+        /// <summary>Legacy Unity world-space application point, used without an origin converter.</summary>
         public CompressedVector3? position;
         public ForceMode mode;
         public bool isTorque;
+        /// <summary>Origin-invariant application point. When present, takes precedence over
+        /// <see cref="position"/> and is decoded using the receiving peer's current origin.</summary>
+        public double3? absolutePosition;
     }
 
     public struct RigidbodyStateData
@@ -113,6 +117,7 @@ namespace PurrNet
         /// otherwise the absolute peer-agnostic frame (origin-invariant either
         /// way, so it survives a local origin shift).</summary>
         public double3 position;
+        public RigidbodyPositionFrame positionFrame;
         public Quaternion rotation;
         public Vector3 linearVelocity;
         public Vector3 angularVelocity;
@@ -229,10 +234,11 @@ namespace PurrNet
         private int _bufferCount;
 
         private double3 _targetPosition;
+        private RigidbodyPositionFrame _targetPositionFrame = RigidbodyPositionFrame.World;
         private Quaternion _targetRotation = Quaternion.identity;
         private Vector3 _targetLinearVelocity;
         private Vector3 _targetAngularVelocity;
-        /// <summary>Reference frame for _target* values. Null means world-space.</summary>
+        /// <summary>Parent required by a ParentLocal target, even if Unity later destroys it.</summary>
         private Transform _targetParent;
 
         private double3 _lastSyncedPosition;
@@ -251,6 +257,7 @@ namespace PurrNet
 
         private string _lastCorrectionReason = "No";
         private double3 _latestRawSnapshotPos;
+        private RigidbodyPositionFrame _latestRawSnapshotFrame = RigidbodyPositionFrame.World;
         private Transform _latestRawSnapshotParent;
         private string _bufferSampleMode = "None";
         private double _lastLogTime;
@@ -323,6 +330,7 @@ namespace PurrNet
             _targetLinearVelocity = linVel;
             _targetAngularVelocity = angVel;
             _targetParent = parentTrs;
+            _targetPositionFrame = GetPositionFrame(parentTrs);
 
             _lastSyncedPosition = pos;
             _lastSyncedRotation = rot;
@@ -333,6 +341,7 @@ namespace PurrNet
 
             _latestRawSnapshotPos = pos;
             _latestRawSnapshotParent = parentTrs;
+            _latestRawSnapshotFrame = _targetPositionFrame;
             ClearBuffer();
 
             EnsureSettingsInstance();
@@ -445,14 +454,13 @@ namespace PurrNet
 
         private RigidbodyStateData CaptureTargetState()
         {
+            if (!IsPositionFrameAvailable(_targetPositionFrame, _targetParent))
+                return CaptureCurrentState();
+
             var parentIdentity = _targetParent ? _targetParent.GetComponent<NetworkIdentity>() : null;
             var isSoft = parentIdentity && _softParent == parentIdentity;
 
-            var frame = _targetParent
-                ? RigidbodyPositionFrame.ParentLocal
-                : _positionTransform != null
-                    ? RigidbodyPositionFrame.Absolute
-                    : RigidbodyPositionFrame.World;
+            var frame = _targetPositionFrame;
 
             return new RigidbodyStateData
             {
@@ -503,6 +511,7 @@ namespace PurrNet
             _targetLinearVelocity = linVel;
             _targetAngularVelocity = angVel;
             _targetParent = parentTrs;
+            _targetPositionFrame = wireFrame;
 
             _lastSyncedPosition = pos;
             _lastSyncedRotation = rot;
@@ -512,6 +521,7 @@ namespace PurrNet
 
             _latestRawSnapshotPos = pos;
             _latestRawSnapshotParent = parentTrs;
+            _latestRawSnapshotFrame = wireFrame;
             ClearBuffer();
 
             if (!isActiveAndEnabled)
@@ -618,6 +628,7 @@ namespace PurrNet
             _targetLinearVelocity = linVel;
             _targetAngularVelocity = angVel;
             _targetParent = parentTrs;
+            _targetPositionFrame = wireFrame;
 
             var stateData = new RigidbodyStateData
             {
@@ -708,7 +719,13 @@ namespace PurrNet
             if (!_rigidbody)
                 return;
 
-            Vector3 worldTargetPos = ToWorldPosition(_targetPosition, _targetParent);
+            if (!IsPositionFrameAvailable(_targetPositionFrame, _targetParent))
+            {
+                _lastCorrectionReason = "Waiting for valid position frame";
+                return;
+            }
+            // Keep non-finite converter output in the existing correction validation below.
+            TryToWorldPosition(_targetPosition, _targetParent, _targetPositionFrame, out var worldTargetPos);
             Quaternion worldTargetRot = ToWorldRotation(_targetRotation, _targetParent);
             Vector3 worldTargetLinVel = ToWorldLinearVelocity(_targetLinearVelocity, _targetParent, worldTargetPos);
             Vector3 worldTargetAngVel = ToWorldAngularVelocity(_targetAngularVelocity, _targetParent);
@@ -1120,6 +1137,8 @@ namespace PurrNet
             if (senderTime <= 0)
                 return now;
 
+            bool hadOffset = _hasSenderTimeOffset;
+            double previousOffset = _senderTimeOffset;
             double sample = now - senderTime;
 
             if (!_hasSenderTimeOffset || Math.Abs(sample - _senderTimeOffset) > 0.5)
@@ -1136,12 +1155,28 @@ namespace PurrNet
                 _senderTimeOffset += (sample - _senderTimeOffset) * 0.02;
             }
 
+            if (hadOffset && _senderTimeOffset != previousOffset)
+            {
+                // A clock estimate changes the origin of the whole timeline, not the
+                // spacing between captures. Rebasing only the incoming snapshot can
+                // collapse a queued batch into the monotonic timestamp clamp below.
+                double adjustment = _senderTimeOffset - previousOffset;
+                for (int i = 0; i < _bufferCount; i++)
+                {
+                    int index = (_bufferHead - _bufferCount + i + BUFFER_SIZE) % BUFFER_SIZE;
+                    _snapshotBuffer[index].time += adjustment;
+                }
+            }
+
             return senderTime + _senderTimeOffset;
         }
 
         private void PushSnapshot(RigidbodyStateData data, bool orderAlreadyAccepted = false)
         {
             if (!ValidateIncomingSnapshot(in data, "snapshot"))
+                return;
+
+            if (!TryResolveReceivedParent(data.parent, data.positionFrame, out var parentTrs))
                 return;
 
             if (!orderAlreadyAccepted && !TryAcceptStateOrder(in data))
@@ -1159,6 +1194,11 @@ namespace PurrNet
                     ClearBuffer();
             }
 
+            // Legacy captures use arrival time, which cannot be rebased with the
+            // sender clock. Start a fresh buffer when the timing convention changes.
+            if (_bufferCount > 0 && (data.time > 0) != _hasSenderTimeOffset)
+                ClearBuffer();
+
             var snapshotTime = MapToLocalTimeline(data.time, now);
 
             if (_bufferCount > 0)
@@ -1170,11 +1210,11 @@ namespace PurrNet
             }
 
             var syncPos = ExtractSyncPosition(data.positionFrame, data.position, data.absolutePosition);
-            var parentTrs = ResolveParentTransform(data.parent, data.positionFrame, data.isSoftParent);
             _snapshotBuffer[_bufferHead] = new TimestampedSnapshot
             {
                 time = snapshotTime,
                 position = syncPos,
+                positionFrame = data.positionFrame,
                 rotation = data.rotation,
                 linearVelocity = data.linearVelocity,
                 angularVelocity = data.angularVelocity,
@@ -1186,6 +1226,7 @@ namespace PurrNet
                 _bufferCount++;
 
             _latestRawSnapshotPos = syncPos;
+            _latestRawSnapshotFrame = data.positionFrame;
             _latestRawSnapshotParent = parentTrs;
         }
 
@@ -1196,8 +1237,28 @@ namespace PurrNet
             return _snapshotBuffer[actual];
         }
 
+        private void DiscardUnavailableSnapshots()
+        {
+            // A Transform can become Unity-null after its snapshot was accepted. Drop the
+            // unusable history, keeping any later states that already use a resolved frame.
+            for (int i = _bufferCount - 1; i >= 0; i--)
+            {
+                var snapshot = GetSnapshot(i);
+                if (IsPositionFrameAvailable(snapshot.positionFrame, snapshot.parent))
+                    continue;
+
+                _bufferCount -= i + 1;
+                if (_bufferCount == 0)
+                    ClearBuffer();
+                _bufferSampleMode = "Waiting for valid position frame";
+                break;
+            }
+        }
+
         private void SampleBuffer()
         {
+            DiscardUnavailableSnapshots();
+
             if (_bufferCount == 0)
                 return;
 
@@ -1233,6 +1294,7 @@ namespace PurrNet
                 _targetLinearVelocity = clamped ? Vector3.zero : newest.linearVelocity;
                 _targetAngularVelocity = clamped ? Vector3.zero : newest.angularVelocity;
                 _targetParent = newest.parent;
+                _targetPositionFrame = newest.positionFrame;
                 _bufferSampleMode = clamped ? $"Extrap-Clamped ({overshoot:F3}s)" : $"Extrap ({overshoot:F3}s)";
                 _predictionOffset = extrapolationTime;
                 return;
@@ -1277,7 +1339,7 @@ namespace PurrNet
                 return Vector3.zero;
 
             var previous = GetSnapshot(_bufferCount - 2);
-            if (previous.parent != newest.parent)
+            if (previous.parent != newest.parent || previous.positionFrame != newest.positionFrame)
                 return Vector3.zero;
 
             float span = (float)(newest.time - previous.time);
@@ -1334,6 +1396,7 @@ namespace PurrNet
             _targetLinearVelocity = snap.linearVelocity;
             _targetAngularVelocity = snap.angularVelocity;
             _targetParent = snap.parent;
+            _targetPositionFrame = snap.positionFrame;
         }
 
         private void HermiteInterpolate(TimestampedSnapshot a, TimestampedSnapshot b, float dt, float t)
@@ -1346,7 +1409,7 @@ namespace PurrNet
             float h01 = -2f * t3 + 3f * t2;
             float h11 = t3 - t2;
 
-            if (a.parent == b.parent)
+            if (a.parent == b.parent && a.positionFrame == b.positionFrame)
             {
                 _targetPosition = h00 * a.position
                                 + ToD3(a.linearVelocity * (h10 * dt))
@@ -1357,11 +1420,13 @@ namespace PurrNet
                 _targetRotation = Quaternion.Slerp(a.rotation, b.rotation, t);
                 _targetAngularVelocity = ResolveInterpolatedAngularVelocity(a, b, dt, t);
                 _targetParent = a.parent;
+                _targetPositionFrame = a.positionFrame;
             }
             else
             {
-                Vector3 aWorldPos = ToWorldPosition(a.position, a.parent);
-                Vector3 bWorldPos = ToWorldPosition(b.position, b.parent);
+                if (!TryToWorldPosition(a.position, a.parent, a.positionFrame, out var aWorldPos) ||
+                    !TryToWorldPosition(b.position, b.parent, b.positionFrame, out var bWorldPos))
+                    return;
                 Vector3 aWorldLinVel = ToWorldLinearVelocity(a.linearVelocity, a.parent, aWorldPos);
                 Vector3 bWorldLinVel = ToWorldLinearVelocity(b.linearVelocity, b.parent, bWorldPos);
                 Quaternion aWorldRot = ToWorldRotation(a.rotation, a.parent);
@@ -1379,6 +1444,7 @@ namespace PurrNet
                 _targetRotation = Quaternion.Slerp(aWorldRot, bWorldRot, t);
                 _targetAngularVelocity = Vector3.Lerp(aWorldAngVel, bWorldAngVel, t);
                 _targetParent = null;
+                _targetPositionFrame = GetPositionFrame(null);
             }
         }
 
@@ -1681,34 +1747,30 @@ namespace PurrNet
 
         private void ApplyReceivedSoftParent(NetworkIdentity parent, bool isSoftParent)
         {
-            if (!isSoftParent)
-            {
-                _softParent = null;
-                return;
-            }
-
-            if (parent)
-                _softParent = parent;
+            _softParent = isSoftParent ? parent : null;
         }
 
         /// <summary>
-        /// Resolves the parent transform for a received state. Prefers the networked
-        /// parent reference, but falls back to the local Unity parent only for real
-        /// Unity-parent packets. Soft-parent packets must not decode against the real
-        /// hierarchy when their soft-parent reference is unavailable.
+        /// A parent-local payload is usable only with its own resolved wire parent.
+        /// Neither the previous soft parent nor the local hierarchy identifies an
+        /// unresolved reference in a new packet. Wait for a subsequent valid state.
         /// </summary>
-        private Transform ResolveParentTransform(NetworkIdentity wireParent, RigidbodyPositionFrame frame, bool isSoftParent = false)
+        private static bool TryResolveReceivedParent(NetworkIdentity wireParent, RigidbodyPositionFrame frame, out Transform parent)
         {
-            if (wireParent)
-                return wireParent.transform;
+            parent = frame == RigidbodyPositionFrame.ParentLocal && wireParent ? wireParent.transform : null;
+            return IsPositionFrameAvailable(frame, parent);
+        }
 
-            if (isSoftParent)
-                return _softParent ? _softParent.transform : null;
+        private static bool IsPositionFrameAvailable(RigidbodyPositionFrame frame, Transform parent)
+        {
+            return frame == RigidbodyPositionFrame.ParentLocal ? parent :
+                frame == RigidbodyPositionFrame.Absolute || frame == RigidbodyPositionFrame.World;
+        }
 
-            if (frame == RigidbodyPositionFrame.ParentLocal)
-                return transform.parent;
-
-            return null;
+        private RigidbodyPositionFrame GetPositionFrame(Transform parent)
+        {
+            return parent ? RigidbodyPositionFrame.ParentLocal :
+                _positionTransform != null ? RigidbodyPositionFrame.Absolute : RigidbodyPositionFrame.World;
         }
 
         /// <summary>Converts an unparented Unity world-space position into the sync frame.</summary>
@@ -1756,17 +1818,21 @@ namespace PurrNet
         }
 
         /// <summary>
-        /// Converts a sync-frame position back into this peer's Unity world space:
-        /// parent transform when parented, the position transform's inverse when
-        /// unparented and a transform is installed, otherwise the value as-is.
+        /// Decodes the explicit frame; a missing parent must never turn its local
+        /// offset into an absolute/world position. Raw World payloads bypass drivers.
         /// </summary>
-        private Vector3 ToWorldPosition(double3 pos, Transform parent)
+        private bool TryToWorldPosition(double3 pos, Transform parent, RigidbodyPositionFrame frame, out Vector3 worldPosition)
         {
-            if (parent)
-                return ParentTransformPoint(parent, ToV3(pos));
-            if (_positionTransform != null)
-                return _positionTransform.ToLocal(this, pos);
-            return ToV3(pos);
+            worldPosition = default;
+            if (!IsPositionFrameAvailable(frame, parent))
+                return false;
+
+            worldPosition = frame == RigidbodyPositionFrame.ParentLocal
+                ? ParentTransformPoint(parent, ToV3(pos))
+                : frame == RigidbodyPositionFrame.Absolute && _positionTransform != null
+                    ? _positionTransform.ToLocal(this, pos)
+                    : ToV3(pos);
+            return IsFinite(worldPosition);
         }
 
         private float GetPositionError(Vector3 worldTargetPos)
@@ -2015,8 +2081,15 @@ namespace PurrNet
 
             if (force.isTorque)
                 ApplyTorqueToRigidbody(force.force, force.mode);
-            else if (force.position.HasValue)
-                ApplyForceAtPositionToRigidbody(force.force, force.position.Value, force.mode);
+            else if (force.absolutePosition.HasValue || force.position.HasValue)
+            {
+                if (TryResolveForcePosition(in force, out var position))
+                    ApplyForceAtPositionToRigidbody(force.force, position, force.mode);
+                else
+                    PurrLogger.LogError(
+                        "Rejected NetworkRigidbody force because its application point could not be decoded. " +
+                        "Absolute positions require an INetworkRigidbodyPositionTransform, and decoded positions must be finite.", this);
+            }
             else
                 ApplyForceToRigidbody(force.force, force.mode);
         }
@@ -2191,15 +2264,13 @@ namespace PurrNet
             if (!isSpawned || !_rigidbody)
                 return;
 
-            var appliedForce = new AppliedForce { force = force, position = (CompressedVector3)position, mode = mode };
-
             if (IsController(_ownerAuth))
             {
                 ApplyForceAtPositionToRigidbody(force, position, mode);
             }
             else if (isActiveAndEnabled)
             {
-                BroadcastForce(appliedForce);
+                BroadcastForce(EncodeForceAtPosition(force, position, mode));
             }
         }
 
@@ -2235,8 +2306,9 @@ namespace PurrNet
         }
 
         /// <summary>
-        /// Instantly teleports the rigidbody to a new position and rotation, clearing the
-        /// interpolation buffer and syncing to all observers. Use this for respawns, portals,
+        /// Instantly teleports the local rigidbody to a new position and rotation, zeroing its
+        /// linear and angular velocity, clearing the interpolation buffer, and syncing the teleport.
+        /// A non-controller also forwards a teleport request to the controller. Use this for respawns, portals,
         /// or any instant repositioning. For regular physics movement, use position/rotation
         /// setters, MovePosition/MoveRotation, or AddForce instead.
         /// </summary>
@@ -2261,7 +2333,8 @@ namespace PurrNet
 
         /// <summary>
         /// Instantly teleports the rigidbody to a new position, clearing the interpolation
-        /// buffer and syncing to all observers. Preserves current rotation and velocity.
+        /// buffer and syncing the teleport. Preserves current rotation and zeros the local
+        /// rigidbody's linear and angular velocity, as the position-and-rotation overload does.
         /// </summary>
         public void TeleportTo(Vector3 position)
         {
@@ -2273,6 +2346,7 @@ namespace PurrNet
         /// <summary>
         /// Locally repositions the rigidbody and resets all interpolation/correction state
         /// (target pose, lastSynced mirrors, snapshot buffer) without sending any RPCs.
+        /// Zeros the rigidbody's linear and angular velocity.
         /// Use this when the caller is already handling network sync separately, or to fix
         /// up a single peer's view (e.g. a late-joining client snapping to a known pose).
         /// </summary>
@@ -2286,7 +2360,7 @@ namespace PurrNet
 
         /// <summary>
         /// Locally repositions the rigidbody and resets interpolation/correction state without
-        /// sending any RPCs. Preserves current rotation.
+        /// sending any RPCs. Preserves current rotation and zeros linear and angular velocity.
         /// </summary>
         public void TeleportLocal(Vector3 position)
         {
@@ -2315,6 +2389,7 @@ namespace PurrNet
             _targetLinearVelocity = syncLinVel;
             _targetAngularVelocity = syncAngVel;
             _targetParent = parentTrs;
+            _targetPositionFrame = GetPositionFrame(parentTrs);
 
             _lastSyncedPosition = syncPos;
             _lastSyncedRotation = syncRot;
@@ -2443,14 +2518,17 @@ namespace PurrNet
             _rigidbody.useGravity = settings.useGravity;
             _rigidbody.isKinematic = settings.isKinematic;
 
+            // Settings remain usable even if this first pose arrives before its parent.
+            if (!TryResolveReceivedParent(data.parent, data.positionFrame, out var parentTrs))
+                return;
+            var syncPos = ExtractSyncPosition(data.positionFrame, data.position, data.absolutePosition);
+            if (!TryToWorldPosition(syncPos, parentTrs, data.positionFrame, out var worldPos))
+                return;
+
             if (!TryAcceptStateOrder(in data))
                 return;
 
             ApplyReceivedSoftParent(data.parent, data.isSoftParent);
-
-            var parentTrs = ResolveParentTransform(data.parent, data.positionFrame, data.isSoftParent);
-            var syncPos = ExtractSyncPosition(data.positionFrame, data.position, data.absolutePosition);
-            var worldPos = ToWorldPosition(syncPos, parentTrs);
 
             _rigidbody.position = worldPos;
             _rigidbody.rotation = NormalizeQuaternion(ToWorldRotation(data.rotation, parentTrs));
@@ -2462,6 +2540,7 @@ namespace PurrNet
             _targetLinearVelocity = data.linearVelocity;
             _targetAngularVelocity = data.angularVelocity;
             _targetParent = parentTrs;
+            _targetPositionFrame = data.positionFrame;
 
             _lastSyncedPosition = syncPos;
             _lastSyncedRotation = data.rotation;
@@ -2486,12 +2565,14 @@ namespace PurrNet
             if (!ValidateIncomingSnapshot(in data, "ownership handoff"))
                 return;
 
+            if (!TryResolveReceivedParent(data.parent, data.positionFrame, out var parentTrs))
+                return;
+
             if (!TryAcceptStateOrder(in data))
                 return;
 
             ApplyReceivedSoftParent(data.parent, data.isSoftParent);
 
-            var parentTrs = ResolveParentTransform(data.parent, data.positionFrame, data.isSoftParent);
             var syncPos = ExtractSyncPosition(data.positionFrame, data.position, data.absolutePosition);
 
             _targetPosition = syncPos;
@@ -2499,6 +2580,7 @@ namespace PurrNet
             _targetLinearVelocity = data.linearVelocity;
             _targetAngularVelocity = data.angularVelocity;
             _targetParent = parentTrs;
+            _targetPositionFrame = data.positionFrame;
 
             _lastSyncedPosition = syncPos;
             _lastSyncedRotation = data.rotation;
@@ -2580,6 +2662,12 @@ namespace PurrNet
             if (!_rigidbody)
                 return;
 
+            if (!TryResolveReceivedParent(data.parent, data.positionFrame, out var parentTrs))
+                return;
+            var syncPos = ExtractSyncPosition(data.positionFrame, data.position, data.absolutePosition);
+            if (!TryToWorldPosition(syncPos, parentTrs, data.positionFrame, out var worldPos))
+                return;
+
             var previousPosition = _rigidbody.position;
             var previousRotation = _rigidbody.rotation;
 
@@ -2587,10 +2675,6 @@ namespace PurrNet
             _hasPendingTeleport = true;
 
             ApplyReceivedSoftParent(data.parent, data.isSoftParent);
-
-            var parentTrs = ResolveParentTransform(data.parent, data.positionFrame, data.isSoftParent);
-            var syncPos = ExtractSyncPosition(data.positionFrame, data.position, data.absolutePosition);
-            var worldPos = ToWorldPosition(syncPos, parentTrs);
 
             _rigidbody.position = worldPos;
             _rigidbody.rotation = NormalizeQuaternion(ToWorldRotation(data.rotation, parentTrs));
@@ -2602,13 +2686,14 @@ namespace PurrNet
             _targetLinearVelocity = data.linearVelocity;
             _targetAngularVelocity = data.angularVelocity;
             _targetParent = parentTrs;
+            _targetPositionFrame = data.positionFrame;
 
             ClearBuffer();
             _hasPendingTeleport = false;
 
             if (_settingsInstance != null)
             {
-                Vector3 worldTargetPos = ToWorldPosition(_targetPosition, _targetParent);
+                Vector3 worldTargetPos = worldPos;
                 Quaternion worldTargetRot = ToWorldRotation(_targetRotation, _targetParent);
                 Vector3 worldTargetLinVel = ToWorldLinearVelocity(_targetLinearVelocity, _targetParent, worldTargetPos);
                 Vector3 worldTargetAngVel = ToWorldAngularVelocity(_targetAngularVelocity, _targetParent);
@@ -2667,7 +2752,9 @@ namespace PurrNet
             if (!_rigidbody)
                 return;
 
-            _rigidbody.position = ToWorldPosition(ExtractSyncPosition(frame, position, absolutePosition), null);
+            if (!TryToWorldPosition(ExtractSyncPosition(frame, position, absolutePosition), null, frame, out var worldPosition))
+                return;
+            _rigidbody.position = worldPosition;
             _rigidbody.rotation = rotation;
             BroadcastTeleport();
         }
@@ -2678,7 +2765,9 @@ namespace PurrNet
             if (!_rigidbody)
                 return;
 
-            _rigidbody.position = ToWorldPosition(ExtractSyncPosition(frame, position, absolutePosition), null);
+            if (!TryToWorldPosition(ExtractSyncPosition(frame, position, absolutePosition), null, frame, out var worldPosition))
+                return;
+            _rigidbody.position = worldPosition;
             _rigidbody.rotation = rotation;
             BroadcastTeleport();
         }

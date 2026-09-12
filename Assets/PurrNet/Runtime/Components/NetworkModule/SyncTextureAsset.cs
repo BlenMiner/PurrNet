@@ -6,7 +6,7 @@ namespace PurrNet
     [Serializable]
     public class SyncTextureAsset : SyncAsset<Texture2D>
     {
-        public SyncTextureAsset(bool ownerAuth = false, int maxKBPerSec = 15) : base(ownerAuth, maxKBPerSec) { }
+        public SyncTextureAsset(bool ownerAuth = false, int maxKBPerSec = 15, bool ownerOnly = false) : base(ownerAuth, maxKBPerSec, ownerOnly) { }
 
         public override void FromBytes(ArraySegment<byte> bytes, ref Texture2D content)
         {

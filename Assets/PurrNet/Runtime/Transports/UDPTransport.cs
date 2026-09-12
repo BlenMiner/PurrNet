@@ -30,6 +30,9 @@ namespace PurrNet.Transports
         [SerializeField]
         private float _timeoutInSeconds = 5f;
 
+        [Tooltip("Use native UDP sockets on supported Windows/Linux runtimes to avoid per-packet socket allocations. Other platforms use managed sockets. Applied when the transport is enabled.")]
+        [SerializeField] private bool _useNativeSockets = true;
+
         [SerializeField] private NetworkSimulation _networkSimulation = NetworkSimulation.@default;
 
         public event OnConnected onConnected;
@@ -136,6 +139,21 @@ namespace PurrNet.Transports
             }
         }
 
+        public bool measuresRoundTripTime => true;
+
+        public int GetRoundTripTime(Connection conn, bool asServer)
+        {
+            if (asServer)
+                return _connectionToPeer.TryGetValue(conn, out var peer) ? GetRoundTripTime(peer) : -1;
+
+            return GetRoundTripTime(_client?.FirstPeer);
+        }
+
+        private static int GetRoundTripTime(NetPeer peer)
+        {
+            return peer != null && peer.HasRoundTripTime ? peer.RoundTripTime : -1;
+        }
+
         private void SetupCloud()
         {
             if (_automaticCloudSetups == null)
@@ -164,6 +182,7 @@ namespace PurrNet.Transports
                 UnconnectedMessagesEnabled = true,
                 PingInterval = 900,
                 AutoRecycle = true,
+                UseNativeSockets = _useNativeSockets,
                 EnableStatistics = false,
                 DisconnectTimeout = Mathf.RoundToInt(_timeoutInSeconds * 1000)
             };
@@ -173,6 +192,7 @@ namespace PurrNet.Transports
                 UnconnectedMessagesEnabled = true,
                 PingInterval = 900,
                 AutoRecycle = true,
+                UseNativeSockets = _useNativeSockets,
                 EnableStatistics = false,
                 DisconnectTimeout = Mathf.RoundToInt(_timeoutInSeconds * 1000)
             };
@@ -454,6 +474,25 @@ namespace PurrNet.Transports
             var deliveryMethod = ToDeliveryMethod(method);
             _client.SendToAll(data.data, data.offset, data.length, deliveryMethod);
             RaiseDataSent(default, data, false);
+        }
+
+        public bool FlushConnection(Connection conn, bool asServer)
+        {
+            if (asServer)
+            {
+                if (listenerState is not ConnectionState.Connected)
+                    return false;
+
+                if (_connectionToPeer.TryGetValue(conn, out var peer))
+                    peer.FlushSends();
+                return true;
+            }
+
+            if (clientState != ConnectionState.Connected)
+                return false;
+
+            _client.FirstPeer?.FlushSends();
+            return true;
         }
 
         public void CloseConnection(Connection conn)

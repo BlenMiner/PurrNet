@@ -77,8 +77,9 @@ on:
         type: boolean
         required: false
         default: false
-      # Default off for workflow_call so the scaling curve uses clean release builds; the manual
-      # single-benchmark dispatch defaults on to get the CPU-by-phase breakdown.
+      # Default off for workflow_call (clean release builds unless the caller opts in); the
+      # scaling curve passes its own profiling input through, and the manual single-benchmark
+      # dispatch defaults on to get the CPU-by-phase breakdown.
       profiling:
         type: boolean
         required: false

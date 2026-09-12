@@ -35,7 +35,7 @@ namespace LiteNetLib
         /// Adds a packet to the outgoing queue and notifies the peer to schedule a send update.
         /// </summary>
         /// <param name="packet">The packet to be enqueued.</param>
-        public void AddToQueue(NetPacket packet)
+        public virtual void AddToQueue(NetPacket packet)
         {
             lock (OutgoingQueue)
             {

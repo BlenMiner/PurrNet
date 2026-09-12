@@ -42,6 +42,8 @@ namespace PurrNet
     public class SyncHashSet<T> : NetworkModule, ISet<T>
     {
         [SerializeField] private bool _ownerAuth;
+
+        [SerializeField] private bool _ownerOnly;
         [SerializeField] private List<T> _serializedSet = new List<T>();
         private HashSet<T> _set = new HashSet<T>();
 
@@ -57,6 +59,8 @@ namespace PurrNet
         /// </summary>
         public bool ownerAuth => _ownerAuth;
 
+        public override bool ownerOnly => _ownerOnly;
+
         /// <summary>
         /// The amount of entries in the hash set
         /// </summary>
@@ -64,9 +68,10 @@ namespace PurrNet
 
         public bool IsReadOnly => false;
 
-        public SyncHashSet(bool ownerAuth = false)
+        public SyncHashSet(bool ownerAuth = false, bool ownerOnly = false)
         {
             _ownerAuth = ownerAuth;
+            _ownerOnly = ownerOnly;
 
 #if UNITY_EDITOR
             onChanged += UpdateSerializedSet;

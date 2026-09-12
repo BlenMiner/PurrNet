@@ -131,8 +131,31 @@ namespace PurrNet.Editor
             }
         }
 
+        /// <summary>
+        /// Resolves a staged batch and treats all batch targets becoming visible as completion. This
+        /// also handles a no-op Resolve after embedded package files auto-register before the call.
+        /// </summary>
+        public static async Task<Result<bool>> ResolvePackagesWithRetry(Func<bool> completionPredicate)
+        {
+            await OperationGate.WaitAsync();
+            try
+            {
+                await ResolvePackagesCore(completionPredicate: completionPredicate);
+                return Result<bool>.Ok(true);
+            }
+            catch (Exception e)
+            {
+                return Result<bool>.Fail(FormatInstallFailure(e, null));
+            }
+            finally
+            {
+                OperationGate.Release();
+            }
+        }
+
         private static async Task ResolvePackagesCore(PackageInfo package = null, string expectedVersion = null,
-            string expectedPackageName = null, bool expectRemoved = false, bool acceptAlreadyVisible = false)
+            string expectedPackageName = null, bool expectRemoved = false, bool acceptAlreadyVisible = false,
+            Func<bool> completionPredicate = null)
         {
             const int maxAttempts = 3;
             const int eventTimeoutMs = 12000;
@@ -151,6 +174,33 @@ namespace PurrNet.Editor
                 try
                 {
                     UnityEditor.PackageManager.Client.Resolve();
+
+                    if (completionPredicate != null)
+                    {
+                        const int predicatePollMs = 250;
+                        for (var elapsed = 0; elapsed < eventTimeoutMs; elapsed += predicatePollMs)
+                        {
+                            await Task.Delay(predicatePollMs);
+                            bool complete = false;
+                            try
+                            {
+                                complete = completionPredicate();
+                            }
+                            catch
+                            {
+                                // Package state can be briefly unavailable during registration.
+                            }
+
+                            if (!complete)
+                                continue;
+
+                            await WaitForLockFileToSettle();
+                            return;
+                        }
+
+                        throw new TimeoutException(
+                            "Unity Package Manager did not make every staged package update visible.");
+                    }
 
                     // Resolve has no Request object. A registration event is the only public completion
                     // signal Unity exposes. If the requested state is already visible, a short quiet
@@ -799,6 +849,48 @@ namespace PurrNet.Editor
             }
         }
 
+        public static bool IsPackageLockVersion(string packageName, string expectedVersion)
+        {
+            if (string.IsNullOrEmpty(packageName) || string.IsNullOrEmpty(expectedVersion))
+                return false;
+
+            try
+            {
+                var entry = GetLockFileJson()?["dependencies"]?[packageName] as JObject;
+                var resolvedVersion = entry?["version"]?.ToString();
+                return GitUrlsMatch(resolvedVersion, expectedVersion);
+            }
+            catch
+            {
+                return false;
+            }
+        }
+
+        public static bool IsRegisteredPackageVersion(string packageName, string expectedVersion)
+        {
+            if (string.IsNullOrEmpty(packageName))
+                return false;
+
+            try
+            {
+                foreach (var registered in UnityEditor.PackageManager.PackageInfo.GetAllRegisteredPackages())
+                {
+                    if (!string.Equals(registered.name, packageName, StringComparison.OrdinalIgnoreCase))
+                        continue;
+
+                    return string.IsNullOrEmpty(expectedVersion)
+                           || string.Equals(registered.version, expectedVersion,
+                               StringComparison.OrdinalIgnoreCase);
+                }
+            }
+            catch
+            {
+                // Registration can be temporarily unavailable during a package refresh.
+            }
+
+            return false;
+        }
+
         /// <summary>
         /// Finds the installed entry for a package. Checks user-selected Assets imports,
         /// embedded packages in Packages/{name}/, manifest entries (git URLs), and legacy
@@ -999,20 +1091,24 @@ namespace PurrNet.Editor
         /// Existing dependencies are left at their installed version.
         /// </summary>
         public static async Task<Result<bool>> InstallWithDependencies(string apiKey, PackageInfo package,
-            VersionInfo version, PackageInfo[] catalog)
+            VersionInfo version, PackageInfo[] catalog, bool resolve = true,
+            bool allowUserEditableDependencies = true,
+            Action<string> onDownloadedPackagePrepared = null)
         {
             if (version == null)
                 return Result<bool>.Fail($"'{package?.DisplayName}' has no installable version.");
 
-            var dependencies = await InstallMissingDependencies(apiKey, package, version.Channel, catalog);
+            var dependencies = await InstallMissingDependencies(apiKey, package, version.Channel, catalog,
+                allowUserEditableDependencies);
             if (!dependencies.Success)
                 return dependencies;
 
-            return await Install(apiKey, package, version);
+            return await Install(apiKey, package, version, resolve, onDownloadedPackagePrepared);
         }
 
         public static async Task<Result<bool>> InstallExternalWithDependencies(string apiKey, PackageInfo package,
-            string gitUrl, PackageInfo[] catalog)
+            string gitUrl, PackageInfo[] catalog, bool resolve = true,
+            bool allowUserEditableDependencies = true)
         {
             if (string.IsNullOrEmpty(gitUrl))
                 return Result<bool>.Fail($"'{package?.DisplayName}' has no install URL.");
@@ -1020,15 +1116,16 @@ namespace PurrNet.Editor
             var channel = string.Equals(gitUrl, package?.GitInstallUrlDev, StringComparison.Ordinal)
                 ? "dev"
                 : "release";
-            var dependencies = await InstallMissingDependencies(apiKey, package, channel, catalog);
+            var dependencies = await InstallMissingDependencies(apiKey, package, channel, catalog,
+                allowUserEditableDependencies);
             if (!dependencies.Success)
                 return dependencies;
 
-            return await InstallExternal(package, gitUrl);
+            return await InstallExternal(package, gitUrl, resolve);
         }
 
         private static async Task<Result<bool>> InstallMissingDependencies(string apiKey, PackageInfo root,
-            string preferredChannel, PackageInfo[] catalog)
+            string preferredChannel, PackageInfo[] catalog, bool allowUserEditableDependencies)
         {
             if (root?.DependencyIds == null || root.DependencyIds.Length == 0)
                 return Result<bool>.Ok(true);
@@ -1059,11 +1156,19 @@ namespace PurrNet.Editor
                     if (!visiting.Add(dependencyId))
                         return Result<bool>.Fail($"Circular package dependency detected at '{dependency.DisplayName}'.");
 
+                    bool dependencyInstalled = IsInstalled(dependency);
+                    if (!dependencyInstalled && dependency.IsUserEditable && !allowUserEditableDependencies)
+                    {
+                        return Result<bool>.Fail(
+                            $"'{owner.DisplayName}' requires user-editable package '{dependency.DisplayName}'. " +
+                            "Install or update that dependency individually before running Update All.");
+                    }
+
                     var nested = await Ensure(dependency);
                     if (!nested.Success)
                         return nested;
 
-                    if (!IsInstalled(dependency))
+                    if (!dependencyInstalled)
                     {
                         if (!dependency.HasAccess)
                             return Result<bool>.Fail($"'{owner.DisplayName}' requires '{dependency.DisplayName}', but your account does not have access to it.");
@@ -1189,7 +1294,8 @@ namespace PurrNet.Editor
             return await completion.Task;
         }
 
-        public static async Task<Result<bool>> Install(string apiKey, PackageInfo package, VersionInfo version, bool resolve = true)
+        public static async Task<Result<bool>> Install(string apiKey, PackageInfo package, VersionInfo version,
+            bool resolve = true, Action<string> onDownloadedPackagePrepared = null)
         {
             if (package == null || string.IsNullOrEmpty(package.GetUpmPackageName()))
                 return Result<bool>.Fail($"'{package?.DisplayName ?? "Package"}' has no valid name from package.json. Refresh the package catalog and try again.");
@@ -1197,7 +1303,7 @@ namespace PurrNet.Editor
             await OperationGate.WaitAsync();
             try
             {
-                return await InstallCore(apiKey, package, version, resolve);
+                return await InstallCore(apiKey, package, version, resolve, onDownloadedPackagePrepared);
             }
             finally
             {
@@ -1205,7 +1311,8 @@ namespace PurrNet.Editor
             }
         }
 
-        private static async Task<Result<bool>> InstallCore(string apiKey, PackageInfo package, VersionInfo version, bool resolve)
+        private static async Task<Result<bool>> InstallCore(string apiKey, PackageInfo package, VersionInfo version,
+            bool resolve, Action<string> onDownloadedPackagePrepared)
         {
             var backup = ManifestBackup.Capture();
             using var quarantine = new QuarantineScope();
@@ -1230,8 +1337,8 @@ namespace PurrNet.Editor
                 // The normal Git path is cached by UPM and read-only.
                 if (!package.IsExternal && !package.IsUserEditable)
                 {
-                    var gitUrl = GetGitUrlForChannel(package, version.Channel);
-                    if (gitUrl != null && !string.IsNullOrEmpty(version.TagName))
+                    var gitManifestValue = GetGitManifestValueForVersion(package, version);
+                    if (gitManifestValue != null)
                     {
                         EditorUtility.DisplayProgressBar("PurrNet Package Manager", $"Installing {package.DisplayName}...", 0.5f);
 
@@ -1239,7 +1346,7 @@ namespace PurrNet.Editor
 
                         ClearExistingInstall(package, gitUpmName, quarantine);
 
-                        SetManifestEntry(gitUpmName, StripGitRef(gitUrl) + "#" + version.TagName);
+                        SetManifestEntry(gitUpmName, gitManifestValue);
 
                         // Commit before asking UPM to resolve. Resolving can trigger an assembly/domain
                         // reload, so no in-memory rollback state may be assumed to survive this point.
@@ -1345,6 +1452,11 @@ namespace PurrNet.Editor
                     EditorUtility.ClearProgressBar();
                     return Result<bool>.Fail("package.json is missing 'name' or 'version' field");
                 }
+
+                // The catalog version can differ from package.json. Let resumable callers persist
+                // the exact target while failure is still side-effect free, before any package or
+                // manifest mutation can trigger an assembly reload.
+                onDownloadedPackagePrepared?.Invoke(upmVersion);
 
                 // Remove embedded packages if they exist (Unity prioritizes Packages/{name}/ over manifest)
                 var apiName = package.GetUpmPackageName();
@@ -1514,6 +1626,11 @@ namespace PurrNet.Editor
                     quarantine.Commit();
                     mutationCommitted = true;
 
+                    // Resolving a code package can compile scripts and reload this editor assembly,
+                    // abandoning the async continuation (including the finally block below). Clear
+                    // Unity's native progress dialog before crossing that reload boundary.
+                    EditorUtility.ClearProgressBar();
+
                     if (resolve)
                     {
                         PurrPackageManagerCache.Invalidate();
@@ -1552,11 +1669,88 @@ namespace PurrNet.Editor
             var match = FindInstalledEntry(package);
             if (match == null) return "release";
             var value = match.Value.value;
-            if (!IsGitUrl(value)) return "release";
+            return ClassifyInstalledGitChannel(package, value, GetInstalledCommitHash(package));
+        }
 
-            if (!string.IsNullOrEmpty(package.GitInstallUrlDev) && value == package.GitInstallUrlDev)
+        internal static string ClassifyInstalledGitChannel(PackageInfo package, string installedValue,
+            string installedHash)
+        {
+            if (package == null || !IsGitUrl(installedValue))
+                return "release";
+
+            if (GitUrlsMatch(installedValue, package.GitInstallUrlDev))
                 return "dev";
-            return "release";
+            if (GitUrlsMatch(installedValue, package.GitInstallUrlRelease))
+                return "release";
+
+            // Equivalent/manual URLs can differ in superficial spelling. The resolved commit is a
+            // stronger channel signal when the API supplies hashes for both channels.
+            bool matchesDev = HashesMatch(installedHash, package.LatestCommitDev);
+            bool matchesRelease = HashesMatch(installedHash, package.LatestCommitRelease);
+            if (matchesDev && !matchesRelease)
+                return "dev";
+            if (matchesRelease && !matchesDev)
+                return "release";
+
+            var installedBase = GetBaseGitUrl(installedValue);
+            bool baseMatchesDev = !string.IsNullOrEmpty(package.GitInstallUrlDev)
+                                  && string.Equals(installedBase, GetBaseGitUrl(package.GitInstallUrlDev),
+                                      StringComparison.OrdinalIgnoreCase);
+            bool baseMatchesRelease = !string.IsNullOrEmpty(package.GitInstallUrlRelease)
+                                      && string.Equals(installedBase,
+                                          GetBaseGitUrl(package.GitInstallUrlRelease),
+                                          StringComparison.OrdinalIgnoreCase);
+            if (baseMatchesDev && !baseMatchesRelease)
+                return "dev";
+            if (baseMatchesRelease && !baseMatchesDev)
+                return "release";
+
+            // A manual/older pin can share a repository base with both channels. Do not guess and
+            // silently switch that installation to release during Update All.
+            return null;
+        }
+
+        internal static string GetGitManifestValueForVersion(PackageInfo package, VersionInfo version)
+        {
+            if (package == null || version == null || package.IsExternal || package.IsUserEditable
+                || string.IsNullOrEmpty(version.TagName))
+                return null;
+
+            var gitUrl = GetGitUrlForChannel(package, version.Channel);
+            return string.IsNullOrEmpty(gitUrl) ? null : StripGitRef(gitUrl) + "#" + version.TagName;
+        }
+
+        private static bool GitUrlsMatch(string a, string b)
+        {
+            if (string.IsNullOrEmpty(a) || string.IsNullOrEmpty(b))
+                return false;
+
+            static string Normalize(string value)
+            {
+                value = value.Trim();
+                if (value.StartsWith("git+", StringComparison.OrdinalIgnoreCase))
+                    value = value.Substring("git+".Length);
+
+                int queryIndex = value.IndexOf('?');
+                int fragmentIndex = value.IndexOf('#');
+                int suffixIndex = queryIndex < 0
+                    ? fragmentIndex
+                    : fragmentIndex < 0 ? queryIndex : Math.Min(queryIndex, fragmentIndex);
+                if (suffixIndex < 0)
+                    return value.TrimEnd('/');
+
+                return value.Substring(0, suffixIndex).TrimEnd('/') + value.Substring(suffixIndex);
+            }
+
+            return string.Equals(Normalize(a), Normalize(b), StringComparison.OrdinalIgnoreCase);
+        }
+
+        private static bool HashesMatch(string a, string b)
+        {
+            if (string.IsNullOrEmpty(a) || string.IsNullOrEmpty(b))
+                return false;
+            int minLength = Math.Min(a.Length, b.Length);
+            return string.Compare(a, 0, b, 0, minLength, StringComparison.OrdinalIgnoreCase) == 0;
         }
 
         private static bool IsGitUrl(string value)

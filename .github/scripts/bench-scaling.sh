@@ -85,6 +85,27 @@ jq -rs '
             + "| \($c | avg(.rttP95Ms) | r2) |"
         ] | join("\n") )
     + "\n\n"
+    # Per-marker CPU scaling (Development builds only; release builds have no markers).
+    # This is the table that shows which packing/encode phase scales with player count:
+    # read across a row — a phase that grows ~linearly with connections is an O(players) loop.
+    + ( ([ $srows[] | (.cpuMarkers // []) | map(.name) ] | add // [] | unique) as $allNames
+        | if ($allNames | length) == 0 then "" else
+          ($allNames
+            | map(. as $n | {name: $n, peak: ([ $srows[] | (.cpuMarkers // [])[] | select(.name == $n) | .perFrameMs ] | max // 0)})
+            | sort_by(-.peak) | .[0:14] | map(.name)) as $top
+          | "#### Server CPU µs/frame by marker vs connections — \($name) (Development build)\n\n"
+          + "| Marker | \($conns | map(tostring) | join(" | ")) |\n"
+          + "|---|\($conns | map("---") | join("|"))|\n"
+          + ( [ $top[] | . as $mk
+                | "| \($mk) | "
+                  + ( [ $srows[]
+                        | ((.cpuMarkers // []) | map(select(.name == $mk)) | first) as $entry
+                        | if $entry == null then "-" else "\($entry.perFrameMs * 1000 | floor)" end
+                      ] | join(" | ") )
+                  + " |"
+              ] | join("\n") )
+          + "\n\n"
+          end )
     + ( if ($conns | length) < 2 then "_Charts need ≥2 connection sizes._\n"
         else chart("CPU % vs connections — \($name)"; "CPU %"; $conns; $cpu)
            + chart("RTT p95 (ms) vs connections — \($name)"; "RTT p95 (ms)"; $conns; $rtt)

@@ -1,6 +1,5 @@
 using System;
 using Cysharp.Threading.Tasks;
-using PurrNet;
 using PurrNet.Modules;
 using UnityEngine;
 using UnityEngine.AddressableAssets;
@@ -229,7 +228,7 @@ public class SceneUnloadApiScenario : Scenario
             }
             case UnloadApi.AddressableSceneStruct:
             {
-                scenes.UnloadSceneAsync(SceneManager.GetSceneByName(AddressableSceneName));
+                _ = scenes.UnloadSceneAsync(SceneManager.GetSceneByName(AddressableSceneName));
                 break;
             }
             case UnloadApi.Mixed:
@@ -377,9 +376,9 @@ public class SceneUnloadApiScenario : Scenario
         var scenes = ctx.networkManager.sceneModule;
 
         if (IsNetworkSceneLoaded(ctx, buildIndex))
-            scenes.UnloadSceneAsync(SceneManager.GetSceneByName(TargetSceneName));
+            _ = scenes.UnloadSceneAsync(SceneManager.GetSceneByName(TargetSceneName));
         else if (IsSceneLoaded(TargetSceneName))
-            SceneManager.UnloadSceneAsync(SceneManager.GetSceneByName(TargetSceneName));
+            _ = SceneManager.UnloadSceneAsync(SceneManager.GetSceneByName(TargetSceneName));
 
         if (scenes.TryGetSceneIdByAddressableGuid(AddressableSceneGuid, out var addressableId))
         {
@@ -388,7 +387,7 @@ public class SceneUnloadApiScenario : Scenario
                 handle.Completed += completed => Addressables.Release(completed);
         }
         else if (IsSceneLoaded(AddressableSceneName))
-            SceneManager.UnloadSceneAsync(SceneManager.GetSceneByName(AddressableSceneName));
+            _ = SceneManager.UnloadSceneAsync(SceneManager.GetSceneByName(AddressableSceneName));
 
         try
         {

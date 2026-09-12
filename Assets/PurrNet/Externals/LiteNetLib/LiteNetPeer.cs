@@ -1,4 +1,4 @@
-﻿#if DEBUG
+#if DEBUG
 #define STATS_ENABLED
 #endif
 using System;
@@ -191,6 +191,11 @@ namespace LiteNetLib
         public int RoundTripTime => _avgRtt;
 
         /// <summary>
+        /// Whether at least one ping/pong exchange has completed, so <see cref="RoundTripTime"/> is a real measurement.
+        /// </summary>
+        public bool HasRoundTripTime => _rttCount > 0;
+
+        /// <summary>
         /// Current MTU - Maximum Transfer Unit ( maximum udp packet size without fragmentation )
         /// </summary>
         public int Mtu => _mtu;
@@ -267,6 +272,7 @@ namespace LiteNetLib
                 NativeAddress = new byte[_cachedSocketAddr.Size];
                 for (int i = 0; i < _cachedSocketAddr.Size; i++)
                     NativeAddress[i] = _cachedSocketAddr[i];
+                NativeSocket.SetNativeAddressFamily(NativeAddress, this);
             }
 #if NET8_0_OR_GREATER
             _cachedHashCode = NetManager.UseNativeSockets ? base.GetHashCode() : _cachedSocketAddr.GetHashCode();
@@ -308,6 +314,7 @@ namespace LiteNetLib
                 NativeAddress = new byte[_cachedSocketAddr.Size];
                 for (int i = 0; i < _cachedSocketAddr.Size; i++)
                     NativeAddress[i] = _cachedSocketAddr[i];
+                NativeSocket.SetNativeAddressFamily(NativeAddress, this);
             }
 #if NET8_0_OR_GREATER
             _cachedHashCode = NetManager.UseNativeSockets ? base.GetHashCode() : _cachedSocketAddr.GetHashCode();
@@ -670,6 +677,12 @@ namespace LiteNetLib
 
                     length -= sendLength;
                 }
+                return;
+            }
+
+            if (userData == null && length > 0 && mtu <= NetConstants.MaxPacketSize && channel is ReliableChannel reliableChannel)
+            {
+                reliableChannel.AddToQueue(data, mtu);
                 return;
             }
 
@@ -1308,6 +1321,23 @@ namespace LiteNetLib
 
             UpdateMtuLogic(deltaTime);
 
+            SendQueued();
+        }
+
+        /// <summary>
+        /// Sends everything already queued on this peer: reliable channel packets, pending
+        /// unreliable packets and the merge buffer. Timers are untouched; Update still owns those.
+        /// </summary>
+        public void FlushSends()
+        {
+            if (_connectionState != ConnectionState.Connected)
+                return;
+
+            SendQueued();
+        }
+
+        private void SendQueued()
+        {
             UpdateChannels();
 
             if (_unreliablePendingCount > 0)

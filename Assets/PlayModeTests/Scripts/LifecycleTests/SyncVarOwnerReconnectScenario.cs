@@ -7,9 +7,8 @@ using PurrNet.Transports;
 using UnityEngine;
 
 /// <summary>
-/// Reconnect reproducer for owner-authoritative SyncVars. The suspected failure mode is that the
-/// reconnecting owner's local SyncVar packet id restarts below the server's retained packet id, so
-/// the first owner update after reconnect is dropped.
+/// Reconnect regression for owner-authoritative SyncVars. A delayed catch-up snapshot must not
+/// rewind the restored owner's packet id and cause its next value update to be dropped.
 /// </summary>
 public class SyncVarOwnerReconnectScenario : Scenario
 {
@@ -28,6 +27,8 @@ public class SyncVarOwnerReconnectScenario : Scenario
     [SerializeField] private float _doneTimeoutSeconds = 30f;
     [SerializeField] private float _propagationDelaySeconds = 0.5f;
     [SerializeField] private float _stayDisconnectedSeconds = 1f;
+    [Tooltip("Replay a captured snapshot after an unchanged owner resend to exercise packet-id rollback deterministically. Disable to exercise natural reconnect timing only.")]
+    [SerializeField] private bool _replayDelayedSnapshot = true;
 
     private SyncVarOwnerReconnectIdentity _prefab;
 
@@ -142,6 +143,21 @@ public class SyncVarOwnerReconnectScenario : Scenario
                 $"server={inst.DescribeLocalSyncVar()}");
         }
 
+        ulong? acknowledgedResendPacketId = null;
+        if (_replayDelayedSnapshot)
+        {
+            try
+            {
+                acknowledgedResendPacketId = await ReplayDelayedSnapshot(ctx, inst, owner.Value);
+            }
+            catch (Exception e)
+            {
+                failures.Add($"delayed-snapshot setup failed: {e.Message}");
+            }
+        }
+
+        // Queued after the replay on the same reliable ordered RPC lane. The owner records
+        // its counter and performs the actual application write only after applying it.
         inst.BroadcastPostReconnectBurst(PostReconnectFirstValue, PostReconnectBurstCount);
 
         try
@@ -157,6 +173,14 @@ public class SyncVarOwnerReconnectScenario : Scenario
                 "owner did not report receiving/sending the post-reconnect burst; " +
                 $"server={inst.DescribeLocalSyncVar()}; " +
                 $"burst=({SyncVarOwnerReconnectIdentity.DescribeBurstReport()})");
+        }
+
+        if (acknowledgedResendPacketId.HasValue && SyncVarOwnerReconnectIdentity.BurstReportCount >= 1 &&
+            SyncVarOwnerReconnectIdentity.BurstReportPacketIdBefore < acknowledgedResendPacketId.Value)
+        {
+            failures.Add(
+                $"delayed snapshot rewound owner packet id: acknowledged={acknowledgedResendPacketId.Value}, " +
+                $"beforeWrite={SyncVarOwnerReconnectIdentity.BurstReportPacketIdBefore}");
         }
 
         try
@@ -192,8 +216,45 @@ public class SyncVarOwnerReconnectScenario : Scenario
         }
 
         return failures.Count == 0
-            ? ScenarioResult.Ok($"owner={owner.Value.id.value}, value={inst.currentValue}")
+            ? ScenarioResult.Ok($"owner={owner.Value.id.value}, value={inst.currentValue}, delayedSnapshot={_replayDelayedSnapshot}")
             : ScenarioResult.Fail(string.Join(" | ", failures));
+    }
+
+    private async UniTask<ulong> ReplayDelayedSnapshot(
+        ScenarioContext ctx, SyncVarOwnerReconnectIdentity inst, PlayerID owner)
+    {
+        ulong snapshotPacketId = inst.debugPacketId;
+        int snapshotValue = inst.currentValue;
+
+        // Send a real baseline snapshot, retaining its arguments for a delayed duplicate.
+        // No private SyncVar state is written and no receiver or transport is replaced.
+        inst.SendCapturedSnapshot(owner, snapshotPacketId, snapshotValue);
+        inst.RequestUnchangedOwnerResend(owner, snapshotPacketId);
+
+        await UniTaskUtils.WaitWithTimeout(
+            () => SyncVarOwnerReconnectIdentity.UnchangedResendReportCount >= 1,
+            _readyTimeoutSeconds,
+            ctx.cancellationToken);
+
+        if (SyncVarOwnerReconnectIdentity.UnchangedResendError != null)
+            throw new InvalidOperationException(SyncVarOwnerReconnectIdentity.UnchangedResendError);
+
+        ulong resendPacketId = SyncVarOwnerReconnectIdentity.UnchangedResendPacketId;
+        await UniTaskUtils.WaitWithTimeout(
+            () => inst.debugPacketId >= resendPacketId,
+            _postSyncTimeoutSeconds,
+            ctx.cancellationToken);
+
+        if (resendPacketId <= snapshotPacketId || inst.currentValue != snapshotValue)
+            throw new InvalidOperationException(
+                $"unchanged resend did not establish the baseline: snapshot={snapshotPacketId}/{snapshotValue}, " +
+                $"resend={resendPacketId}, server={inst.DescribeLocalSyncVar()}");
+
+        Debug.Log(
+            $"[SyncVarOwnerReconnectScenario] Replaying snapshot packetId={snapshotPacketId}, value={snapshotValue} " +
+            $"after owner resend packetId={resendPacketId} reached the server.");
+        inst.SendCapturedSnapshot(owner, snapshotPacketId, snapshotValue);
+        return resendPacketId;
     }
 
     private async UniTask<ScenarioResult> RunAsClient(ScenarioContext ctx)

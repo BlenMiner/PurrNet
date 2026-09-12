@@ -46,9 +46,14 @@ namespace PurrNet.Packing
 
         public static unsafe void RegisterWriter(DeltaWriteFunc<T> write)
         {
-            if (RuntimeHelpers.IsReferenceOrContainsReferences<T>())
+            if (_hasWriter || RuntimeHelpers.IsReferenceOrContainsReferences<T>())
                 return;
 
+#if ENABLE_IL2CPP && !UNITY_EDITOR
+            // IL2CPP does not support GetFunctionPointer; WebGL may have exceptions disabled.
+            _writeDelegate = write;
+            RegisterWriterWithPointer(write, &WriteDelegateFallback);
+#else
             try
             {
                 var ptr = (delegate*<BitPacker, T, T, bool>)write.Method.MethodHandle.GetFunctionPointer();
@@ -59,6 +64,7 @@ namespace PurrNet.Packing
                 _writeDelegate = write;
                 RegisterWriterWithPointer(write, &WriteDelegateFallback);
             }
+#endif
         }
 
         static unsafe void RegisterWriterWithPointer(DeltaWriteFunc<T> write, delegate*<BitPacker, T, T, bool> ptr)
@@ -73,9 +79,13 @@ namespace PurrNet.Packing
 
         public static unsafe void RegisterReader(DeltaReadFunc<T> read)
         {
-            if (RuntimeHelpers.IsReferenceOrContainsReferences<T>())
+            if (_hasReader || RuntimeHelpers.IsReferenceOrContainsReferences<T>())
                 return;
 
+#if ENABLE_IL2CPP && !UNITY_EDITOR
+            _readDelegate = read;
+            RegisterReaderWithPointer(read, &ReadDelegateFallback);
+#else
             try
             {
                 var ptr = (delegate*<BitPacker, T, ref T, void>)read.Method.MethodHandle.GetFunctionPointer();
@@ -86,6 +96,7 @@ namespace PurrNet.Packing
                 _readDelegate = read;
                 RegisterReaderWithPointer(read, &ReadDelegateFallback);
             }
+#endif
         }
 
         public static unsafe void RegisterReaderWithPointer(DeltaReadFunc<T> b, delegate*<BitPacker, T, ref T, void> ptr)

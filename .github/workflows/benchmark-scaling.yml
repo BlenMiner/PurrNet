@@ -22,6 +22,11 @@ on:
         description: "RTT pings per second per measured client"
         required: true
         default: "10"
+      profiling:
+        description: "Development build so the per-marker CPU scaling table renders (dev-build numbers are comparative across sizes/commits, not shipping-absolute; disable for clean release throughput numbers)"
+        type: boolean
+        required: false
+        default: true
 
 jobs:
   size-10:
@@ -34,6 +39,7 @@ jobs:
       bench_seconds: ${{ inputs.bench_seconds }}
       bench_objects: ${{ inputs.bench_objects }}
       ping_rate: ${{ inputs.ping_rate }}
+      profiling: ${{ inputs.profiling }}
       tag: "s10"
 
   size-25:
@@ -47,6 +53,7 @@ jobs:
       bench_seconds: ${{ inputs.bench_seconds }}
       bench_objects: ${{ inputs.bench_objects }}
       ping_rate: ${{ inputs.ping_rate }}
+      profiling: ${{ inputs.profiling }}
       tag: "s25"
       player_artifact: "bench-player-s10"
 
@@ -61,6 +68,7 @@ jobs:
       bench_seconds: ${{ inputs.bench_seconds }}
       bench_objects: ${{ inputs.bench_objects }}
       ping_rate: ${{ inputs.ping_rate }}
+      profiling: ${{ inputs.profiling }}
       tag: "s50"
       player_artifact: "bench-player-s10"
 
@@ -75,6 +83,7 @@ jobs:
       bench_seconds: ${{ inputs.bench_seconds }}
       bench_objects: ${{ inputs.bench_objects }}
       ping_rate: ${{ inputs.ping_rate }}
+      profiling: ${{ inputs.profiling }}
       tag: "s100"
       player_artifact: "bench-player-s10"
 

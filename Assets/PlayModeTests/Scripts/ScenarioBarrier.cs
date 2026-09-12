@@ -7,35 +7,38 @@ using UnityEngine;
 public static class ScenarioBarrier
 {
     private static readonly Dictionary<int, int> _arrivedByBarrier = new();
-    // Shared handle for concurrent in-process callers (host's parallel RunSplit halves).
+    // Shared handle for both concurrent and late in-process callers (host's RunSplit halves).
     // System.Threading.Task is multi-awaitable; UniTask.Preserve()/MemoizeSource is not
     // before completion — it forwards OnCompleted to the underlying state-machine source,
     // which only allows one continuation.
-    private static readonly Dictionary<int, Task> _inFlight = new();
+    private static readonly Dictionary<int, Task> _waitsByBarrier = new();
     // Exact-match per-id proceeds (NOT a high-water mark): barrier ids are scenario-local constants
     // with no global ordering, so "any id <= last proceeded" would let clients skip barriers in any
     // scenario that runs after one with higher ids. The set also covers proceeds that arrive before
     // a client starts waiting. Ids must still be globally unique across scenarios.
     private static readonly HashSet<int> _proceeded = new();
 
+    [RuntimeInitializeOnLoadMethod(RuntimeInitializeLoadType.SubsystemRegistration)]
+    private static void ResetRunState()
+    {
+        _arrivedByBarrier.Clear();
+        _waitsByBarrier.Clear();
+        _proceeded.Clear();
+    }
+
     public static async UniTask Wait(ScenarioContext ctx, int barrierId, float timeoutSeconds)
     {
-        if (_inFlight.TryGetValue(barrierId, out var existing))
+        if (_waitsByBarrier.TryGetValue(barrierId, out var existing))
         {
             await existing;
             return;
         }
 
         var task = WaitImpl(ctx, barrierId, timeoutSeconds).AsTask();
-        _inFlight[barrierId] = task;
-        try
-        {
-            await task;
-        }
-        finally
-        {
-            _inFlight.Remove(barrierId);
-        }
+        // Each id is used once per run. Keep the terminal result, including failures:
+        // a host half arriving after the other completed must not report and wait again.
+        _waitsByBarrier[barrierId] = task;
+        await task;
     }
 
     private static async UniTask WaitImpl(ScenarioContext ctx, int barrierId, float timeoutSeconds)

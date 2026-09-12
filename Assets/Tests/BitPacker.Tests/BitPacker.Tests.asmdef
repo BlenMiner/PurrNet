@@ -4,6 +4,8 @@
     "references": [
         "GUID:6e20f757a1bae164fa42750dd2b27dcb",
         "GUID:e0cd26848372d4e5c891c569017e11f1",
+        "GUID:22480835dfad5104ab4375f0d06ee008",
+        "GUID:f51ebe6a0ceec4240a699833d6309b23",
         "Unity.Addressables",
         "Unity.ResourceManager"
     ],

@@ -51,6 +51,25 @@ namespace PurrNet.Steam
             }
         }
 
+        public int GetRoundTripTime()
+        {
+#if STEAMWORKS_NET_PACKAGE && !DISABLESTEAMWORKS
+            if (_connection == HSteamNetConnection.Invalid || connectionState != PurrConnectionState.Connected)
+                return -1;
+
+            var status = new SteamNetConnectionRealTimeStatus_t();
+            var lanes = new SteamNetConnectionRealTimeLaneStatus_t();
+
+            var result = _isDedicated
+                ? SteamGameServerNetworkingSockets.GetConnectionRealTimeStatus(_connection, ref status, 0, ref lanes)
+                : SteamNetworkingSockets.GetConnectionRealTimeStatus(_connection, ref status, 0, ref lanes);
+
+            return result == EResult.k_EResultOK ? status.m_nPing : -1;
+#else
+            return -1;
+#endif
+        }
+
         public IEnumerator Connect(string address, ushort port, bool dedicated = false)
         {
             yield return null;

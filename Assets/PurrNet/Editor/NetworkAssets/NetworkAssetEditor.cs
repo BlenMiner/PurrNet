@@ -35,6 +35,9 @@ namespace PurrNet
             _assetsProp = serializedObject.FindProperty("assets");
             _linkedProp = serializedObject.FindProperty("linkedNetworkAssets");
 
+            if (_target.autoGenerate)
+                _target.GenerateAssets();
+
             _cachedTypes = _target.AvailableTypeNames
                 .Select(Type.GetType)
                 .Where(t => t != null)

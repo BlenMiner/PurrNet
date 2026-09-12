@@ -58,12 +58,15 @@ namespace PurrNet
 
             if (_buffer.Count >= maxBufferSize)
             {
-                // remove up to minBufferSize
                 var removeCount = _buffer.Count - minBufferSize;
                 if (removeCount > 0)
                 {
-                    for (int i = 0; i < removeCount; i++)
+                    // Commit the dropped span so the restarted lerp cannot snap backwards.
+                    // Lerp results are caller-owned, so rebasing on one is not an option here.
+                    _lastValue?.Dispose();
+                    for (int i = 0; i < removeCount - 1; i++)
                         _buffer[i].Dispose();
+                    _lastValue = _buffer[removeCount - 1];
 
                     _buffer.RemoveRange(0, removeCount);
                     _timer = 0f;

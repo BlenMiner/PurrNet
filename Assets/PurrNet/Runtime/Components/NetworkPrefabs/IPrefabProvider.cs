@@ -13,7 +13,7 @@ namespace PurrNet
 
     public struct PrefabData
     {
-        public int prefabId;
+        public PrefabID prefabId;
         public GameObject prefab;
         public PoolingConfig pooling;
 

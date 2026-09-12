@@ -9,6 +9,25 @@
         void OnTick(float delta);
     }
 
+    public interface IBaseTickListener
+    {
+    }
+
+    public interface ITickListener : IBaseTickListener
+    {
+        void OnTick();
+    }
+
+    public interface IPreTickListener : IBaseTickListener
+    {
+        void OnPreTick();
+    }
+
+    public interface IPostTickListener : IBaseTickListener
+    {
+        void OnPostTick();
+    }
+
     public interface IPlayerEvents
     {
         void OnPlayerConnected(PlayerID playerId, bool isReconnect, bool asServer);

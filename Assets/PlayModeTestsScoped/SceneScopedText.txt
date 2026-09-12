@@ -1,0 +1,1 @@
+scene scoped asset registry test payload

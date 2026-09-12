@@ -19,13 +19,14 @@ public static class LocalTestBuild
             .ToArray();
 
         var outputPath = GetCommandLineValue("-purrBuildOutput") ?? OutputPath;
+        var release = Array.IndexOf(Environment.GetCommandLineArgs(), "-purrRelease") >= 0;
 
         var options = new BuildPlayerOptions
         {
             scenes = scenes,
             locationPathName = outputPath,
             target = BuildTarget.StandaloneWindows64,
-            options = BuildOptions.Development
+            options = release ? BuildOptions.None : BuildOptions.Development
         };
 
         Debug.Log($"[LocalTestBuild] Building StandaloneWindows64 -> {outputPath}");

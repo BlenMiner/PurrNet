@@ -5,7 +5,7 @@ namespace PurrNet
     [Serializable]
     public class SyncRawFile : SyncFile<byte[]>
     {
-        public SyncRawFile(bool ownerAuth = false, int maxKBPerSec = 15) : base(ownerAuth, maxKBPerSec) { }
+        public SyncRawFile(bool ownerAuth = false, int maxKBPerSec = 15, bool ownerOnly = false) : base(ownerAuth, maxKBPerSec, ownerOnly) { }
 
         public override void FromBytes(ArraySegment<byte> bytes, ref byte[] content)
         {

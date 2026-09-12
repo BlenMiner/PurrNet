@@ -1,3 +1,4 @@
+using System;
 using PurrNet.Contributors;
 using PurrNet.Logging;
 using PurrNet.Modules;
@@ -53,6 +54,10 @@ namespace PurrNet
         private float _sendDelta;
         private bool _cachedIsController;
         private bool _cachedConnectedOwner;
+
+        private Action _onLateLateUpdate;
+        private int _lateLateUpdateHandle = PurrAction<Action>.InvalidHandle;
+
         private bool _loggedBoneMismatch;
 
         protected override void OnDestroy()
@@ -106,7 +111,8 @@ namespace PurrNet
 
         private void OnEnable()
         {
-            UnityLatestUpdate.onLatestUpdate += LateLateUpdate;
+            _onLateLateUpdate ??= LateLateUpdate;
+            _lateLateUpdateHandle = UnityLatestUpdate.latestUpdate.Add(_onLateLateUpdate);
 
             if (!isSpawned)
                 return;
@@ -121,7 +127,8 @@ namespace PurrNet
 
         private void OnDisable()
         {
-            UnityLatestUpdate.onLatestUpdate -= LateLateUpdate;
+            UnityLatestUpdate.latestUpdate.RemoveAt(_lateLateUpdateHandle, _onLateLateUpdate);
+            _lateLateUpdateHandle = PurrAction<Action>.InvalidHandle;
         }
 
         private void GatherBones()

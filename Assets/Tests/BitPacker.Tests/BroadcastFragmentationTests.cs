@@ -101,6 +101,7 @@ public class BroadcastFragmentationTests
         public void InternalUnregisterClientModules() { }
         public void InternalUnregisterServerModules() { }
         public bool HasModule<T>(bool asServer) where T : INetworkModule => false;
+        public void RequestSendFlushThisFrame() { }
     }
 
     [OneTimeSetUp]

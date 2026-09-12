@@ -23,7 +23,7 @@ namespace PurrNet
         private bool _ownerAuth = true;
 
         [Tooltip(
-            "Automatically sync parameters when they are changed, if you are using NetworkAnimator directly you should set this to false")]
+            "Automatically sync parameters and layer weights when they are changed, if you are using NetworkAnimator directly you should set this to false")]
         [SerializeField, PurrLock]
         private bool _autoSyncParameters = true;
 
@@ -38,8 +38,10 @@ namespace PurrNet
         public bool ownerAuth => _ownerAuth;
 
         /// <summary>
-        /// Automatically sync parameters when they are changed,
-        /// if you are using NetworkAnimator directly you should set this to false
+        /// Automatically sync parameters and layer weights when they are changed,
+        /// if you are using NetworkAnimator directly you should set this to false.
+        /// Triggers are not covered; the Animator consumes them before the next tick,
+        /// so they must go through <see cref="SetTrigger(int)"/>.
         /// </summary>
         public bool autoSyncParameters => _autoSyncParameters;
 
@@ -62,6 +64,7 @@ namespace PurrNet
             _boolValues.Clear();
             _floatValues.Clear();
             _intValues.Clear();
+            _layerWeights.Clear();
             _pendingTriggerActions.Clear();
             _hasPendingAnimatorParameterState = false;
             _dontSyncHashes.Clear();
@@ -179,7 +182,7 @@ namespace PurrNet
                 return true;
 
             var nm = networkManager;
-            if (!nm || !nm.networkAssets || !nm.networkAssets.TryGetIndex(asset, out _))
+            if (!nm || !nm.networkAssetResolver.TryGetId(asset, out _))
             {
                 Logging.PurrLogger.LogError(
                     $"NetworkAnimator.{memberName}: '{asset.name}' is not registered in NetworkAssets. " +
@@ -564,7 +567,10 @@ namespace PurrNet
 
         public string GetLayerName(int layerIndex) => _animator.GetLayerName(layerIndex);
 
-        public float GetLayerWeight(int layerIndex) => _animator.GetLayerWeight(layerIndex);
+        public float GetLayerWeight(int layerIndex) =>
+            !canApplyAnimatorParameters && _layerWeights.TryGetValue(layerIndex, out var weight)
+                ? weight
+                : _animator.GetLayerWeight(layerIndex);
 
         public Transform GetBoneTransform(HumanBodyBones humanBoneId) => _animator.GetBoneTransform(humanBoneId);
 
@@ -1071,10 +1077,14 @@ namespace PurrNet
                 return;
 
             var setLayerWeight = new SetLayerWeight { layerIndex = layerIndex, weight = weight };
-            setLayerWeight.Apply(_animator);
+            if (canApplyAnimatorParameters)
+                setLayerWeight.Apply(_animator);
+            else
+                _hasPendingAnimatorParameterState = true;
+            CacheLayerWeight(layerIndex, weight);
 
             IfSameReplace(new NetAnimatorRPC(setLayerWeight),
-                (a, b) => a._setLayerWeight.layerIndex == b._setLayerWeight.layerIndex);
+                (a, b) => a._setLayerWeight.layerIndex.value == b._setLayerWeight.layerIndex.value);
         }
 
         public void WriteDefaultValues()

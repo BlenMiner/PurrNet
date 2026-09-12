@@ -73,7 +73,7 @@ namespace PurrNet
 
                 foreach (var data in provider.allPrefabs)
                 {
-                    int unifiedId = data.prefabId + offset;
+                    int unifiedId = (int)data.prefabId + offset;
                     _unified[unifiedId] = new PrefabData
                     {
                         prefabId = unifiedId,
@@ -82,8 +82,8 @@ namespace PurrNet
                         warmupCount = data.warmupCount
                     };
 
-                    if (data.prefabId > localMax)
-                        localMax = data.prefabId;
+                    if ((int)data.prefabId > localMax)
+                        localMax = (int)data.prefabId;
                 }
 
                 int count = localMax + 1;
@@ -170,7 +170,7 @@ namespace PurrNet
             {
                 if (_providers[i].TryGetPrefabData(prefab, out var pd) && pd.prefab != null)
                 {
-                    int unifiedId = _offsets[i] + pd.prefabId;
+                    int unifiedId = _offsets[i] + (int)pd.prefabId;
                     prefabData = new PrefabData
                     {
                         prefabId = unifiedId,
@@ -213,7 +213,7 @@ namespace PurrNet
         public bool TryGetPersistentId(GameObject prefab, out string persistentId)
         {
             if (TryGetPrefabData(prefab, out var prefabData))
-                return TryGetPersistentId(prefabData.prefabId, out persistentId);
+                return TryGetPersistentId((int)prefabData.prefabId, out persistentId);
 
             persistentId = null;
             return false;
@@ -235,7 +235,7 @@ namespace PurrNet
                 if (!persistentProvider.TryGetPrefabDataByPersistentId(persistentId, out var localData))
                     continue;
 
-                int unifiedId = _offsets[i] + localData.prefabId;
+                int unifiedId = _offsets[i] + (int)localData.prefabId;
                 prefabData = new PrefabData
                 {
                     prefabId = unifiedId,

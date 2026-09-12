@@ -53,8 +53,9 @@ namespace PurrNet
         {
             if (b.isAbsolute)
             {
-                var lerpedAbs = math.lerp(a.value, b.value, t);
-                return new Vector3WithParent(default, false, b.posTransform.ToLocal(b.self, lerpedAbs));
+                // a.value is only comparable when a is also absolute; a mixed pair snaps to b.
+                var lerpedAbs = a.isAbsolute ? math.lerp(a.value, b.value, t) : b.value;
+                return new Vector3WithParent(b.self, b.posTransform, lerpedAbs);
             }
 
             var aWorldPos = a.ResolveWorld();
@@ -64,6 +65,9 @@ namespace PurrNet
 
         public static Vector3WithParent NoLerp(Vector3WithParent a, Vector3WithParent b, float t)
         {
+            if (b.isAbsolute)
+                return b;
+
             return new Vector3WithParent(default, false, b.ResolveWorld());
         }
     }

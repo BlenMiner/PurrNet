@@ -1,0 +1,1 @@
+asset registered by two scene scoped registries

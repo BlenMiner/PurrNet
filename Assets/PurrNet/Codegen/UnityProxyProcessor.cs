@@ -87,7 +87,10 @@ namespace PurrNet.Codegen
                                 targerRef = module.ImportReference(genRef);
                             }
 
-                            processor.Replace(instruction, processor.Create(instruction.OpCode, targerRef));
+                            // Rewrite in place. Replace() removes the instruction, and any branch that targets this
+                            // call (e.g. `Destroy(c ? a : b)`) would keep pointing at the removed one and be written
+                            // with a stale offset; Unity 6.6's ILPP runner re-reads the assembly and rejects that.
+                            instruction.Operand = targerRef;
                             continue;
                         }
 
@@ -125,7 +128,9 @@ namespace PurrNet.Codegen
 
                         var addrTargetRef = module.ImportReference(addrTargetMethod);
 
-                        processor.Replace(instruction, processor.Create(OpCodes.Call, addrTargetRef));
+                        // in place, see above
+                        instruction.OpCode = OpCodes.Call;
+                        instruction.Operand = addrTargetRef;
                     }
                 }
             }

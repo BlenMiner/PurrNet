@@ -49,20 +49,21 @@ namespace PurrNet.Packing
         [UsedByIL]
         private static unsafe bool WriteDouble(BitPacker packer, double oldvalue, double newvalue)
         {
-            // ReSharper disable once CompareOfFloatsByEqualityOperator
-            bool hasChanged = oldvalue != newvalue;
+            ulong oldBits = *(ulong*)&oldvalue;
+            ulong newBits = *(ulong*)&newvalue;
 
-            packer.WriteBit(hasChanged);
-
-            if (hasChanged)
+            if (newBits == oldBits)
             {
-                ulong oldBits = *(ulong*)&oldvalue;
-                ulong newBits = *(ulong*)&newvalue;
-                long diff = (long)(newBits - oldBits);
-                Packer<PackedLong>.Write(packer, diff);
+                packer.WriteBit(false);
+                return false;
             }
 
-            return hasChanged;
+            packer.WriteBit(true);
+            ulong zigzag = PackingIntegers.ZigzagEncode((long)(newBits - oldBits));
+            int bitCount = 64 - PackingIntegers.CountLeadingZeroBits(zigzag);
+            packer.WriteBits((ulong)(bitCount - 1), 6);
+            packer.WriteBits(zigzag, (byte)bitCount);
+            return true;
         }
 
         [UsedByIL]
@@ -70,10 +71,11 @@ namespace PurrNet.Packing
         {
             if (packer.ReadBit())
             {
-                PackedLong packed = default;
-                Packer<PackedLong>.Read(packer, ref packed);
+                int bitCount = (int)packer.ReadBits(6) + 1;
+                ulong zigzag = packer.ReadBits((byte)bitCount);
+                ulong diff = (ulong)PackingIntegers.ZigzagDecode(zigzag);
                 ulong oldBits = *(ulong*)&oldvalue;
-                ulong newBits = (ulong)((long)oldBits + packed.value);
+                ulong newBits = oldBits + diff;
                 value = *(double*)&newBits;
             }
             else value = oldvalue;

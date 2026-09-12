@@ -50,9 +50,11 @@ namespace PurrNet
 
         private HierarchyFactory _hierarchy;
 
-        public SyncLazyRef(bool ownerAuth = false)
+        public override bool ownerOnly => _networkID.ownerOnly;
+
+        public SyncLazyRef(bool ownerAuth = false, bool ownerOnly = false)
         {
-            _networkID = new SyncVar<GlobalNetworkID>(default, ownerAuth: ownerAuth);
+            _networkID = new SyncVar<GlobalNetworkID>(default, ownerAuth: ownerAuth, ownerOnly: ownerOnly);
             _networkID.onChanged += OnNetworkIDChanged;
         }
 

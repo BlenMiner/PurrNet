@@ -8,6 +8,7 @@ public enum AsyncInstantiateAwakeMutation
     AddNetworkIdentity = 0,
     ReparentNetworkIdentity = 1,
     RemoveNetworkIdentity = 2,
+    SwapNetworkSiblings = 3,
 }
 
 /// <summary>
@@ -129,6 +130,18 @@ public sealed class AsyncInstantiateAwakeShapeMutator : MonoBehaviour
                     // The shape must already be different when the async completion callback
                     // validates it. Destroy is deferred by Unity until the end of the frame.
                     UnityProxy.DestroyImmediateDirectly(child.gameObject);
+                break;
+            }
+            case AsyncInstantiateAwakeMutation.SwapNetworkSiblings:
+            {
+                // Same identity count, same parents — only the sibling order of two networked
+                // children changes. Silent acceptance would desync child order across peers.
+                var expected = transform.Find("ExpectedNetworkChild");
+                var second = transform.Find("SecondNetworkChild");
+                if (!expected || !second)
+                    break;
+
+                second.SetSiblingIndex(expected.GetSiblingIndex());
                 break;
             }
         }

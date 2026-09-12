@@ -25,6 +25,21 @@ public class IdentityServerRpcs : NetworkIdentity
     }
 
     [Serializable]
+    public struct SimplePackedPayload : IPackedSimple
+    {
+        public bool success;
+        public int integerVar;
+        public float floatVar;
+
+        public void Serialize(BitPacker packer)
+        {
+            Packer<bool>.Serialize(packer, ref success);
+            Packer<int>.Serialize(packer, ref integerVar);
+            Packer<float>.Serialize(packer, ref floatVar);
+        }
+    }
+
+    [Serializable]
     public struct AsyncPayload : IAsyncPackable
     {
         public int seed;
@@ -79,6 +94,18 @@ public class IdentityServerRpcs : NetworkIdentity
 
     [ServerRpc(requireOwnership: false)]
     public Task<TestPayload> Echo_Struct(TestPayload p, RPCInfo info = default) => Task.FromResult(p);
+
+    [ServerRpc(requireOwnership: false)]
+    public Task<SimplePackedPayload> Echo_SimplePacked(int seed, RPCInfo info = default)
+    {
+        return Task.FromResult(new SimplePackedPayload { success = true, integerVar = seed, floatVar = 42.5f });
+    }
+
+    [ServerRpc(requireOwnership: false)]
+    public UniTask<SimplePackedPayload> Echo_SimplePackedUni(int seed, RPCInfo info = default)
+    {
+        return UniTask.FromResult(new SimplePackedPayload { success = true, integerVar = seed, floatVar = 42.5f });
+    }
 
     [ServerRpc(requireOwnership: false)]
     public Task<int> Echo_Sum(int a, int b, int c, RPCInfo info = default) => Task.FromResult(a + b + c);

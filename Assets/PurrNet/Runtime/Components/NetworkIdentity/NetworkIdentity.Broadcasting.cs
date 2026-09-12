@@ -283,7 +283,8 @@ namespace PurrNet
             return players;
         }
 
-        public void SendRPCChild(Type statisticsParent, RPCModule rpcModule, ChildRPCPacket packet, RPCSignature signature)
+        public void SendRPCChild(Type statisticsParent, RPCModule rpcModule, ChildRPCPacket packet, RPCSignature signature,
+            bool ownerOnly = false)
         {
             _sendRPCMarker.Begin();
 
@@ -313,12 +314,31 @@ namespace PurrNet
                 {
                     if (isServer)
                     {
+                        var cachedOwner = owner;
+
+                        if (ownerOnly && !cachedOwner.HasValue)
+                            break;
+
                         if (signature.targetPlayer != null)
                         {
+                            if (ownerOnly && signature.targetPlayer.Value != cachedOwner.Value)
+                                break;
+
 #if UNITY_EDITOR || PURR_RUNTIME_PROFILING
                             Statistics.SentRPC(statisticsParent, signature.type, signature.rpcName, packet.rpcData, this);
 #endif
                             rpcModule.BatchToTarget(signature.targetPlayer.Value, packet, signature.channel, signature.mtuExceeded, signature.immediate);
+                        }
+                        else if (signature.targetPlayerList is IReadOnlyList<PlayerID> groupTargets)
+                        {
+#if UNITY_EDITOR || PURR_RUNTIME_PROFILING
+                            if (Statistics.shouldTrack)
+                            {
+                                for (var i = groupTargets.Count - 1; i >= 0; --i)
+                                    Statistics.SentRPC(statisticsParent, signature.type, signature.rpcName, packet.rpcData, this);
+                            }
+#endif
+                            rpcModule.BatchToTargets(groupTargets, packet, signature.channel, default, signature.mtuExceeded, signature.immediate);
                         }
                         else
                         {
@@ -328,7 +348,8 @@ namespace PurrNet
                             bool skipLocal = signature.runLocally || signature.excludeSender;
                             var filter = new ObserverFilter(
                                 networkManager.localPlayer, skipLocal,
-                                owner ?? default, signature.excludeOwner && owner.HasValue
+                                cachedOwner ?? default, signature.excludeOwner && cachedOwner.HasValue,
+                                cachedOwner ?? default, ownerOnly
                             );
 
 #if UNITY_EDITOR || PURR_RUNTIME_PROFILING
@@ -361,6 +382,18 @@ namespace PurrNet
                 case RPCType.TargetRPC:
                     if (isServer)
                     {
+                        PlayerID ownerValue = default;
+
+                        if (ownerOnly)
+                        {
+                            var cachedOwner = owner;
+
+                            if (!cachedOwner.HasValue)
+                                break;
+
+                            ownerValue = cachedOwner.Value;
+                        }
+
                         if (networkManager.isHost && signature.targetPlayer == PlayerID.Server &&
                             networkManager.TryGetRpcModule(false, out var hostClientRpcModule))
                         {
@@ -374,6 +407,15 @@ namespace PurrNet
                         }
 
                         using var players = signature.GetTargets();
+
+                        if (ownerOnly)
+                        {
+                            for (var i = players.Count - 1; i >= 0; --i)
+                            {
+                                if (players[i] != ownerValue)
+                                    players.RemoveAt(i);
+                            }
+                        }
 
                         if (players.Count == 0)
                             break;
@@ -450,6 +492,17 @@ namespace PurrNet
                             Statistics.SentRPC(statisticsParent, signature.type, signature.rpcName, packet.rpcData, this);
 #endif
                             rpcModule.BatchToTarget(signature.targetPlayer.Value, packet, signature.channel, signature.mtuExceeded, signature.immediate);
+                        }
+                        else if (signature.targetPlayerList is IReadOnlyList<PlayerID> groupTargets)
+                        {
+#if UNITY_EDITOR || PURR_RUNTIME_PROFILING
+                            if (Statistics.shouldTrack)
+                            {
+                                for (var i = groupTargets.Count - 1; i >= 0; --i)
+                                    Statistics.SentRPC(statisticsParent, signature.type, signature.rpcName, packet.rpcData, this);
+                            }
+#endif
+                            rpcModule.BatchToTargets(groupTargets, packet, signature.channel, default, signature.mtuExceeded, signature.immediate);
                         }
                         else
                         {
@@ -551,6 +604,7 @@ namespace PurrNet
         [UsedByIL]
         protected void SendRPC(RPCPacket packet, RPCSignature signature)
         {
+            NetworkAssetResolver.serializationSceneHint = null;
 #if UNITY_EDITOR || PURR_RUNTIME_PROFILING
             _myType ??= GetType();
 #endif
@@ -637,7 +691,8 @@ namespace PurrNet
             return ValidateIncomingRPC(info, signature, data, asServer, requestId, isAwaitable);
         }
 
-        internal bool ValidateIncomingRPC<T>(RPCInfo info, RPCSignature signature, T data, bool asServer, uint requestId, bool isAwaitable) where T : struct, IRpc
+        internal bool ValidateIncomingRPC<T>(RPCInfo info, RPCSignature signature, T data, bool asServer, uint requestId, bool isAwaitable,
+            bool ownerOnly = false) where T : struct, IRpc
         {
             using (_validatingRRPCMarker.Auto())
             {
@@ -727,6 +782,10 @@ namespace PurrNet
                     case RPCType.ObserversRPC:
                     {
                         var cachedOwner = owner;
+
+                        if (ownerOnly && !cachedOwner.HasValue)
+                            return !isClient;
+
                         using var players = DisposableList<PlayerID>.Create(observers.Count);
 
                         for (var i = 0; i < observers.Count; ++i)
@@ -738,6 +797,9 @@ namespace PurrNet
                             bool ignoreOwner = signature.excludeOwner && observer == cachedOwner;
 
                             if (ignoreSender || ignoreOwner)
+                                continue;
+
+                            if (ownerOnly && observer != cachedOwner.Value)
                                 continue;
 
                             players.Add(observer);
@@ -752,6 +814,9 @@ namespace PurrNet
                     }
                     case RPCType.TargetRPC:
                     {
+                        if (ownerOnly && data.targetPlayerId != owner)
+                            return !isClient;
+
                         bool shouldExecute =
                             SendToTargetOrServer(rules, module, data.targetPlayerId, data, signature, info, requestId, isAwaitable, asServer);
                         AppendToBufferedRPCs(signature, data, module);

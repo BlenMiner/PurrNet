@@ -22,12 +22,18 @@ namespace PurrNet.Modules
 
             _pools.Clear();
             _scenePools.Clear();
+            HierarchyPool.ClearPrototypes();
         }
 
         private static readonly Dictionary<IPrefabProvider, HierarchyPool> _pools = new();
         private static readonly Dictionary<SceneID, HierarchyPool> _scenePools = new();
 
-        public static HierarchyPool GetScenePool(Scene unityScene, SceneID scene)
+        public static bool TryGetScenePool(SceneID scene, out HierarchyPool pool)
+        {
+            return _scenePools.TryGetValue(scene, out pool);
+        }
+
+        public static HierarchyPool GetScenePool(Scene unityScene, SceneID scene, NetworkManager manager)
         {
             if (_scenePools.TryGetValue(scene, out var pool))
                 return pool;
@@ -44,7 +50,7 @@ namespace PurrNet.Modules
 
             SceneManager.MoveGameObjectToScene(poolParent, unityScene);
 
-            pool = new HierarchyPool(poolParent.transform);
+            pool = new HierarchyPool(poolParent.transform, manager.prefabResolver);
             _scenePools.Add(scene, pool);
             return pool;
         }
@@ -70,7 +76,7 @@ namespace PurrNet.Modules
             poolParent.AddComponent<PurrNetPoolRoot>();
 
             Object.DontDestroyOnLoad(poolParent);
-            pool = new HierarchyPool(poolParent.transform, prefabs);
+            pool = new HierarchyPool(poolParent.transform, manager.prefabResolver);
             _pools.Add(prefabs, pool);
             pool.Warmup();
             return pool;
@@ -86,6 +92,8 @@ namespace PurrNet.Modules
         {
             if (_scenePools.Remove(scene, out var pool))
                 pool.Dispose();
+
+            HierarchyPool.EvictPrototypes(scene);
         }
     }
 }

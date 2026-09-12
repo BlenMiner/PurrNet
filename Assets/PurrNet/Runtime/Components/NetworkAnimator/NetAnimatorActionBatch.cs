@@ -150,12 +150,13 @@ namespace PurrNet
         private static void SyncAssetReferences(Animator animator, DisposableList<NetAnimatorRPC> actions)
         {
             var nm = NetworkManager.main;
-            var assets = nm ? nm.networkAssets : null;
-            if (!assets)
+            if (!nm)
                 return;
 
+            var assets = nm.networkAssetResolver;
+
             var controller = animator.runtimeAnimatorController;
-            if (controller && assets.TryGetIndex(controller, out _))
+            if (controller && assets.TryGetId(controller, out _))
             {
                 actions.Add(new NetAnimatorRPC(new SetRuntimeAnimatorController
                 {
@@ -164,7 +165,7 @@ namespace PurrNet
             }
 
             var avatar = animator.avatar;
-            if (avatar && assets.TryGetIndex(avatar, out _))
+            if (avatar && assets.TryGetId(avatar, out _))
             {
                 actions.Add(new NetAnimatorRPC(new SetAvatar
                 {

@@ -18,7 +18,7 @@ public class CpuProfileSampler
     // samplers; we only want ours.
     private static readonly string[] Prefixes =
     {
-        "NetworkManager.", "NetworkTransform.", "NetworkIdentity.", "RPCModule.", "RPCBatch", "PurrNet"
+        "NetworkManager.", "NetworkTransform.", "NetworkIdentity.", "RPCModule.", "RPCBatch", "DeltaModule.", "PurrNet"
     };
 
     private readonly List<string> _names = new();

@@ -1,4 +1,5 @@
 using System;
+using JetBrains.Annotations;
 using PurrNet.Logging;
 using PurrNet.Modules;
 using PurrNet.Transports;
@@ -29,20 +30,27 @@ namespace PurrNet
         public int packetLoss { get; private set; }
         public float upload { get; private set; }
         public float download { get; private set; }
-        public bool isHighPing => _isHighPing;
-        public bool isHighJitter => _isHighJitter;
-        public bool isHighPacketLoss => _isHighPacketLoss;
-        public bool isConnectionStalled => _isConnectionStalled;
+        /// <summary>
+        /// False until the warmup has enough clean samples to publish a ping. While it is false
+        /// <see cref="ping"/> and <see cref="jitter"/> are 0 and no quality flag can raise, so a UI
+        /// can hide a readout rather than show a zero it would have to explain.
+        /// </summary>
+        [PublicAPI] public bool hasPingEstimate { get; private set; }
+
+        [PublicAPI] public bool isHighPing => _isHighPing;
+        [PublicAPI] public bool isHighJitter => _isHighJitter;
+        [PublicAPI] public bool isHighPacketLoss => _isHighPacketLoss;
+        [PublicAPI] public bool isConnectionStalled { get; private set; }
 
         public delegate void HighPingChanged(bool isHigh, int ping);
         public delegate void HighJitterChanged(bool isHigh, int jitter);
         public delegate void HighPacketLossChanged(bool isHigh, int packetLoss);
         public delegate void ConnectionStalledChanged(bool isStalled, float secondsSinceLastReceived);
 
-        public event HighPingChanged onHighPingChanged;
-        public event HighJitterChanged onHighJitterChanged;
-        public event HighPacketLossChanged onHighPacketLossChanged;
-        public event ConnectionStalledChanged onConnectionStalledChanged;
+        [PublicAPI] public event HighPingChanged onHighPingChanged;
+        [PublicAPI] public event HighJitterChanged onHighJitterChanged;
+        [PublicAPI] public event HighPacketLossChanged onHighPacketLossChanged;
+        [PublicAPI] public event ConnectionStalledChanged onConnectionStalledChanged;
 
         private NetworkManager _networkManager;
         private PlayersBroadcaster _playersClientBroadcaster;
@@ -59,11 +67,20 @@ namespace PurrNet
         private const float PING_EMA_FALL_ALPHA = 0.1f;
         private const float JITTER_EMA_ALPHA = 0.0625f;
         private const float WARMUP_DURATION = 1.0f;
+
+        private const int PING_WARMUP_SAMPLES = 5;
+        private const float STALL_FRAME_SECONDS = 0.25f;
+
         private float _emaPing;
-        private bool _hasPingSample;
         private float _connectionTime;
         private int _lastRawPing;
         private float _emaJitter;
+
+        private readonly int[] _warmupSamples = new int[PING_WARMUP_SAMPLES];
+        private readonly int[] _warmupScratch = new int[PING_WARMUP_SAMPLES];
+        private int _warmupWrites;
+        private float _lastFrameRealtime = -1f;
+        private float _lastStallRealtime = -1f;
 
         private const int MAX_SEQUENCE_TRACKING = 256;
         private const float PACKET_LOSS_WINDOW = 5f;
@@ -91,10 +108,14 @@ namespace PurrNet
         private bool _isHighPing;
         private bool _isHighJitter;
         private bool _isHighPacketLoss;
-        private bool _isConnectionStalled;
         private float _highPingTransitionStarted = -1f;
         private float _highJitterTransitionStarted = -1f;
         private float _highPacketLossTransitionStarted = -1f;
+        private int _highPingTransitionTicks;
+        private int _highJitterTransitionTicks;
+        private int _highPacketLossTransitionTicks;
+
+        private const int MIN_QUALITY_TICKS = 3;
 
         private int _cachedPing = -1;
         private int _cachedJitter = -1;
@@ -219,17 +240,26 @@ namespace PurrNet
             if (!_displayTarget.HasFlag(requiredTarget))
                 return;
 
-            if (placement == StatisticsPlacement.None || !connectedClient)
+            if (placement == StatisticsPlacement.None || (!connectedClient && !connectedServer))
                 return;
 
             EnsureLabelStyle();
             UpdateCachedStrings();
 
-            var position = GetPosition();
-            const float labelWidth = 200;
+            var labelWidth = GetStatsWidth();
+            var position = GetPosition(labelWidth);
             Rect rect = new(position.x, position.y, labelWidth, LineHeight);
 
-            if (_displayType.HasFlag(StatisticsDisplayType.Ping))
+            if (_displayType.HasFlag(StatisticsDisplayType.Connection))
+            {
+                if (connectedClient)
+                    DrawConnectionLabel(ref rect, _cachedClientConnectionText);
+
+                if (connectedServer)
+                    DrawConnectionLabel(ref rect, _cachedServerConnectionText);
+            }
+
+            if (connectedClient && _displayType.HasFlag(StatisticsDisplayType.Ping))
             {
                 GUI.Label(rect, _cachedPingText, _labelStyle);
                 rect.y += LineHeight;
@@ -247,7 +277,7 @@ namespace PurrNet
                 rect.y += LineHeight;
             }
 
-            if (_displayType.HasFlag(StatisticsDisplayType.ServerStats))
+            if (connectedClient && _displayType.HasFlag(StatisticsDisplayType.ServerStats))
             {
                 GUI.Label(rect, "Server Stats:", _labelStyle);
                 rect.y += LineHeight;
@@ -256,17 +286,18 @@ namespace PurrNet
                 GUI.Label(rect, _cachedServerAvgFpsText, _labelStyle);
                 rect.y += LineHeight;
                 GUI.Label(rect, _cachedServerMinFpsText, _labelStyle);
+                rect.y += LineHeight;
             }
 
             if (_displayType.HasFlag(StatisticsDisplayType.Version))
-            {
-                rect.y += LineHeight;
                 GUI.Label(rect, "Version: " + NetworkManager.version, _labelStyle);
-            }
         }
 
         private void UpdateCachedStrings()
         {
+            if (_displayType.HasFlag(StatisticsDisplayType.Connection))
+                UpdateConnectionStrings();
+
             if (ping != _cachedPing)
             {
                 _cachedPing = ping;
@@ -365,41 +396,55 @@ namespace PurrNet
             return pos;
         }
 
-        private Vector2 GetPosition()
+        private Vector2 GetPosition(float labelWidth)
         {
             var x = placement switch
             {
                 StatisticsPlacement.TopLeft or StatisticsPlacement.BottomLeft => PADDING,
-                _ => Screen.width - 200 - PADDING
+                _ => Screen.width - labelWidth - PADDING
             };
 
             var y = placement switch
             {
                 StatisticsPlacement.TopLeft or StatisticsPlacement.TopRight => PADDING,
-                _ => Screen.height - GetStatsHeight() - PADDING
+                _ => Screen.height - GetStatsHeight(labelWidth) - PADDING
             };
 
             return new Vector2(x, y);
         }
 
-        private int GetStatsHeight()
+        private int GetStatsHeight(float labelWidth)
         {
             int lines = 0;
+            float connectionHeight = 0f;
 
-            if (_displayType.HasFlag(StatisticsDisplayType.Ping))
+            if (_displayType.HasFlag(StatisticsDisplayType.Connection))
+            {
+                if (connectedClient)
+                    connectionHeight += GetConnectionHeight(_cachedClientConnectionText, labelWidth);
+                if (connectedServer)
+                    connectionHeight += GetConnectionHeight(_cachedServerConnectionText, labelWidth);
+            }
+
+            if (connectedClient && _displayType.HasFlag(StatisticsDisplayType.Ping))
                 lines += 3;
 
             if (_displayType.HasFlag(StatisticsDisplayType.Usage))
                 lines += 2;
 
-            if (_displayType.HasFlag(StatisticsDisplayType.ServerStats))
-                lines += 3;
+            if (connectedClient && _displayType.HasFlag(StatisticsDisplayType.ServerStats))
+                lines += 4;
 
-            return Mathf.CeilToInt(LineHeight * lines);
+            if (_displayType.HasFlag(StatisticsDisplayType.Version))
+                lines++;
+
+            return Mathf.CeilToInt(connectionHeight + LineHeight * lines);
         }
 
         private void Update()
         {
+            TrackLocalStalls();
+
             if (Time.unscaledTime - _lastDataCheckTime >= 1f)
             {
                 download = _totalDataReceived / 1024f;
@@ -524,7 +569,8 @@ namespace PurrNet
             jitter = 0;
             packetLoss = 0;
             _emaPing = 0;
-            _hasPingSample = false;
+            hasPingEstimate = false;
+            _warmupWrites = 0;
             _connectionTime = Time.unscaledTime;
             _lastRawPing = 0;
             _emaJitter = 0;
@@ -575,11 +621,10 @@ namespace PurrNet
             _playersClientBroadcaster.SendToServer(
                 new PingMessage {
                     sendTime = NowMilliseconds(),
-                    realSendTime = now
+                    realSendTime = Time.realtimeSinceStartup
                 },
                 Channel.Unreliable);
             _lastPingSendTime = now;
-            _networkManager.RequestSendFlushThisFrame();
         }
 
         private void ReceivePing(PlayerID sender, PingMessage msg, bool asServer)
@@ -592,11 +637,10 @@ namespace PurrNet
                         realSendTime = msg.realSendTime
                     },
                     Channel.Unreliable);
-                _networkManager.RequestSendFlushThisFrame();
                 return;
             }
 
-            if (Time.unscaledTime - _connectionTime < WARMUP_DURATION)
+            if (_lastStallRealtime >= msg.realSendTime)
                 return;
 
             uint elapsedMs = NowMilliseconds() - msg.sendTime;
@@ -605,26 +649,72 @@ namespace PurrNet
 
             int currentPing = (int)elapsedMs;
 
-            if (_hasPingSample)
+            if (!hasPingEstimate)
             {
-                int diff = Mathf.Abs(currentPing - _lastRawPing);
-                _emaJitter += JITTER_EMA_ALPHA * (diff - _emaJitter);
+                CollectWarmupSample(currentPing);
+                return;
             }
+
+            int diff = Mathf.Abs(currentPing - _lastRawPing);
+            _emaJitter += JITTER_EMA_ALPHA * (diff - _emaJitter);
             _lastRawPing = currentPing;
 
-            if (!_hasPingSample)
-            {
-                _emaPing = currentPing;
-                _hasPingSample = true;
-            }
-            else
-            {
-                float alpha = currentPing > _emaPing ? PING_EMA_RISE_ALPHA : PING_EMA_FALL_ALPHA;
-                _emaPing = alpha * currentPing + (1f - alpha) * _emaPing;
-            }
+            float alpha = currentPing > _emaPing ? PING_EMA_RISE_ALPHA : PING_EMA_FALL_ALPHA;
+            _emaPing = alpha * currentPing + (1f - alpha) * _emaPing;
 
             ping = Mathf.RoundToInt(_emaPing);
             jitter = Mathf.RoundToInt(_emaJitter);
+        }
+
+        private void CollectWarmupSample(int currentPing)
+        {
+            _warmupSamples[_warmupWrites % PING_WARMUP_SAMPLES] = currentPing;
+            _warmupWrites++;
+
+            if (_warmupWrites < PING_WARMUP_SAMPLES ||
+                Time.unscaledTime - _connectionTime < WARMUP_DURATION)
+            {
+                return;
+            }
+
+            _emaPing = MedianWarmupSample();
+            _lastRawPing = Mathf.RoundToInt(_emaPing);
+            _emaJitter = 0f;
+            hasPingEstimate = true;
+
+            ping = Mathf.RoundToInt(_emaPing);
+            jitter = 0;
+        }
+
+        private int MedianWarmupSample()
+        {
+            Array.Copy(_warmupSamples, _warmupScratch, PING_WARMUP_SAMPLES);
+
+            for (int i = 1; i < PING_WARMUP_SAMPLES; i++)
+            {
+                int value = _warmupScratch[i];
+                int j = i - 1;
+
+                while (j >= 0 && _warmupScratch[j] > value)
+                {
+                    _warmupScratch[j + 1] = _warmupScratch[j];
+                    j--;
+                }
+
+                _warmupScratch[j + 1] = value;
+            }
+
+            return _warmupScratch[PING_WARMUP_SAMPLES / 2];
+        }
+
+        private void TrackLocalStalls()
+        {
+            float realtime = Time.realtimeSinceStartup;
+
+            if (_lastFrameRealtime >= 0f && realtime - _lastFrameRealtime >= STALL_FRAME_SECONDS)
+                _lastStallRealtime = realtime;
+
+            _lastFrameRealtime = realtime;
         }
 
         private void SendPacketCheck(float now)
@@ -670,35 +760,36 @@ namespace PurrNet
                     totalLost++;
             }
 
-            if (totalSettled > 0)
-                packetLoss = Mathf.Clamp(totalLost * 100 / totalSettled, 0, 100);
-            else
-                packetLoss = 0;
+            packetLoss = totalSettled > 0 ? Mathf.Clamp(totalLost * 100 / totalSettled, 0, 100) : 0;
         }
 
         private void UpdateNetworkQuality()
         {
             float now = Time.unscaledTime;
 
-            if (UpdateQualityState(ping, _highPingThreshold, _highPingRecoveryThreshold, now, ref _isHighPing, ref _highPingTransitionStarted))
-                onHighPingChanged?.Invoke(_isHighPing, ping);
+            if (hasPingEstimate)
+            {
+                if (UpdateQualityState(ping, _highPingThreshold, _highPingRecoveryThreshold, now, ref _isHighPing, ref _highPingTransitionStarted, ref _highPingTransitionTicks))
+                    onHighPingChanged?.Invoke(_isHighPing, ping);
 
-            if (UpdateQualityState(jitter, _highJitterThreshold, _highJitterRecoveryThreshold, now, ref _isHighJitter, ref _highJitterTransitionStarted))
-                onHighJitterChanged?.Invoke(_isHighJitter, jitter);
+                if (UpdateQualityState(jitter, _highJitterThreshold, _highJitterRecoveryThreshold, now, ref _isHighJitter, ref _highJitterTransitionStarted, ref _highJitterTransitionTicks))
+                    onHighJitterChanged?.Invoke(_isHighJitter, jitter);
+            }
 
-            if (UpdateQualityState(packetLoss, _highPacketLossThreshold, _highPacketLossRecoveryThreshold, now, ref _isHighPacketLoss, ref _highPacketLossTransitionStarted))
+            if (UpdateQualityState(packetLoss, _highPacketLossThreshold, _highPacketLossRecoveryThreshold, now, ref _isHighPacketLoss, ref _highPacketLossTransitionStarted, ref _highPacketLossTransitionTicks))
                 onHighPacketLossChanged?.Invoke(_isHighPacketLoss, packetLoss);
 
             UpdateConnectionStall(now);
         }
 
-        private bool UpdateQualityState(int value, int threshold, int recoveryThreshold, float now, ref bool isActive, ref float transitionStarted)
+        private bool UpdateQualityState(int value, int threshold, int recoveryThreshold, float now, ref bool isActive, ref float transitionStarted, ref int transitionTicks)
         {
             bool shouldChange = isActive ? value <= recoveryThreshold : value >= threshold;
 
             if (!shouldChange)
             {
                 transitionStarted = -1f;
+                transitionTicks = 0;
                 return false;
             }
 
@@ -706,17 +797,24 @@ namespace PurrNet
             {
                 isActive = !isActive;
                 transitionStarted = -1f;
+                transitionTicks = 0;
                 return true;
             }
 
             if (transitionStarted < 0f)
+            {
                 transitionStarted = now;
+                transitionTicks = 0;
+            }
 
-            if (now - transitionStarted < _qualityChangeDuration)
+            transitionTicks++;
+
+            if (now - transitionStarted < _qualityChangeDuration || transitionTicks < MIN_QUALITY_TICKS)
                 return false;
 
             isActive = !isActive;
             transitionStarted = -1f;
+            transitionTicks = 0;
             return true;
         }
 
@@ -730,16 +828,16 @@ namespace PurrNet
 
             float secondsSinceLastReceived = now - _lastClientDataReceivedTime;
 
-            if (!_isConnectionStalled && secondsSinceLastReceived >= _connectionStallThreshold)
+            if (!isConnectionStalled && secondsSinceLastReceived >= _connectionStallThreshold)
                 SetConnectionStalled(true, secondsSinceLastReceived);
         }
 
         private void SetConnectionStalled(bool isStalled, float secondsSinceLastReceived)
         {
-            if (_isConnectionStalled == isStalled)
+            if (isConnectionStalled == isStalled)
                 return;
 
-            _isConnectionStalled = isStalled;
+            isConnectionStalled = isStalled;
             onConnectionStalledChanged?.Invoke(isStalled, secondsSinceLastReceived);
         }
 
@@ -748,6 +846,9 @@ namespace PurrNet
             _highPingTransitionStarted = -1f;
             _highJitterTransitionStarted = -1f;
             _highPacketLossTransitionStarted = -1f;
+            _highPingTransitionTicks = 0;
+            _highJitterTransitionTicks = 0;
+            _highPacketLossTransitionTicks = 0;
 
             if (_isHighPing)
             {
@@ -831,6 +932,7 @@ namespace PurrNet
             Usage = 1 << 1,
             ServerStats = 1 << 2,
             Version = 1 << 3,
+            Connection = 1 << 4,
         }
 
         [Flags]

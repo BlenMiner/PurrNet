@@ -32,6 +32,7 @@ namespace PurrNet.Editor
         private bool _releasePopupTouched;
         private bool _devPopupTouched;
         private bool _isUpdatingAll;
+        [NonSerialized] private bool _isRunningUpdateBatch;
         private bool _isRegisteringRepository;
         private int _updatableCount;
         private readonly HashSet<string> _activePackageOperations = new();
@@ -92,7 +93,25 @@ namespace PurrNet.Editor
         private const string CategoryFoldoutPreferencePrefix = "PurrNet.PackageManager.CategoryExpanded.";
         private const string PackageWebsiteBaseUrl = "https://purrnet.dev/packages/";
         private const string PackageAdminUrl = "https://purrnet.dev/admin/packages";
+        private const string PendingUpdateBatchSessionKey = "PurrNet.PackageManager.PendingUpdateBatch";
         private static readonly string[] _busyFrames = { "|", "/", "-", "\\" };
+
+        [InitializeOnLoadMethod]
+        private static void InitializeUpdateBatchReloadGuard()
+        {
+            AssemblyReloadEvents.beforeAssemblyReload -= ClearBatchProgressBeforeReload;
+            AssemblyReloadEvents.beforeAssemblyReload += ClearBatchProgressBeforeReload;
+
+            // A native progress dialog can survive the managed domain that created it.
+            if (HasPendingUpdateBatch())
+                EditorUtility.ClearProgressBar();
+        }
+
+        private static void ClearBatchProgressBeforeReload()
+        {
+            if (HasPendingUpdateBatch())
+                EditorUtility.ClearProgressBar();
+        }
 
         [MenuItem("Tools/PurrNet/PurrNet Packages %#&p", false, -101)]
         public static void ShowWindow()
@@ -117,6 +136,8 @@ namespace PurrNet.Editor
             _userProfile.Refresh();
             DetectCurrentRepository();
             PurrPackageManagerAuth.onAuthChanged += onAuthChanged;
+            UnityEditor.PackageManager.Events.registeredPackages += OnRegisteredPackages;
+            _isUpdatingAll = HasPendingUpdateBatch();
             LoadData();
         }
 
@@ -129,6 +150,14 @@ namespace PurrNet.Editor
         private void OnDisable()
         {
             PurrPackageManagerAuth.onAuthChanged -= onAuthChanged;
+            UnityEditor.PackageManager.Events.registeredPackages -= OnRegisteredPackages;
+        }
+
+        private void OnRegisteredPackages(UnityEditor.PackageManager.PackageRegistrationEventArgs args)
+        {
+            if (HasPendingUpdateBatch() && !_isRunningUpdateBatch && _packages?.Packages != null)
+                _ = ResumePendingUpdateBatch();
+            Repaint();
         }
 
         private void onAuthChanged()
@@ -968,14 +997,9 @@ namespace PurrNet.Editor
                 EditorGUI.DrawRect(itemRect, _hoverBg);
             }
 
-            // Git update detection — compare lock file hash against both channel commits
-            // Only used for IsExternal packages; non-external uses version comparison.
-            bool hasGitUpdate = false;
-            if (package.IsExternal && isGitInstall)
-            {
-                var hash = PurrPackageManagerInstaller.GetInstalledCommitHash(package);
-                hasGitUpdate = HasGitUpdate(package, hash);
-            }
+            // Follow the channel already installed so the row, Update All count, and batch target agree.
+            bool hasGitUpdate = package.IsExternal && isGitInstall
+                                && TryGetExternalUpdateTarget(package, out _, out _);
 
             // Build right-side info text
             bool showEarlyAccess = package.IsEarlyAccess && package.HasAccess;
@@ -1215,8 +1239,7 @@ namespace PurrNet.Editor
             var updateTarget = isInstalled ? GetVersionUpdateTarget(package, installedVersion, release, dev) : null;
             bool hasUpdate = updateTarget != null;
 
-            // Git update detection — compare lock file hash against both channel commits
-            // Only used for IsExternal packages; non-external uses version comparison.
+            // Follow the channel already installed so the detail badge matches Update All.
             string gitInstalledHash = null;
             string gitInstalledChannel = null;
             bool hasGitUpdate = false;
@@ -1224,7 +1247,7 @@ namespace PurrNet.Editor
             {
                 gitInstalledHash = PurrPackageManagerInstaller.GetInstalledCommitHash(package);
                 gitInstalledChannel = PurrPackageManagerInstaller.GetInstalledGitChannel(package);
-                hasGitUpdate = HasGitUpdate(package, gitInstalledHash);
+                hasGitUpdate = TryGetExternalUpdateTarget(package, out _, out _);
             }
 
             EditorGUILayout.Space(8);
@@ -1297,7 +1320,7 @@ namespace PurrNet.Editor
                 GUILayout.Label($"Tier: {tierName}", _smallLabelStyle);
 
             if (package.IsUserEditable)
-                GUILayout.Label("Uses Unity's interactive importer to install selected files under Assets",
+                GUILayout.Label("Uses Unity's interactive importer under Assets; update this package individually",
                     _smallLabelStyle);
 
             if (!string.IsNullOrEmpty(package.Slug))
@@ -1900,28 +1923,6 @@ namespace PurrNet.Editor
             return target;
         }
 
-        // Treats empty server hashes as "no info" (not a mismatch) and matches by case-insensitive
-        // prefix so a short SHA from one side equals a full SHA from the other. Avoids false
-        // "update available" when the API has no commit data for a channel that doesn't exist
-        // on the upstream repo (common for IsExternal packages).
-        private static bool HasGitUpdate(PackageInfo package, string installedHash)
-        {
-            if (string.IsNullOrEmpty(installedHash))
-                return false;
-
-            bool hasRelease = !string.IsNullOrEmpty(package.LatestCommitRelease);
-            bool hasDev = !string.IsNullOrEmpty(package.LatestCommitDev);
-            if (!hasRelease && !hasDev)
-                return false;
-
-            if (hasRelease && HashesMatch(installedHash, package.LatestCommitRelease))
-                return false;
-            if (hasDev && HashesMatch(installedHash, package.LatestCommitDev))
-                return false;
-
-            return true;
-        }
-
         private static bool HashesMatch(string a, string b)
         {
             if (string.IsNullOrEmpty(a) || string.IsNullOrEmpty(b))
@@ -2046,32 +2047,71 @@ namespace PurrNet.Editor
                 totalCount += categoryCount;
             }
 
-            return totalCount;
+            // The button also counts hidden updates and missing dependency installs that have no row.
+            return _packages?.Packages == null ? totalCount : CollectUpdatablePackages().Count;
         }
 
         private static bool HasAvailableUpdate(PackageInfo pkg, VersionInfo release, VersionInfo dev)
         {
-            if (!pkg.HasAccess || pkg.Frozen || !PurrPackageManagerInstaller.IsInstalled(pkg))
+            // User-editable packages open Unity's interactive importer and may replace selected
+            // project assets. They must be reviewed and updated individually, never unattended.
+            if (!pkg.HasAccess || pkg.Frozen || pkg.IsUserEditable
+                || !PurrPackageManagerInstaller.IsInstalled(pkg))
                 return false;
 
             bool isGitInstall = PurrPackageManagerInstaller.IsInstalledViaGit(pkg);
             if (pkg.IsExternal && isGitInstall)
-            {
-                var hash = PurrPackageManagerInstaller.GetInstalledCommitHash(pkg);
-                return HasGitUpdate(pkg, hash);
-            }
+                return TryGetExternalUpdateTarget(pkg, out _, out _);
 
             var installedVersion = PurrPackageManagerInstaller.GetInstalledVersion(pkg);
             return GetVersionUpdateTarget(pkg, installedVersion, release, dev) != null;
         }
 
-        private List<(PackageInfo pkg, VersionInfo version, string gitUrl)> CollectUpdatablePackages()
+        private static bool TryGetExternalUpdateTarget(PackageInfo package, out string gitUrl,
+            out string expectedCommit)
         {
-            var updates = new List<(PackageInfo pkg, VersionInfo version, string gitUrl)>();
+            gitUrl = null;
+            expectedCommit = null;
 
-            foreach (var (pkg, release, dev) in _sortedPackages)
+            var installedHash = PurrPackageManagerInstaller.GetInstalledCommitHash(package);
+            if (string.IsNullOrEmpty(installedHash))
+                return false;
+
+            var channel = PurrPackageManagerInstaller.GetInstalledGitChannel(package);
+            if (string.Equals(channel, "dev", StringComparison.OrdinalIgnoreCase))
             {
-                if (!pkg.HasAccess || pkg.Frozen) continue;
+                gitUrl = package.GitInstallUrlDev;
+                expectedCommit = package.LatestCommitDev;
+            }
+            else if (string.Equals(channel, "release", StringComparison.OrdinalIgnoreCase))
+            {
+                gitUrl = package.GitInstallUrlRelease;
+                expectedCommit = package.LatestCommitRelease;
+            }
+            else
+            {
+                // An older/manual pin can be ambiguous when both channels use the same repository.
+                // Leave it alone until the user explicitly chooses a channel.
+                return false;
+            }
+
+            return !string.IsNullOrEmpty(gitUrl)
+                   && !string.IsNullOrEmpty(expectedCommit)
+                   && !HashesMatch(installedHash, expectedCommit);
+        }
+
+        private List<(PackageInfo pkg, VersionInfo version, string gitUrl, string expectedCommit)>
+            CollectUpdatablePackages()
+        {
+            var updates = new List<(
+                PackageInfo pkg, VersionInfo version, string gitUrl, string expectedCommit)>();
+
+            foreach (var pkg in _packages.Packages)
+            {
+                if (!pkg.HasAccess || pkg.Frozen || pkg.IsUserEditable) continue;
+
+                var release = FindLatestByChannel(pkg, "release");
+                var dev = FindLatestByChannel(pkg, "dev");
 
                 bool isInstalled = PurrPackageManagerInstaller.IsInstalled(pkg);
                 if (!isInstalled) continue;
@@ -2081,27 +2121,142 @@ namespace PurrNet.Editor
 
                 if (pkg.IsExternal && isGitInstall)
                 {
-                    var hash = PurrPackageManagerInstaller.GetInstalledCommitHash(pkg);
-                    if (HasGitUpdate(pkg, hash))
-                    {
-                        var channel = PurrPackageManagerInstaller.GetInstalledGitChannel(pkg);
-                        var gitUrl = channel == "dev" ? pkg.GitInstallUrlDev : pkg.GitInstallUrlRelease;
-                        if (!string.IsNullOrEmpty(gitUrl))
-                            updates.Add((pkg, null, gitUrl));
-                    }
+                    if (TryGetExternalUpdateTarget(pkg, out var gitUrl, out var expectedCommit))
+                        updates.Add((pkg, null, gitUrl, expectedCommit));
                 }
                 else
                 {
                     var target = GetVersionUpdateTarget(pkg, installedVersion, release, dev);
                     if (target != null)
-                        updates.Add((pkg, target, null));
+                        updates.Add((pkg, target, null, null));
                 }
             }
 
-            return updates;
+            var catalogById = new Dictionary<string, PackageInfo>(StringComparer.OrdinalIgnoreCase);
+            foreach (var package in _packages.Packages)
+            {
+                if (!string.IsNullOrEmpty(package.Id))
+                    catalogById[package.Id] = package;
+            }
+
+            // Every missing dependency is promoted into the durable queue before its root. That way
+            // a reload or failed root cannot leave a staged dependency outside final verification.
+            var plannedById = new Dictionary<string, (
+                PackageInfo pkg, VersionInfo version, string gitUrl, string expectedCommit)>(
+                StringComparer.OrdinalIgnoreCase);
+            foreach (var update in updates)
+            {
+                if (!string.IsNullOrEmpty(update.pkg.Id))
+                    plannedById[update.pkg.Id] = update;
+            }
+
+            var ordered = new List<(
+                PackageInfo pkg, VersionInfo version, string gitUrl, string expectedCommit)>();
+            var added = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+            var visitingUpdates = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+            var visitingDependencies = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+
+            void AddWithDependencies((
+                PackageInfo pkg, VersionInfo version, string gitUrl, string expectedCommit) update)
+            {
+                var key = update.pkg.Id ?? update.pkg.GetUpmPackageName();
+                if (string.IsNullOrEmpty(key) || added.Contains(key) || !visitingUpdates.Add(key))
+                    return;
+
+                string preferredChannel = update.version?.Channel;
+                if (string.IsNullOrEmpty(preferredChannel))
+                {
+                    preferredChannel = string.Equals(update.gitUrl, update.pkg.GitInstallUrlDev,
+                        StringComparison.Ordinal) ? "dev" : "release";
+                }
+
+                AddDependencies(update.pkg, preferredChannel);
+
+                visitingUpdates.Remove(key);
+                if (added.Add(key))
+                    ordered.Add(update);
+            }
+
+            void AddDependencies(PackageInfo owner, string preferredChannel)
+            {
+                if (owner.DependencyIds == null)
+                    return;
+
+                foreach (var dependencyId in owner.DependencyIds)
+                {
+                    if (plannedById.TryGetValue(dependencyId, out var plannedDependency))
+                    {
+                        AddWithDependencies(plannedDependency);
+                        continue;
+                    }
+
+                    if (!catalogById.TryGetValue(dependencyId, out var dependency))
+                        continue;
+
+                    if (!PurrPackageManagerInstaller.IsInstalled(dependency))
+                    {
+                        if (TryCreateDependencyInstall(dependency, preferredChannel,
+                                out var dependencyInstall))
+                        {
+                            plannedById[dependencyId] = dependencyInstall;
+                            AddWithDependencies(dependencyInstall);
+                        }
+                        continue;
+                    }
+
+                    // Installed dependencies with no update can still have a newly-added missing
+                    // transitive dependency. Traverse them without adding an unnecessary update item.
+                    if (visitingDependencies.Add(dependencyId))
+                    {
+                        AddDependencies(dependency, preferredChannel);
+                        visitingDependencies.Remove(dependencyId);
+                    }
+                }
+            }
+
+            static bool TryCreateDependencyInstall(PackageInfo dependency, string preferredChannel,
+                out (PackageInfo pkg, VersionInfo version, string gitUrl, string expectedCommit) install)
+            {
+                install = default;
+                if (dependency == null || !dependency.HasAccess || dependency.IsUserEditable)
+                    return false;
+
+                if (dependency.IsExternal)
+                {
+                    bool preferDev = string.Equals(preferredChannel, "dev",
+                        StringComparison.OrdinalIgnoreCase);
+                    var gitUrl = preferDev
+                        ? dependency.GitInstallUrlDev ?? dependency.GitInstallUrlRelease
+                        : dependency.GitInstallUrlRelease ?? dependency.GitInstallUrlDev;
+                    if (string.IsNullOrEmpty(gitUrl))
+                        return false;
+
+                    var expectedCommit = string.Equals(gitUrl, dependency.GitInstallUrlDev,
+                        StringComparison.Ordinal)
+                        ? dependency.LatestCommitDev
+                        : dependency.LatestCommitRelease;
+                    install = (dependency, null, gitUrl, expectedCommit);
+                    return true;
+                }
+
+                var version = FindLatestByChannel(dependency, preferredChannel)
+                              ?? (dependency.Versions != null && dependency.Versions.Length > 0
+                                  ? dependency.Versions[0]
+                                  : null);
+                if (version == null)
+                    return false;
+
+                install = (dependency, version, null, null);
+                return true;
+            }
+
+            foreach (var update in updates)
+                AddWithDependencies(update);
+
+            return ordered;
         }
 
-        private async void UpdateAllPackages()
+        private void UpdateAllPackages()
         {
             if (_isUpdatingAll || _packages?.Packages == null)
                 return;
@@ -2111,70 +2266,287 @@ namespace PurrNet.Editor
                 return;
 
             var names = new StringBuilder();
-            foreach (var (pkg, _, _) in updates)
+            foreach (var (pkg, _, _, _) in updates)
                 names.AppendLine($"\u2022 {pkg.DisplayName}");
 
             if (!EditorUtility.DisplayDialog("Update All Packages",
-                $"The following {updates.Count} package(s) will be updated:\n\n{names}",
+                $"The following {updates.Count} package(s) will be updated:\n\n{names}\n" +
+                "User-editable packages are excluded and must be updated individually. " +
+                "Required hidden or missing dependencies are included. Downloaded embedded packages " +
+                "will still ask before replacing local changes.",
                 "Update All", "Cancel"))
                 return;
 
+            var state = new PackageUpdateBatchState();
+            foreach (var (pkg, version, gitUrl, expectedCommit) in updates)
+            {
+                state.Items.Add(new PackageUpdateBatchItem
+                {
+                    PackageId = pkg.Id,
+                    UpmName = pkg.GetUpmPackageName(),
+                    DisplayName = pkg.DisplayName,
+                    VersionId = version?.Id,
+                    Version = version?.Version,
+                    GitUrl = gitUrl,
+                    ExpectedCommit = expectedCommit,
+                    ExpectedLockVersion = !string.IsNullOrEmpty(gitUrl)
+                        ? gitUrl
+                        : PurrPackageManagerInstaller.GetGitManifestValueForVersion(pkg, version),
+                    DependencyIds = pkg.DependencyIds ?? Array.Empty<string>()
+                });
+            }
+
+            SavePendingUpdateBatch(state);
             _isUpdatingAll = true;
             Repaint();
+            _ = ResumePendingUpdateBatch();
+        }
 
-            var apiKey = PurrPackageManagerAuth.GetApiKey();
-            var errors = new List<string>();
+        private async System.Threading.Tasks.Task ResumePendingUpdateBatch()
+        {
+            if (_isRunningUpdateBatch || _packages?.Packages == null)
+                return;
+            if (!TryGetPendingUpdateBatch(out var state))
+            {
+                _isUpdatingAll = false;
+                Repaint();
+                return;
+            }
 
+            _isRunningUpdateBatch = true;
+            _isUpdatingAll = true;
+            Repaint();
             try
             {
-                for (int i = 0; i < updates.Count; i++)
-                {
-                    var (pkg, version, gitUrl) = updates[i];
-                    EditorUtility.DisplayProgressBar("Updating All Packages",
-                        $"Updating {pkg.DisplayName} ({i + 1}/{updates.Count})...",
-                        (float)(i + 1) / updates.Count);
-
-                    try
+                await PackageUpdateBatchRunner.Run(
+                    state,
+                    IsBatchItemApplied,
+                    IsBatchItemResolved,
+                    (item, resolve) => InstallBatchItem(state, item, resolve),
+                    SavePendingUpdateBatch,
+                    (index, count, item) =>
                     {
-                        if (gitUrl != null)
-                        {
-                            var result = await PurrPackageManagerInstaller.InstallExternalWithDependencies(
-                                apiKey, pkg, gitUrl, _packages.Packages);
-                            if (!result.Success)
-                                errors.Add($"{pkg.DisplayName}: {result.Error}");
-                        }
-                        else if (version != null)
-                        {
-                            var result = await PurrPackageManagerInstaller.InstallWithDependencies(
-                                apiKey, pkg, version, _packages.Packages);
-                            if (!result.Success)
-                                errors.Add($"{pkg.DisplayName}: {result.Error}");
-                        }
-                    }
-                    catch (Exception e)
+                        EditorUtility.DisplayProgressBar("Updating All Packages",
+                            $"Updating {item.DisplayName} ({index + 1}/{count})...",
+                            (float)(index + 1) / count);
+                    },
+                    EditorUtility.ClearProgressBar,
+                    () =>
                     {
-                        errors.Add($"{pkg.DisplayName}: {e.Message}");
-                    }
-                }
+                        PurrPackageManagerCache.Invalidate();
+                        Repaint();
+                    },
+                    () => PurrPackageManagerInstaller.ResolvePackagesWithRetry(
+                        () => AreSuccessfulBatchItemsApplied(state)));
 
+                // Keep the SessionState journal until Resolve returns or a new domain verifies its
+                // targets. This preserves failures and keeps Update All disabled throughout UPM work.
+                ClearPendingUpdateBatch();
                 PurrPackageManagerCache.Invalidate();
             }
             catch (Exception e)
             {
-                errors.Add(e.Message);
+                state.Errors ??= new List<string>();
+                state.Errors.Add($"Update All: {e.Message}");
+                ClearPendingUpdateBatch();
             }
             finally
             {
                 EditorUtility.ClearProgressBar();
+                _isRunningUpdateBatch = false;
                 _isUpdatingAll = false;
                 Repaint();
             }
 
-            if (errors.Count > 0)
+            if (state.Errors != null && state.Errors.Count > 0)
                 EditorUtility.DisplayDialog("Update Failed",
-                    string.Join("\n", errors), "Ok");
+                    string.Join("\n", state.Errors), "Ok");
 
             LoadData();
+        }
+
+        private async System.Threading.Tasks.Task<Result<bool>> InstallBatchItem(
+            PackageUpdateBatchState state, PackageUpdateBatchItem item, bool resolve)
+        {
+            var package = FindBatchPackage(item);
+            if (package == null)
+                return Result<bool>.Fail("The package is no longer present in the catalog.");
+
+            var apiKey = PurrPackageManagerAuth.GetApiKey();
+            Result<bool> result;
+            if (!string.IsNullOrEmpty(item.GitUrl))
+            {
+                result = await PurrPackageManagerInstaller.InstallExternalWithDependencies(
+                    apiKey, package, item.GitUrl, _packages.Packages, resolve,
+                    allowUserEditableDependencies: false);
+            }
+            else
+            {
+                var version = FindBatchVersion(package, item);
+                if (version == null)
+                    return Result<bool>.Fail($"Version '{item.Version}' is no longer present in the catalog.");
+
+                result = await PurrPackageManagerInstaller.InstallWithDependencies(
+                    apiKey, package, version, _packages.Packages, resolve,
+                    allowUserEditableDependencies: false,
+                    onDownloadedPackagePrepared: actualVersion =>
+                    {
+                        if (string.IsNullOrEmpty(actualVersion))
+                            return;
+
+                        item.Version = actualVersion;
+                        SavePendingUpdateBatch(state);
+                    });
+            }
+
+            // Download metadata and package.json versions can differ. Store the actual embedded
+            // version before the runner persists this item so final registration checks are exact.
+            if (result.Success && string.IsNullOrEmpty(item.ExpectedLockVersion))
+                item.Version = PurrPackageManagerInstaller.GetInstalledVersion(package);
+
+            return result;
+        }
+
+        private bool IsBatchItemApplied(PackageUpdateBatchItem item)
+        {
+            var package = FindBatchPackage(item);
+            if (package == null)
+                return false;
+
+            if (!string.IsNullOrEmpty(item.GitUrl))
+            {
+                var installedHash = PurrPackageManagerInstaller.GetInstalledCommitHash(package);
+                if (!string.IsNullOrEmpty(item.ExpectedCommit))
+                    return HashesMatch(installedHash, item.ExpectedCommit);
+                return PurrPackageManagerInstaller.IsPackageLockVersion(
+                    item.UpmName, item.ExpectedLockVersion);
+            }
+
+            return string.Equals(PurrPackageManagerInstaller.GetInstalledVersion(package), item.Version,
+                StringComparison.OrdinalIgnoreCase);
+        }
+
+        private bool AreSuccessfulBatchItemsApplied(PackageUpdateBatchState state)
+        {
+            foreach (var item in state.Items)
+            {
+                if (item?.Succeeded != true)
+                    continue;
+
+                if (!IsBatchItemResolved(item))
+                    return false;
+            }
+
+            // With no successful item there is no target to poll. Resolve is still issued once to
+            // flush any conservative install attempt recorded by the runner.
+            return true;
+        }
+
+        private bool IsBatchItemResolved(PackageUpdateBatchItem item)
+        {
+            if (!string.IsNullOrEmpty(item.ExpectedCommit))
+            {
+                var package = FindBatchPackage(item);
+                var installedHash = package == null
+                    ? null
+                    : PurrPackageManagerInstaller.GetInstalledCommitHash(package);
+                return HashesMatch(installedHash, item.ExpectedCommit);
+            }
+
+            if (!string.IsNullOrEmpty(item.ExpectedLockVersion))
+            {
+                return PurrPackageManagerInstaller.IsPackageLockVersion(
+                    item.UpmName, item.ExpectedLockVersion);
+            }
+
+            return PurrPackageManagerInstaller.IsRegisteredPackageVersion(item.UpmName, item.Version);
+        }
+
+        private PackageInfo FindBatchPackage(PackageUpdateBatchItem item)
+        {
+            if (_packages?.Packages == null)
+                return null;
+
+            foreach (var package in _packages.Packages)
+            {
+                if ((!string.IsNullOrEmpty(item.PackageId)
+                     && string.Equals(package.Id, item.PackageId, StringComparison.OrdinalIgnoreCase))
+                    || (!string.IsNullOrEmpty(item.UpmName)
+                        && string.Equals(package.GetUpmPackageName(), item.UpmName,
+                            StringComparison.OrdinalIgnoreCase)))
+                    return package;
+            }
+
+            return null;
+        }
+
+        private static VersionInfo FindBatchVersion(PackageInfo package, PackageUpdateBatchItem item)
+        {
+            if (package?.Versions == null)
+                return null;
+
+            foreach (var version in package.Versions)
+            {
+                if ((!string.IsNullOrEmpty(item.VersionId)
+                     && string.Equals(version.Id, item.VersionId, StringComparison.OrdinalIgnoreCase))
+                    || (!string.IsNullOrEmpty(item.Version)
+                        && string.Equals(version.Version, item.Version, StringComparison.OrdinalIgnoreCase)))
+                    return version;
+            }
+
+            return null;
+        }
+
+        private static bool HasPendingUpdateBatch()
+        {
+            return !string.IsNullOrEmpty(SessionState.GetString(PendingUpdateBatchSessionKey, string.Empty));
+        }
+
+        private static bool TryGetPendingUpdateBatch(out PackageUpdateBatchState state)
+        {
+            state = null;
+            var json = SessionState.GetString(PendingUpdateBatchSessionKey, string.Empty);
+            if (string.IsNullOrEmpty(json))
+                return false;
+
+            try
+            {
+                state = JsonUtility.FromJson<PackageUpdateBatchState>(json);
+                if (state?.Items == null || state.Items.Count == 0)
+                {
+                    ClearPendingUpdateBatch();
+                    state = null;
+                    return false;
+                }
+
+                if (state.NextIndex < 0)
+                    state.NextIndex = 0;
+                if (state.NextIndex > state.Items.Count)
+                    state.NextIndex = state.Items.Count;
+                state.Errors ??= new List<string>();
+                foreach (var item in state.Items)
+                {
+                    if (item != null)
+                        item.DependencyIds ??= Array.Empty<string>();
+                }
+                return true;
+            }
+            catch (Exception e)
+            {
+                Debug.LogError($"[PurrNet] Could not restore the pending package update batch: {e.Message}");
+                ClearPendingUpdateBatch();
+                return false;
+            }
+        }
+
+        private static void SavePendingUpdateBatch(PackageUpdateBatchState state)
+        {
+            SessionState.SetString(PendingUpdateBatchSessionKey, JsonUtility.ToJson(state));
+        }
+
+        private static void ClearPendingUpdateBatch()
+        {
+            SessionState.EraseString(PendingUpdateBatchSessionKey);
         }
 
         private async void LoadData()
@@ -2231,6 +2603,10 @@ namespace PurrNet.Editor
 
                     _isLoading = false;
                     Repaint();
+
+                    if (_packages?.Packages != null && HasPendingUpdateBatch()
+                        && !_isRunningUpdateBatch)
+                        _ = ResumePendingUpdateBatch();
                 }
                 catch (Exception e)
                 {

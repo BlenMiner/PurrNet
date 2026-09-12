@@ -17,7 +17,8 @@ namespace PurrNet.Analyzers
                 PurrNetDiagnostics.StaticNetworkModuleField,
                 PurrNetDiagnostics.NetworkModuleProperty,
                 PurrNetDiagnostics.UninitializedNetworkModuleField,
-                PurrNetDiagnostics.NetworkModuleFieldReassignedAfterInitialization);
+                PurrNetDiagnostics.NetworkModuleFieldReassignedAfterInitialization,
+                PurrNetDiagnostics.ObserversBypassesOwnerOnly);
 
         public override void Initialize(AnalysisContext context)
         {
@@ -33,7 +34,45 @@ namespace PurrNet.Analyzers
                 startContext.RegisterSymbolAction(symbolContext => AnalyzeField(symbolContext, symbols), SymbolKind.Field);
                 startContext.RegisterSymbolAction(symbolContext => AnalyzeProperty(symbolContext, symbols), SymbolKind.Property);
                 startContext.RegisterOperationAction(operationContext => AnalyzeAssignment(operationContext, symbols), OperationKind.SimpleAssignment);
+                startContext.RegisterOperationAction(operationContext => AnalyzeObserversAccess(operationContext, symbols), OperationKind.PropertyReference);
             });
+        }
+
+        /// <summary>
+        /// Reading parent.observers from inside a NetworkModule returns the identity's full observer
+        /// list, which silently defeats [OwnerOnly]. The module's own 'observers' applies the filter.
+        /// </summary>
+        private static void AnalyzeObserversAccess(OperationAnalysisContext context, PurrNetSymbols symbols)
+        {
+            var reference = (IPropertyReferenceOperation)context.Operation;
+
+            if (reference.Property.Name != "observers")
+                return;
+
+            if (!symbols.IsNetworkIdentity(reference.Property.ContainingType))
+                return;
+
+            // Only modules have a filtered alternative to steer people towards.
+            var containingType = context.ContainingSymbol?.ContainingType;
+            if (!symbols.IsNetworkModule(containingType))
+                return;
+
+            // NetworkModule itself implements the filtered 'observers'; its own reads are the filter.
+            if (symbols.IsSame(containingType, symbols.NetworkModule))
+                return;
+
+            // parent.observers specifically; identity.observers on some unrelated instance is fine.
+            var instance = reference.Instance;
+            while (instance is IConversionOperation conversion)
+                instance = conversion.Operand;
+
+            if (instance is not IPropertyReferenceOperation { Property.Name: "parent" })
+                return;
+
+            context.ReportDiagnostic(Diagnostic.Create(
+                PurrNetDiagnostics.ObserversBypassesOwnerOnly,
+                reference.Syntax.GetLocation(),
+                context.ContainingSymbol?.Name ?? "<unknown>"));
         }
 
         private static void AnalyzeField(SymbolAnalysisContext context, PurrNetSymbols symbols)

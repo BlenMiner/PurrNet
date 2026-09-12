@@ -2,6 +2,7 @@ using System;
 using System.Collections.Generic;
 using System.Threading.Tasks;
 using PurrNet.Pooling;
+using PurrNet.Utils;
 using UnityEngine;
 
 namespace PurrNet
@@ -12,17 +13,44 @@ namespace PurrNet
     {
         static UnityLatestUpdate _instance;
 
-        public static event Action onUpdate;
+        private static readonly PurrAction<Action> _update = new(static action => action(), 32);
+        private static readonly PurrAction<Action> _fixedUpdate = new(static action => action(), 64);
+        private static readonly PurrAction<Action> _latestUpdate = new(static action => action(), 64);
+        private static readonly PurrAction<Action> _postLatestUpdate = new(static action => action(), 8);
 
-        public static event Action onFixedUpdate;
+        internal static PurrAction<Action> update => _update;
 
-        public static event Action onLatestUpdate;
+        internal static PurrAction<Action> fixedUpdate => _fixedUpdate;
+
+        internal static PurrAction<Action> latestUpdate => _latestUpdate;
+
+        public static event Action onUpdate
+        {
+            add => _update.Add(value);
+            remove => _update.Remove(value);
+        }
+
+        public static event Action onFixedUpdate
+        {
+            add => _fixedUpdate.Add(value);
+            remove => _fixedUpdate.Remove(value);
+        }
+
+        public static event Action onLatestUpdate
+        {
+            add => _latestUpdate.Add(value);
+            remove => _latestUpdate.Remove(value);
+        }
 
         /// <summary>
         /// Runs after every <see cref="onLatestUpdate"/> subscriber; for work that must
         /// observe everything the latest-update callbacks produced this frame.
         /// </summary>
-        public static event Action onPostLatestUpdate;
+        public static event Action onPostLatestUpdate
+        {
+            add => _postLatestUpdate.Add(value);
+            remove => _postLatestUpdate.Remove(value);
+        }
 
         private static readonly List<PriorityAction> _executeASAP = new();
 
@@ -104,6 +132,8 @@ namespace PurrNet
             }
         }
 
+        /// <summary>Completes during the next Unity update.</summary>
+        /// <remarks>Call from the Unity main thread.</remarks>
         public static Task Yield()
         {
             var promise = new TaskCompletionSource<bool>();
@@ -119,6 +149,8 @@ namespace PurrNet
             }
         }
 
+        /// <summary>Completes after at least <paramref name="seconds"/> of Unity update time.</summary>
+        /// <remarks>Call from the Unity main thread.</remarks>
         public static Task WaitSeconds(float seconds)
         {
             var promise = new TaskCompletionSource<bool>();
@@ -139,10 +171,10 @@ namespace PurrNet
         [RuntimeInitializeOnLoadMethod(RuntimeInitializeLoadType.SubsystemRegistration)]
         private static void OnSubsystemRegistration()
         {
-            onUpdate = null;
-            onFixedUpdate = null;
-            onLatestUpdate = null;
-            onPostLatestUpdate = null;
+            _update.Clear();
+            _fixedUpdate.Clear();
+            _latestUpdate.Clear();
+            _postLatestUpdate.Clear();
             lock (_executeASAP)
                 _executeASAP.Clear();
 
@@ -180,7 +212,7 @@ namespace PurrNet
         private void Update()
         {
             TriggerPendingAsaps();
-            onUpdate?.Invoke();
+            _update.Invoke();
 #if UNITY_EDITOR && PURR_LEAKS_CHECK
             _sweep += Time.deltaTime;
 
@@ -195,14 +227,14 @@ namespace PurrNet
         private void FixedUpdate()
         {
             TriggerPendingAsaps();
-            onFixedUpdate?.Invoke();
+            _fixedUpdate.Invoke();
         }
 
         private void LateUpdate()
         {
             TriggerPendingAsaps();
-            onLatestUpdate?.Invoke();
-            onPostLatestUpdate?.Invoke();
+            _latestUpdate.Invoke();
+            _postLatestUpdate.Invoke();
         }
     }
 }

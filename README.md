@@ -1,61 +1,98 @@
-# PurrNet - Unity3D 
+<p align="center">
+    <img height="170" alt="purrnet-icon-text-horizontal-orange" src="https://github.com/user-attachments/assets/0e9a07c9-5486-4d6b-9dc2-fa9f59c662ad" />
+</p>
 
-<img width="256" height="266" alt="PurrNet_Logo_-_No_BG(2)" src="https://github.com/user-attachments/assets/8aff6704-165e-435e-a5be-8c2b07ca6ad3" /> 
+<h3 align="center">Networking that feels like Unity, not like netcode.</h3>
 
-PurrNet is our attempt at the purrfect networking solution... It's a 100% free Unity Networking solution with no pro or premium version, and no features locked behind a pay-gate.
-You can use it to release, and we ask nothing in return! Read the Unique to PurrNet section to see what we offer above other solutions!
+<p align="center">
+    <a href="https://openupm.com/packages/dev.purrnet.purrnet/"><img alt="openupm" src="https://img.shields.io/npm/v/dev.purrnet.purrnet?label=openupm&registry_uri=https://package.openupm.com&color=orange"></a>
+    <a href="https://github.com/PurrNet/PurrNet/stargazers"><img alt="stars" src="https://img.shields.io/github/stars/PurrNet/PurrNet?color=orange"></a>
+    <a href="https://discord.gg/HnNKdkq9ta"><img alt="discord" src="https://img.shields.io/discord/1288872904272121957?label=discord&color=orange"></a>
+    <a href="https://assetstore.unity.com/packages/tools/network/purrnet-297320"><img alt="asset store" src="https://img.shields.io/badge/asset%20store-PurrNet-orange"></a>
+    <a href="LICENSE"><img alt="license" src="https://img.shields.io/badge/license-MIT-orange"></a>
+</p>
 
-Website: https://purrnet.dev/
+<p align="center">
+    <a href="https://purrnet.dev/">Website</a> ·
+    <a href="https://purrnet.dev/docs">Docs</a> ·
+    <a href="https://discord.gg/HnNKdkq9ta">Discord</a> ·
+    <a href="https://purrnet.dev/pricing">Support us</a> ·
+    <a href="https://purrnet.dev/studios">For studios</a>
+</p>
 
-Docs: https://purrnet.dev/docs  
+---
 
-Docs (source): https://github.com/PurrNet/PurrDocs
+PurrNet is our attempt at the purrfect networking solution for Unity. The framework is **MIT licensed and open source**, with no seat licenses, no CCU tax and no revenue share. Ship a commercial game with it and we ask nothing in return.
+
+You write Unity code. PurrNet makes it multiplayer.
+
+```csharp
+// This is a networked spawn. That's the whole API.
+_player = Instantiate(playerPrefab);
+```
+
+No `NetworkServer.Spawn()`, no manual registration, no serializer boilerplate, no ID plumbing. PurrNet's IL post-processor generates all of it at compile time.
 
 ## Install
 
-You can install PurrNet through Unity's Package Manager by adding a package through this URL. Dev will generally be more up-to-date but could be more prone to introduce breaking changes:
+Requires Unity **2022** or newer. Install through Unity's Package Manager with one of these Git URLs:
 
-Release: 
+**Release** (stable, recommended):
 
 ```bash
 https://github.com/PurrNet/PurrNet.git?path=/Assets/PurrNet#release
 ```
 
-Dev: 
+**Dev** (more up to date, more prone to breaking changes):
 
 ```bash
 https://github.com/PurrNet/PurrNet.git?path=/Assets/PurrNet#dev
 ```
 
-Or through OpenUM [![openupm](https://img.shields.io/npm/v/dev.purrnet.purrnet?label=PurrNet&registry_uri=https://package.openupm.com)](https://openupm.com/packages/dev.purrnet.purrnet/)
+Or via OpenUPM:
 
-`openupm add dev.purrnet.purrnet`
+```bash
+openupm add dev.purrnet.purrnet
+```
 
-You can also fallback to the asset store but versions will be behind.
+You can also grab it from the [Asset Store](https://assetstore.unity.com/packages/tools/network/purrnet-297320), though those versions lag behind.
 
-[*Asset store link.*](https://assetstore.unity.com/packages/tools/network/purrnet-297320)
+Coming from another solution? We have [migration guides](https://purrnet.dev/docs).
 
-## Discord
+## Why PurrNet
 
-<a href="https://discord.gg/HnNKdkq9ta" target="_blank">
-    <img src="https://discord.com/api/guilds/1288872904272121957/widget.png?style=banner2" alt="Discord Banner">
-</a>
+[![IMAGE ALT TEXT HERE](https://img.youtube.com/vi/JJZY9cI2VqE/0.jpg)](https://www.youtube.com/watch?v=JJZY9cI2VqE)
+
+|                              |                                                                                                          |
+| ---------------------------- | -------------------------------------------------------------------------------------------------------- |
+| **Unity-native spawning**    | `Instantiate()` and `Destroy()` just work. Drag prefabs into the scene and they spawn too.                 |
+| **Zero-ceremony RPCs**       | Mark a method with an attribute. Static, generic, awaitable and coroutine RPCs all supported.               |
+| **Network Rules**            | Per-object policy for who may spawn, despawn, own, observe and call. Server-strict or client-convenient, your call, no code changes. |
+| **Network Modules**          | Compose networked behaviour out of nestable, reusable, generic modules. Every built-in feature is one.      |
+| **Client-side prediction**   | [PurrDiction](https://purrnet.dev/docs) gives you rollback prediction with optional determinism.            |
+| **Reconnection built in**    | Cookie-based identity so players come back to their own state instead of a fresh spawn.                    |
+| **Real serialization**       | Compile-time generated packers, delta compression, and a hand-drivable `BitPacker` when you want the bytes. |
+| **Cross-platform**           | Desktop, mobile, WebGL and consoles.                                                                       |
 
 ## Quick Introduction
 
 ### Transports
 
-- UDP (reliable and unreliable)
+- UDP
 - WebSockets
 - Steam
+- Unity Transport (UTP)
+- Nakama
 - Local (no socket)
-- PurrTransport (Relay free for development)
-- Composite (Allows multiple transports)
+- PurrTransport (our relay: free for development, and self-hostable for free if you'd rather run it yourself), with optional direct WebRTC P2P
+- Composite (allows multiple transports at once)
+
+There's also an Edgegap addon if you want managed server deployment.
 
 ### Spawning and Despawning
- 
+
 ```csharp
-[SerializedField] GameObject playerPrefab;
+[SerializeField] GameObject playerPrefab;
 
 private GameObject _player;
 
@@ -68,21 +105,17 @@ void DespawnPlayer()
 {
     Destroy(_player);
 }
-
 ```
 
 Yes, you are done! PurrNet will handle the rest for you.
-The best part is that if you want to allow flexibility over security, you can even have clients spawn and despawn their own objects depending on which NetworkRules you pick.
-With no changes to this code.
+The best part is that if you want to allow flexibility over security, you can even have clients spawn and despawn their own objects depending on which NetworkRules you pick. With no changes to this code.
 
-Bonus, you can also drag and drop prefabs into the scene and have them spawn automatically.
-As long as they have a NetworkIdentity component attached to them and are part of your NetworkPrefabs list.
+Bonus, you can also drag and drop prefabs into the scene and have them spawn automatically. As long as they have a NetworkIdentity component attached to them and are part of your NetworkPrefabs list.
 
 ### RPCs
 
 You have `TargetRPC`s, `ServerRPC`s, and `ObserverRPC`s.
-Depending on your network rules, these can all be called by clients too.
-Or if you want to keep it secure but still allow clients to call some of them, you can use the `requireServer: false` parameter.
+Depending on your network rules, these can all be called directly by clients too!
 
 ```csharp
 [ServerRPC]
@@ -106,17 +139,17 @@ Awaitable RPCs are also supported.
 
 ```csharp
 [ServerRPC]
-static Task<int> GetMyNymber()
+static Task<int> GetMyNumber()
 {
     return Task.FromResult(42);
 }
 ```
 
-UnitTask integration is also supported.
+UniTask integration is also supported.
 
 ```csharp
 [ServerRPC]
-static UniTask<int> GetMyNymber()
+static UniTask<int> GetMyNumber()
 {
     return UniTask.FromResult(42);
 }
@@ -190,6 +223,8 @@ All our built-in features are implemented using Network Modules, so you can be s
 
 Don't forget they can also be generic!
 
+Out of the box you get `SyncVar`, `SyncList`, `SyncDictionary`, `SyncHashSet`, `SyncArray`, `SyncQueue`, `SyncEvent`, `SyncTimer`, `SyncInput`, `SyncAsset`, `SyncFile` and more.
+
 ### Network Rules
 
 Network Rules are a way to define how your networked objects behave.
@@ -198,6 +233,12 @@ You can also define who can observe your objects and how they are synchronized.
 Almost everything is customizable, and every object can have its own set of rules.
 
 ![image](https://github.com/user-attachments/assets/aa702bc4-ad6b-4cd4-841b-700d21f28d3e)
+
+### Plug and play components
+
+Drop these on a GameObject and they synchronize themselves:
+
+`NetworkTransform` · `NetworkRigidbody` · `NetworkAnimator` · `NetworkAudioSource` · `NetworkBones` · `NetworkStateMachine` · `NetworkVisibility` · `NetworkOwnershipToggle` · `NetworkServerToggle` · `ColliderRollback` · `NetworkLOD` . and more.
 
 ### Serialization
 
@@ -221,7 +262,7 @@ This avoids creating garbage and is much faster than using the object serializat
 It also allows you to send data that might not be able to be represented by a type.
 
 ```csharp
-void SendSometing()
+void SendSomething()
 {
     using var writer = BitPackerPool.Get();
     
@@ -245,4 +286,53 @@ void DoSomethingOnServer(BitPacker data)
     data.Dispose();
 }
 ```
- 
+
+If you use Unity.Mathematics, the Mathematics addon adds packers for its types so `float3`, `quaternion` and friends serialize just as efficiently as the built-in ones.
+
+## Support PurrNet
+
+The framework is MIT and stays that way. Memberships are how people who want it to keep getting better help pay for that, and they get early access to new features while they're at it.
+
+| Tier | Price | What you get |
+| ---- | ----- | ------------ |
+| 💝 **One-time donation** | Pay what you want | Donator Discord role |
+| 🐱 **House Cat** | $20/mo | Early access to features, supporter channels, House Cat Discord role |
+| 👑 **Royal British** | $100/mo | Everything above, plus hands-on project support and eternal gratitude |
+
+[**Become a member →**](https://purrnet.dev/pricing)
+
+## For studios
+
+If you're shipping a multiplayer game and netcode is on the critical path, we'll work inside your project, not from a ticket queue.
+
+Studio plans start at **$500/mo** and cover:
+
+- Priority support with direct access to the team
+- Hands-on project access for debugging your netcode
+- Architecture reviews and migrations from other solutions
+- Custom features and studio-exclusive packages
+
+Scope and price are set per team, so talk to us before assuming it does or doesn't fit.
+
+Already trusted by studios shipping real games: Scythe Studios, Resolute Games and others.
+
+[**Talk to us about a studio plan →**](https://purrnet.dev/studios)
+
+## Community
+
+The fastest place to get an answer.
+
+<a href="https://discord.gg/HnNKdkq9ta" target="_blank">
+    <img src="https://discord.com/api/guilds/1288872904272121957/widget.png?style=banner2" alt="Discord Banner">
+</a>
+
+## Links
+
+- Website: https://purrnet.dev/
+- Docs: https://purrnet.dev/docs
+- Docs source: https://github.com/PurrNet/PurrDocs
+- Changelog: [CHANGELOG.md](Assets/PurrNet/CHANGELOG.md)
+
+## License
+
+MIT. See [LICENSE](LICENSE).

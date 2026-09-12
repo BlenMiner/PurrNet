@@ -123,6 +123,20 @@ public class IdentityServerRpcsScenario : Scenario
                 throw new Exception($"struct round-trip mismatch: got id={r.id}, label='{r.label}', weight={r.weight}");
         });
 
+        await Try(failures, "Echo_SimplePacked", async () =>
+        {
+            var r = await inst.Echo_SimplePacked(12345);
+            if (!r.success || r.integerVar != 12345 || Mathf.Abs(r.floatVar - 42.5f) > 0.0001f)
+                throw new Exception($"IPackedSimple round-trip mismatch: got success={r.success}, integerVar={r.integerVar}, floatVar={r.floatVar}");
+        });
+
+        await Try(failures, "Echo_SimplePackedUni", async () =>
+        {
+            var r = await inst.Echo_SimplePackedUni(54321);
+            if (!r.success || r.integerVar != 54321 || Mathf.Abs(r.floatVar - 42.5f) > 0.0001f)
+                throw new Exception($"IPackedSimple round-trip mismatch: got success={r.success}, integerVar={r.integerVar}, floatVar={r.floatVar}");
+        });
+
         await Try(failures, "Echo_MultiArg", async () =>
         {
             var sum = await inst.Echo_Sum(2, 3, 5);

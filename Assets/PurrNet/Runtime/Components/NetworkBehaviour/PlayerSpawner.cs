@@ -144,13 +144,8 @@ namespace PurrNet
                 return;
 
             bool isDestroyOnDisconnectEnabled = main.networkRules.ShouldDespawnOnOwnerDisconnect();
-            if (!_ignoreNetworkRules && !isDestroyOnDisconnectEnabled)
-            {
-                bool ownershipModuleHasExistingOwner =
-                    main.TryGetModule(out GlobalOwnershipModule ownership, true) && ownership.PlayerOwnsSomething(player);
-                if (ownershipModuleHasExistingOwner)
-                    return;
-            }
+            if (!_ignoreNetworkRules && !isDestroyOnDisconnectEnabled && PlayerOwnsPlayerPrefab(main, player))
+                return;
 
             GameObject newPlayer;
             NetworkIdentity identity;
@@ -181,6 +176,23 @@ namespace PurrNet
 
             if (identity)
                 identity.GiveOwnership(player);
+        }
+
+        private bool PlayerOwnsPlayerPrefab(NetworkManager main, PlayerID player)
+        {
+            if (!main.TryGetModule(out GlobalOwnershipModule ownership, true))
+                return false;
+
+            if (main.prefabProvider == null || !main.prefabProvider.TryGetPrefabData(_playerPrefab, out var prefabData))
+                return false;
+
+            foreach (var owned in ownership.EnumerateAllPlayerOwnedIds(player))
+            {
+                if (owned && owned.scopedPrefabId == prefabData.prefabId)
+                    return true;
+            }
+
+            return false;
         }
 
         private GameObject SpawnPlayer(Vector3 position, Quaternion rotation, Scene unityScene,

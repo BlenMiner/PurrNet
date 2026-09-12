@@ -1,6 +1,7 @@
 using System;
 using PurrNet.Packing;
 using PurrNet.Transports;
+using PurrNet.Utils;
 using UnityEngine;
 
 namespace PurrNet.Modules
@@ -27,9 +28,10 @@ namespace PurrNet.Modules
         }
 
         /// <summary>
-        /// This is the round trip time. Local time it takes for the client to get a response from the server.
-        /// This includes 1 tick for packing and 1 tick for unpacking, meaning you'll have 2 ticks delay calculated into the rtt.
-        /// For actual ping, utilize the statistics manager, or make up for these 2 ticks delay manually.
+        /// Round trip time in seconds, measured by the tick-sync ping: local time from sending the
+        /// request to receiving the server's response. The ping bypasses tick batching on both ends
+        /// (immediate receive, same-frame send flush), so this is network round trip plus at most a
+        /// frame of scheduling on each side rather than the tick interval.
         /// </summary>
         public double rtt { get; private set; }
 
@@ -71,6 +73,9 @@ namespace PurrNet.Modules
 
         public event Action onPreTick, onTick, onPostTick;
         public event Action onReliablePreTick, onReliableTick, onReliablePostTick;
+
+        private readonly PurrAction<ITickListener> _tickListeners = new(static listener => listener.OnTick(), 256);
+        private readonly PurrAction<NetworkIdentity> _identityTicks;
 
         /// <summary>
         /// Lower clamp for <see cref="tickPacingScale"/>.
@@ -131,6 +136,8 @@ namespace PurrNet.Modules
         public TickManager(int tickRate, INetworkManager nm, BroadcastModule broadcaster, bool asServer)
         {
             _asServer = asServer;
+            _identityTicks = new PurrAction<NetworkIdentity>(
+                asServer ? static identity => identity.ServerTick() : static identity => identity.ClientTick(), 256);
             _lastTickTime = Time.unscaledTimeAsDouble;
             _networkManager = nm;
             tickDelta = 1f / tickRate;
@@ -141,26 +148,24 @@ namespace PurrNet.Modules
 
         public void Enable(bool asServer)
         {
+            _broadcaster.RegisterImmediateType<TickManagerRequestLocalTick>();
+            _broadcaster.RegisterImmediateType<TickManagerResponseLocalTick>();
+
             if (asServer)
-            {
                 _broadcaster.Subscribe<TickManagerRequestLocalTick>(OnClientRequestedPing);
-            }
             else
-            {
                 _broadcaster.Subscribe<TickManagerResponseLocalTick>(OnServerRespondedPing);
-            }
         }
 
         public void Disable(bool asServer)
         {
             if (asServer)
-            {
                 _broadcaster.Unsubscribe<TickManagerRequestLocalTick>(OnClientRequestedPing);
-            }
             else
-            {
                 _broadcaster.Unsubscribe<TickManagerResponseLocalTick>(OnServerRespondedPing);
-            }
+
+            _broadcaster.UnregisterImmediateType<TickManagerRequestLocalTick>();
+            _broadcaster.UnregisterImmediateType<TickManagerResponseLocalTick>();
         }
 
         public void PromoteToServerModule()
@@ -211,7 +216,11 @@ namespace PurrNet.Modules
                 onReliablePreTick?.Invoke();
 
                 if (triggerNormalTicks)
+                {
                     onTick?.Invoke();
+                    _identityTicks.Invoke();
+                    _tickListeners.Invoke();
+                }
                 onReliableTick?.Invoke();
 
                 if (triggerNormalTicks)
@@ -220,6 +229,20 @@ namespace PurrNet.Modules
 
                 ticksHandled++;
             }
+        }
+        
+        internal int AddIdentityTick(NetworkIdentity identity) => _identityTicks.Add(identity);
+
+        internal void RemoveIdentityTick(int handle, NetworkIdentity identity) => _identityTicks.RemoveAt(handle, identity);
+
+        public void AddTickListener(ITickListener listener)
+        {
+            _tickListeners.Add(listener);
+        }
+        
+        public void RemoveTickListener(ITickListener listener)
+        {
+            _tickListeners.Remove(listener);
         }
 
         /// <summary>

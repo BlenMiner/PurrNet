@@ -48,7 +48,8 @@ namespace PurrNet.Editor
 
 #if EDGEGAP_PURRNET_SUPPORT
             if (!_edgegapLogo)
-                _edgegapLogo = AssetDatabase.LoadAssetByGUID<Texture2D>(new GUID("3a588301050c6db448986e8ba1c2139f"));
+                _edgegapLogo = AssetDatabase.LoadAssetAtPath<Texture2D>(
+                    AssetDatabase.GUIDToAssetPath("3a588301050c6db448986e8ba1c2139f"));
             _edgegapLabel ??= new GUIContent("Auto Setup Edgegap Server Port", tooltip:
                 "When inside edgegap, automatically setup port.\n" +
                 "Edgegap is detected via environment variables.");

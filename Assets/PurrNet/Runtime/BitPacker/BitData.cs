@@ -39,7 +39,7 @@ namespace PurrNet.Packing
             if (bitLength.value == 0 || packer == null)
                 return default;
             var newpacker = BitPackerPool.Get();
-            newpacker.Write(this);
+            newpacker.WriteBitDataWithoutConsumingIt(this);
             return new BitData(newpacker);
         }
 

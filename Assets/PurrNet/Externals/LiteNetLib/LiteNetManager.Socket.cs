@@ -18,6 +18,8 @@ namespace LiteNetLib
         private Thread _receiveThread;
         private IPEndPoint _bufferEndPointv4;
         private IPEndPoint _bufferEndPointv6;
+        private byte[] _nativeReceiveAddressV4;
+        private byte[] _nativeReceiveAddressV6;
 #if UNITY_SOCKET_FIX
         private PausedSocketFix _pausedSocketFix;
         private bool _useSocketFix;
@@ -70,9 +72,11 @@ namespace LiteNetLib
 #endif
         }
 
-        private bool ProcessError(SocketException ex)
+        private bool ProcessError(SocketException ex) => ProcessError(ex.SocketErrorCode);
+
+        private bool ProcessError(SocketError error)
         {
-            switch (ex.SocketErrorCode)
+            switch (error)
             {
                 case SocketError.NotConnected:
                     NotConnected = true;
@@ -86,11 +90,10 @@ namespace LiteNetLib
                 case SocketError.TimedOut:
                 case SocketError.NetworkReset:
                 case SocketError.WouldBlock:
-                    //NetDebug.Write($"[R]Ignored error: {(int)ex.SocketErrorCode} - {ex}");
                     break;
                 default:
-                    NetDebug.WriteError($"[R]Error code: {(int)ex.SocketErrorCode} - {ex}");
-                    CreateEvent(NetEvent.EType.Error, errorCode: ex.SocketErrorCode);
+                    NetDebug.WriteError($"[R]Error code: {(int)error} - {error}");
+                    CreateEvent(NetEvent.EType.Error, errorCode: error);
                     break;
             }
             return false;
@@ -101,8 +104,23 @@ namespace LiteNetLib
             //Reading data
             try
             {
-                while (socket.Available > 0)
-                    ReceiveFrom(socket, ref bufferEndPoint);
+                // Available may be zero for a queued empty datagram. Drain it so it
+                // cannot prevent subsequent packets from being read (notably on Linux).
+                while (socket.Available > 0 || socket.Poll(0, SelectMode.SelectRead))
+                {
+                    if (UseNativeSockets)
+                    {
+                        var address = socket.AddressFamily == AddressFamily.InterNetwork
+                            ? _nativeReceiveAddressV4
+                            : _nativeReceiveAddressV6;
+                        if (!NativeReceiveFrom(socket, address))
+                            return;
+                    }
+                    else
+                    {
+                        ReceiveFrom(socket, ref bufferEndPoint);
+                    }
+                }
             }
             catch (SocketException ex)
             {
@@ -121,15 +139,11 @@ namespace LiteNetLib
 
         private void NativeReceiveLogic()
         {
-            IntPtr socketHandle4 = _udpSocketv4.Handle;
-            IntPtr socketHandle6 = _udpSocketv6?.Handle ?? IntPtr.Zero;
             byte[] addrBuffer4 = new byte[NativeSocket.IPv4AddrSize];
             byte[] addrBuffer6 = new byte[NativeSocket.IPv6AddrSize];
-            var tempEndPoint = new IPEndPoint(IPAddress.Any, 0);
             var selectReadList = new List<Socket>(2);
             var socketv4 = _udpSocketv4;
             var socketV6 = _udpSocketv6;
-            var packet = PoolGetPacket(NetConstants.MaxPacketSize);
 
             while (_isRunning)
             {
@@ -137,20 +151,20 @@ namespace LiteNetLib
                 {
                     if (socketV6 == null)
                     {
-                        if (NativeReceiveFrom(socketHandle4, addrBuffer4) == false)
+                        if (NativeReceiveFrom(socketv4, addrBuffer4) == false)
                             return;
                         continue;
                     }
                     bool messageReceived = false;
                     if (socketv4.Available != 0 || selectReadList.Contains(socketv4))
                     {
-                        if (NativeReceiveFrom(socketHandle4, addrBuffer4) == false)
+                        if (NativeReceiveFrom(socketv4, addrBuffer4) == false)
                             return;
                         messageReceived = true;
                     }
                     if (socketV6.Available != 0 || selectReadList.Contains(socketV6))
                     {
-                        if (NativeReceiveFrom(socketHandle6, addrBuffer6) == false)
+                        if (NativeReceiveFrom(socketV6, addrBuffer6) == false)
                             return;
                         messageReceived = true;
                     }
@@ -186,55 +200,72 @@ namespace LiteNetLib
                     NetDebug.WriteError("[NM] SocketReceiveThread error: " + e);
                 }
             }
+        }
 
-            bool NativeReceiveFrom(IntPtr s, byte[] address)
+        private bool NativeReceiveFrom(Socket socket, byte[] address)
+        {
+            var packet = PoolGetPacket(NetConstants.MaxPacketSize);
+            int addressSize = address.Length;
+            int received;
+            SocketError error = SocketError.Success;
+            try
             {
-                int addrSize = address.Length;
-                packet.Size = NativeSocket.RecvFrom(s, packet.RawData, NetConstants.MaxPacketSize, address, ref addrSize);
-                if (packet.Size == 0)
-                    return true; //socket closed or empty packet
+                received = NativeSocket.RecvFrom(socket.Handle, packet.RawData,
+                    NetConstants.MaxPacketSize, address, ref addressSize);
+                if (received == -1)
+                    error = NativeSocket.GetSocketError();
+            }
+            catch
+            {
+                PoolRecycle(packet);
+                throw;
+            }
 
-                if (packet.Size == -1)
-                {
-                    //Linux timeout EAGAIN
-                    return ProcessError(new SocketException((int)NativeSocket.GetSocketError())) == false;
-                }
+            if (received <= 0)
+            {
+                // Zero is an empty UDP datagram. Neither it nor a failed receive owns the rent.
+                PoolRecycle(packet);
+                return received == 0 || !ProcessError(error);
+            }
 
-                //NetDebug.WriteForce($"[R]Received data from {endPoint}, result: {packet.Size}");
-                //refresh temp Addr/Port
-                short family = (short)((address[1] << 8) | address[0]);
-                tempEndPoint.Port = (ushort)((address[2] << 8) | address[3]);
-                if ((NativeSocket.UnixMode && family == NativeSocket.AF_INET6) || (!NativeSocket.UnixMode && (AddressFamily)family == AddressFamily.InterNetworkV6))
-                {
-                    uint scope = unchecked((uint)(
-                        (address[27] << 24) +
-                        (address[26] << 16) +
-                        (address[25] << 8) +
-                        (address[24])));
-                    tempEndPoint.Address = new IPAddress(new ReadOnlySpan<byte>(address, 8, 16), scope);
-                }
-                else //IPv4
-                {
-                    long ipv4Addr = unchecked((uint)((address[4] & 0x000000FF) |
-                                                     (address[5] << 8 & 0x0000FF00) |
-                                                     (address[6] << 16 & 0x00FF0000) |
-                                                     (address[7] << 24)));
-                    tempEndPoint.Address = new IPAddress(ipv4Addr);
-                }
-
-                if (TryGetPeer(tempEndPoint, out var peer))
-                {
-                    //use cached native ep
-                    OnMessageReceived(packet, peer);
-                }
-                else
-                {
-                    OnMessageReceived(packet, tempEndPoint);
-                    tempEndPoint = new IPEndPoint(IPAddress.Any, 0);
-                }
-                packet = PoolGetPacket(NetConstants.MaxPacketSize);
+            var family = socket.AddressFamily;
+            int expectedSize = family == AddressFamily.InterNetwork
+                ? NativeSocket.IPv4AddrSize
+                : NativeSocket.IPv6AddrSize;
+            short expectedFamily = NativeSocket.UnixMode && family == AddressFamily.InterNetworkV6
+                ? (short)NativeSocket.AF_INET6
+                : (short)family;
+            if (addressSize != expectedSize || BitConverter.ToInt16(address, 0) != expectedFamily)
+            {
+                PoolRecycle(packet);
                 return true;
             }
+
+            IPEndPoint endPoint;
+            try
+            {
+                if (TryGetNativePeer(new NativeEndPoint(address, family), out var peer))
+                    endPoint = peer;
+                else
+                {
+                    // Unknown senders need an independent endpoint: connection requests and
+                    // delayed events may retain it after this scratch buffer is overwritten.
+                    var ip = family == AddressFamily.InterNetwork
+                        ? new IPAddress((long)(uint)(address[4] | address[5] << 8 | address[6] << 16 | address[7] << 24))
+                        : new IPAddress(new ReadOnlySpan<byte>(address, 8, 16), BitConverter.ToUInt32(address, 24));
+                    endPoint = new IPEndPoint(ip, (address[2] << 8) | address[3]);
+                }
+            }
+            catch
+            {
+                PoolRecycle(packet);
+                throw;
+            }
+
+            packet.Size = received;
+            // Ownership passes to the protocol/event pipeline, including if a callback throws.
+            OnMessageReceived(packet, endPoint);
+            return true;
         }
 
         private int ReceiveFrom(Socket s, ref EndPoint bufferEndPoint)
@@ -352,6 +383,11 @@ namespace LiteNetLib
             if (_manualMode)
             {
                 _bufferEndPointv4 = new IPEndPoint(IPAddress.Any, 0);
+                if (UseNativeSockets)
+                {
+                    _nativeReceiveAddressV4 ??= new byte[NativeSocket.IPv4AddrSize];
+                    _nativeReceiveAddressV6 ??= new byte[NativeSocket.IPv6AddrSize];
+                }
             }
 
             //Check IPv6 support

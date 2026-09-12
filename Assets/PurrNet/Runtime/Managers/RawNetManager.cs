@@ -377,6 +377,12 @@ namespace PurrNet
             _serverModules.TriggerOnUpdate();
             _clientModules.TriggerOnUpdate();
 
+            if (_sendFlushRequested)
+            {
+                _sendFlushRequested = false;
+                SendMessagesNow();
+            }
+
             // No Update-phase transport poll here: RawNetManager has no receive deferral
             // layer, so polling per frame would dispatch transport events outside the tick.
         }
@@ -449,6 +455,21 @@ namespace PurrNet
 
         private double _lastSendTime;
 
+        private void SendMessagesNow()
+        {
+            if (_transportLayer == null)
+                return;
+
+            var now = UnityEngine.Time.unscaledTimeAsDouble;
+            var sendDelta = _lastSendTime > 0 ? (float)(now - _lastSendTime) : tickModule.tickDelta;
+            _lastSendTime = now;
+            _transportLayer.SendMessages(sendDelta);
+        }
+
+        private bool _sendFlushRequested;
+
+        public void RequestSendFlushThisFrame() => _sendFlushRequested = true;
+
         private void OnTick()
         {
             bool serverConnected = serverState == ConnectionState.Connected;
@@ -475,13 +496,7 @@ namespace PurrNet
             if (clientConnected)
                 _clientModules.TriggerOnPostFixedUpdate();
 
-            if (_transportLayer != null)
-            {
-                var now = UnityEngine.Time.unscaledTimeAsDouble;
-                var sendDelta = _lastSendTime > 0 ? (float)(now - _lastSendTime) : tickModule.tickDelta;
-                _lastSendTime = now;
-                _transportLayer.SendMessages(sendDelta);
-            }
+            SendMessagesNow();
 
             if (_isCleaningClient && _clientModules.Cleanup())
             {

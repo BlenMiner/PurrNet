@@ -1,3 +1,509 @@
+# [1.23.0-beta.51](https://github.com/PurrNet/PurrNet/compare/v1.23.0-beta.50...v1.23.0-beta.51) (2026-09-11)
+
+
+### Features
+
+* purrtransport webrtc direct P2P ([1ece06d](https://github.com/PurrNet/PurrNet/commit/1ece06d42edbb0be76e8b1704ec80d631843fb14))
+
+# [1.23.0-beta.50](https://github.com/PurrNet/PurrNet/compare/v1.23.0-beta.49...v1.23.0-beta.50) (2026-09-11)
+
+
+### Features
+
+* WebRTC for PurrTransport ([a7da514](https://github.com/PurrNet/PurrNet/commit/a7da514b776622af3b6a8b56c45899c4f32ad7da))
+
+# [1.23.0-beta.49](https://github.com/PurrNet/PurrNet/compare/v1.23.0-beta.48...v1.23.0-beta.49) (2026-09-11)
+
+
+### Bug Fixes
+
+* purrequality GC boxing ([4a97291](https://github.com/PurrNet/PurrNet/commit/4a972912e42c226f4fc424ad898e2f8476294af6))
+
+# [1.23.0-beta.48](https://github.com/PurrNet/PurrNet/compare/v1.23.0-beta.47...v1.23.0-beta.48) (2026-09-10)
+
+
+### Performance Improvements
+
+* improve editor compilation times further ([572fd0a](https://github.com/PurrNet/PurrNet/commit/572fd0a7e3f15b3d951a38a899d50a6e71b734c0))
+
+# [1.23.0-beta.47](https://github.com/PurrNet/PurrNet/compare/v1.23.0-beta.46...v1.23.0-beta.47) (2026-09-10)
+
+
+### Bug Fixes
+
+* NetworkRigidbody origin-aware reworks ([a887b17](https://github.com/PurrNet/PurrNet/commit/a887b17645b21553cac01fd11229993978127bf7))
+
+
+### Performance Improvements
+
+* editor IL processing improvements ([21e89a9](https://github.com/PurrNet/PurrNet/commit/21e89a903dcdd41a08885d13e25b485a09faadd9))
+
+# [1.23.0-beta.46](https://github.com/PurrNet/PurrNet/compare/v1.23.0-beta.45...v1.23.0-beta.46) (2026-09-10)
+
+
+### Bug Fixes
+
+* Editor network prefabs/assets assets staying loaded forever in ([1fa89cb](https://github.com/PurrNet/PurrNet/commit/1fa89cb0b60da993648b0333b4343f4a64023f9b))
+
+# [1.23.0-beta.45](https://github.com/PurrNet/PurrNet/compare/v1.23.0-beta.44...v1.23.0-beta.45) (2026-09-09)
+
+
+### Bug Fixes
+
+* keep interned paths internal and reuse owned path buffers ([9fa9f3e](https://github.com/PurrNet/PurrNet/commit/9fa9f3e9fe75856eadce90f253ab854d4e89c2bb))
+
+
+### Performance Improvements
+
+* drop interned paths when pools are cleared ([ef95034](https://github.com/PurrNet/PurrNet/commit/ef9503457e05769cb6b9de80c6998e3b5dd8b344))
+* expose interned nearest parent paths as read only ([3ca5811](https://github.com/PurrNet/PurrNet/commit/3ca5811e6d42089d7586623b842ecd85a95d4e0e))
+* intern nearest parent paths to avoid per spawn allocations ([bf5ba3e](https://github.com/PurrNet/PurrNet/commit/bf5ba3e5c9d38a071dead34d1a436a5b5011b870))
+
+# [1.23.0-beta.44](https://github.com/PurrNet/PurrNet/compare/v1.23.0-beta.43...v1.23.0-beta.44) (2026-09-09)
+
+
+### Bug Fixes
+
+* guard scene handle hash for Unity 6000.5 ([724db75](https://github.com/PurrNet/PurrNet/commit/724db757728ddb0a167a0a57b461502f4c7181fe))
+
+
+### Performance Improvements
+
+* avoid boxed enumerator when clearing observers ([af90813](https://github.com/PurrNet/PurrNet/commit/af90813c65e528a8af64fbd62be0ae8f6c1511e1))
+* avoid boxed enumerator when despawning pooled hierarchies ([6f8d089](https://github.com/PurrNet/PurrNet/commit/6f8d089d6358748c44eb1186a56ae703483359c7))
+* avoid boxing on scene id lookups ([86cc45d](https://github.com/PurrNet/PurrNet/commit/86cc45d7f362ff99e4c0f61f91345c726b997b80))
+* avoid closure alloc when clearing failed async observer roots ([b876833](https://github.com/PurrNet/PurrNet/commit/b8768331abba33bf2f8c6ac2bac6125348415440))
+* reuse direct children list in PreparePrefabInfo ([657fe19](https://github.com/PurrNet/PurrNet/commit/657fe194f772da4a62863539ac9b99e7bfd08fd8))
+
+# [1.23.0-beta.43](https://github.com/PurrNet/PurrNet/compare/v1.23.0-beta.42...v1.23.0-beta.43) (2026-09-09)
+
+
+### Performance Improvements
+
+* dispatch generated module initializers without reflection ([dd1133e](https://github.com/PurrNet/PurrNet/commit/dd1133e6f0702126b53f8270718fc093360b1f61))
+* resolve prefab data by lookup instead of scanning ([38b3964](https://github.com/PurrNet/PurrNet/commit/38b3964db1af53401a667a5670918b04f9bd8fe5))
+
+# [1.23.0-beta.42](https://github.com/PurrNet/PurrNet/compare/v1.23.0-beta.41...v1.23.0-beta.42) (2026-09-09)
+
+
+### Performance Improvements
+
+* reuse interpolation buffers across respawns ([a5603cc](https://github.com/PurrNet/PurrNet/commit/a5603cc9c33310430473d8b7cc6d3c8dd044b7d7))
+
+# [1.23.0-beta.41](https://github.com/PurrNet/PurrNet/compare/v1.23.0-beta.40...v1.23.0-beta.41) (2026-09-09)
+
+
+### Bug Fixes
+
+* IL2CPP function pointer crashes webgl when exceptions are disabled ([1a7dbc3](https://github.com/PurrNet/PurrNet/commit/1a7dbc3692e7f2e83e7a3bf2f7cdd3e3a134f2e5))
+
+# [1.23.0-beta.40](https://github.com/PurrNet/PurrNet/compare/v1.23.0-beta.39...v1.23.0-beta.40) (2026-09-07)
+
+
+### Performance Improvements
+
+* udp reliable messages now coalesce while queued ([f046c4c](https://github.com/PurrNet/PurrNet/commit/f046c4c26bf5fab20bc79daf4f3f0788bc7a8ac5))
+
+# [1.23.0-beta.39](https://github.com/PurrNet/PurrNet/compare/v1.23.0-beta.38...v1.23.0-beta.39) (2026-09-07)
+
+
+### Bug Fixes
+
+* ensure siblings is populated before assuming ([2cced88](https://github.com/PurrNet/PurrNet/commit/2cced88490cc22d9b109068801d71a1536a753df))
+
+# [1.23.0-beta.38](https://github.com/PurrNet/PurrNet/compare/v1.23.0-beta.37...v1.23.0-beta.38) (2026-09-06)
+
+
+### Performance Improvements
+
+* cut spawn churn garbage and per-player finish packets ([2e630ad](https://github.com/PurrNet/PurrNet/commit/2e630ad88c6cae46618b700e8e6d7fe261e4700a))
+
+# [1.23.0-beta.37](https://github.com/PurrNet/PurrNet/compare/v1.23.0-beta.36...v1.23.0-beta.37) (2026-09-06)
+
+
+### Bug Fixes
+
+* delta registration bug ([3db7937](https://github.com/PurrNet/PurrNet/commit/3db793787ff3397a78df5cbeef3282a73e9e13e8))
+
+
+### Performance Improvements
+
+* NetworkTransform per-client replay ([efadd94](https://github.com/PurrNet/PurrNet/commit/efadd94c90c604ca982fe550e5cab09d77047ebd))
+
+# [1.23.0-beta.36](https://github.com/PurrNet/PurrNet/compare/v1.23.0-beta.35...v1.23.0-beta.36) (2026-09-06)
+
+
+### Performance Improvements
+
+* introduce a new `OnObserversAdded` with a list of batches; cache visibility results; NetworkTransform uses new observer event for fanout ([0bf65a6](https://github.com/PurrNet/PurrNet/commit/0bf65a68aec2e4a8811f2ff27cc37d13b6e95666))
+
+# [1.23.0-beta.35](https://github.com/PurrNet/PurrNet/compare/v1.23.0-beta.34...v1.23.0-beta.35) (2026-09-06)
+
+
+### Bug Fixes
+
+* UDP GC for .netstandard ([6e7668c](https://github.com/PurrNet/PurrNet/commit/6e7668cfd28711da0a6db6d8d868688c03e06e90))
+
+# [1.23.0-beta.34](https://github.com/PurrNet/PurrNet/compare/v1.23.0-beta.33...v1.23.0-beta.34) (2026-09-06)
+
+
+### Performance Improvements
+
+* improve visibility and cache sibling components ([550987b](https://github.com/PurrNet/PurrNet/commit/550987bab7d74411ef82208cb70fe47ae6976b54))
+
+# [1.23.0-beta.33](https://github.com/PurrNet/PurrNet/compare/v1.23.0-beta.32...v1.23.0-beta.33) (2026-09-06)
+
+
+### Bug Fixes
+
+* revert NT ACK patch, it was not worth it ([32e6053](https://github.com/PurrNet/PurrNet/commit/32e6053cabbd570e8d3105326ce0ffae513a9744))
+
+# [1.23.0-beta.32](https://github.com/PurrNet/PurrNet/compare/v1.23.0-beta.31...v1.23.0-beta.32) (2026-09-06)
+
+
+### Bug Fixes
+
+* forgot to push file ([a256909](https://github.com/PurrNet/PurrNet/commit/a2569099aefbac4a7594a29b3853edbe62cc832d))
+
+# [1.23.0-beta.31](https://github.com/PurrNet/PurrNet/compare/v1.23.0-beta.30...v1.23.0-beta.31) (2026-09-06)
+
+
+### Bug Fixes
+
+* NT ACK correctness ([2b7fd72](https://github.com/PurrNet/PurrNet/commit/2b7fd72b7e08df530ea0007664d490563e214f3e))
+
+# [1.23.0-beta.30](https://github.com/PurrNet/PurrNet/compare/v1.23.0-beta.29...v1.23.0-beta.30) (2026-09-05)
+
+
+### Bug Fixes
+
+* improve NetworkIdentity direct children lookup ([dbb56b7](https://github.com/PurrNet/PurrNet/commit/dbb56b7683f9cece31b3d9d4cd4818b26033fce5))
+
+# [1.23.0-beta.29](https://github.com/PurrNet/PurrNet/compare/v1.23.0-beta.28...v1.23.0-beta.29) (2026-09-05)
+
+
+### Bug Fixes
+
+* clear up some GC on the myers diff ([cdb25d0](https://github.com/PurrNet/PurrNet/commit/cdb25d0aec9ed298d86adb8b84e4d79602353ac9))
+* fast-path for when direct network children are 0 ([81668bd](https://github.com/PurrNet/PurrNet/commit/81668bd45abec6bb5dce092638c3770416ca84d2))
+
+# [1.23.0-beta.28](https://github.com/PurrNet/PurrNet/compare/v1.23.0-beta.27...v1.23.0-beta.28) (2026-09-04)
+
+
+### Bug Fixes
+
+* syncvar bug and tests to ensure we dont regress ([2aea0b7](https://github.com/PurrNet/PurrNet/commit/2aea0b7ddeb940b7a44b8b93e4f39967865dc8d5))
+
+# [1.23.0-beta.27](https://github.com/PurrNet/PurrNet/compare/v1.23.0-beta.26...v1.23.0-beta.27) (2026-09-04)
+
+
+### Bug Fixes
+
+* optimize litenetlib batching for single packets ([b83d746](https://github.com/PurrNet/PurrNet/commit/b83d746982bbbc97542811ec07353c62ac1056bb))
+
+# [1.23.0-beta.26](https://github.com/PurrNet/PurrNet/compare/v1.23.0-beta.25...v1.23.0-beta.26) (2026-09-04)
+
+
+### Bug Fixes
+
+* improving on the adaptive NT CPU usage ([1200724](https://github.com/PurrNet/PurrNet/commit/12007249941e6f8ab82feb966e7c595253ee18c5))
+
+# [1.23.0-beta.25](https://github.com/PurrNet/PurrNet/compare/v1.23.0-beta.24...v1.23.0-beta.25) (2026-09-04)
+
+
+### Bug Fixes
+
+* NetworkTransform registration regression ([5725df0](https://github.com/PurrNet/PurrNet/commit/5725df091f703f3d07fd233b90870ff6eb09d7a0))
+
+# [1.23.0-beta.24](https://github.com/PurrNet/PurrNet/compare/v1.23.0-beta.23...v1.23.0-beta.24) (2026-09-03)
+
+
+### Bug Fixes
+
+* transports can now flush per targer ([e982797](https://github.com/PurrNet/PurrNet/commit/e98279774e484a1fa71304d1ebeee1ca144a946f))
+
+# [1.23.0-beta.23](https://github.com/PurrNet/PurrNet/compare/v1.23.0-beta.22...v1.23.0-beta.23) (2026-09-03)
+
+
+### Bug Fixes
+
+* frame-accurate RTT; immediate rpcs also send on the same frame ([6ab4fad](https://github.com/PurrNet/PurrNet/commit/6ab4fadd785d2c3f5bd5f70c9b3506623d7fd400))
+
+# [1.23.0-beta.22](https://github.com/PurrNet/PurrNet/compare/v1.23.0-beta.21...v1.23.0-beta.22) (2026-09-03)
+
+
+### Bug Fixes
+
+* ILProcessing for unity 6.6 ([bdbbb82](https://github.com/PurrNet/PurrNet/commit/bdbbb8205c66f8729f707892e201f582a2c74824))
+* when using Purrnet, Object.DontDestroyOnLoad() can fail ([2370872](https://github.com/PurrNet/PurrNet/commit/237087254d76d0cafa9f55c40ce1d2368caae0be))
+
+# [1.23.0-beta.21](https://github.com/PurrNet/PurrNet/compare/v1.23.0-beta.20...v1.23.0-beta.21) (2026-09-03)
+
+
+### Bug Fixes
+
+* PlayerSpawner not spawning if DespawnIfOwnerDisconnects = false && ([62b2a7f](https://github.com/PurrNet/PurrNet/commit/62b2a7f7f32bb15580c418a14df2c71134e8945c))
+
+# [1.23.0-beta.20](https://github.com/PurrNet/PurrNet/compare/v1.23.0-beta.19...v1.23.0-beta.20) (2026-09-03)
+
+
+### Bug Fixes
+
+* scene scoped assets test + fixes ([325c740](https://github.com/PurrNet/PurrNet/commit/325c740e945ba7b1206a0509e6c672f9517dd02b))
+
+# [1.23.0-beta.19](https://github.com/PurrNet/PurrNet/compare/v1.23.0-beta.18...v1.23.0-beta.19) (2026-09-02)
+
+
+### Features
+
+* allow a custom prefab resolver for custom resolution of prefabs ([d1f1caa](https://github.com/PurrNet/PurrNet/commit/d1f1caa0374252cfbefd4c026de12a6ed7408c79))
+* NetworkScenePrefabs/Assets ([1ab95e6](https://github.com/PurrNet/PurrNet/commit/1ab95e63f0271912241ba0dfe99180b1a54ff6ac))
+
+# [1.23.0-beta.18](https://github.com/PurrNet/PurrNet/compare/v1.23.0-beta.17...v1.23.0-beta.18) (2026-09-02)
+
+
+### Bug Fixes
+
+* Making up for path delay with pings ([e2c160a](https://github.com/PurrNet/PurrNet/commit/e2c160abb995a65e4f34a6e8e8ff822d56ff2c35))
+
+# [1.23.0-beta.17](https://github.com/PurrNet/PurrNet/compare/v1.23.0-beta.16...v1.23.0-beta.17) (2026-09-02)
+
+
+### Bug Fixes
+
+* Pinging fix for Steam ([e6f423e](https://github.com/PurrNet/PurrNet/commit/e6f423e86bab3ebb6c8c30dbe6cc68b99f3873d8))
+
+# [1.23.0-beta.16](https://github.com/PurrNet/PurrNet/compare/v1.23.0-beta.15...v1.23.0-beta.16) (2026-09-02)
+
+
+### Bug Fixes
+
+* Pre-connection pinging support ([538e959](https://github.com/PurrNet/PurrNet/commit/538e959655c3026a3a886d9d0074782ec5c94716))
+
+# [1.23.0-beta.15](https://github.com/PurrNet/PurrNet/compare/v1.23.0-beta.14...v1.23.0-beta.15) (2026-09-02)
+
+
+### Bug Fixes
+
+* Removed PurrChat from toolbar ([ed451d5](https://github.com/PurrNet/PurrNet/commit/ed451d5ce3555df05c2d8386b24df5a981c29e3a))
+
+# [1.23.0-beta.14](https://github.com/PurrNet/PurrNet/compare/v1.23.0-beta.13...v1.23.0-beta.14) (2026-09-02)
+
+
+### Bug Fixes
+
+* reusing shared data instead of re-packing each time ([c0928ba](https://github.com/PurrNet/PurrNet/commit/c0928ba78641efe709c5fefa73e13e5e3eab055b))
+
+# [1.23.0-beta.13](https://github.com/PurrNet/PurrNet/compare/v1.23.0-beta.12...v1.23.0-beta.13) (2026-09-01)
+
+
+### Bug Fixes
+
+* delta module cache ([e6274d7](https://github.com/PurrNet/PurrNet/commit/e6274d77ee4b40798376f1da9d0460536a7d0b3e))
+* network transform shared baseline ([33ebf20](https://github.com/PurrNet/PurrNet/commit/33ebf20dce3e0b7200ef79d0aeeafc12ecfc36cc))
+* shared baseline for delta module ([c3af09d](https://github.com/PurrNet/PurrNet/commit/c3af09d0567892d6033e3929f47387aad597628f))
+
+# [1.23.0-beta.12](https://github.com/PurrNet/PurrNet/compare/v1.23.0-beta.11...v1.23.0-beta.12) (2026-08-31)
+
+
+### Bug Fixes
+
+* parenting and NT smoothness ([61d2e13](https://github.com/PurrNet/PurrNet/commit/61d2e139b507d8e617b28fee303c9096a5dcc181))
+
+# [1.23.0-beta.11](https://github.com/PurrNet/PurrNet/compare/v1.23.0-beta.10...v1.23.0-beta.11) (2026-08-31)
+
+
+### Bug Fixes
+
+* async spawning reinforcement ([c052897](https://github.com/PurrNet/PurrNet/commit/c052897759acf10287f6b767769a0bd12546668d))
+
+# [1.23.0-beta.10](https://github.com/PurrNet/PurrNet/compare/v1.23.0-beta.9...v1.23.0-beta.10) (2026-08-31)
+
+
+### Features
+
+* allow to pickup network prefabs directly from scene references ([fd3852f](https://github.com/PurrNet/PurrNet/commit/fd3852fc494fc1f8fb677843847c52a16394266b))
+
+# [1.23.0-beta.9](https://github.com/PurrNet/PurrNet/compare/v1.23.0-beta.8...v1.23.0-beta.9) (2026-08-31)
+
+
+### Bug Fixes
+
+* error if parent is changed without permissions + revert to correct ([0871412](https://github.com/PurrNet/PurrNet/commit/08714126db53605d5b0ea29936e536f90d4f5ac8))
+
+# [1.23.0-beta.8](https://github.com/PurrNet/PurrNet/compare/v1.23.0-beta.7...v1.23.0-beta.8) (2026-08-29)
+
+
+### Bug Fixes
+
+* Async instantiation despawn ordering ([d75571a](https://github.com/PurrNet/PurrNet/commit/d75571a944849ec5a5486b964d3f21ec111c94df))
+
+# [1.23.0-beta.7](https://github.com/PurrNet/PurrNet/compare/v1.23.0-beta.6...v1.23.0-beta.7) (2026-08-29)
+
+
+### Bug Fixes
+
+* Async instantiation fix ([afc0a60](https://github.com/PurrNet/PurrNet/commit/afc0a608d6c7810fb2b3818f255deb361872a919))
+
+# [1.23.0-beta.6](https://github.com/PurrNet/PurrNet/compare/v1.23.0-beta.5...v1.23.0-beta.6) (2026-08-27)
+
+
+### Bug Fixes
+
+* improve new updates (perf + gc) ([21e4bfc](https://github.com/PurrNet/PurrNet/commit/21e4bfc1def19e626e08eb4852410398d46564a4))
+
+# [1.23.0-beta.5](https://github.com/PurrNet/PurrNet/compare/v1.23.0-beta.4...v1.23.0-beta.5) (2026-08-27)
+
+
+### Bug Fixes
+
+* lower GC from NetworkTransform delegates, add a handler and RemoveAt for PurrAction with O(1) removal time ([6368f93](https://github.com/PurrNet/PurrNet/commit/6368f931d10ad6f828cef240f7c81e35e4bc2e72))
+
+# [1.23.0-beta.4](https://github.com/PurrNet/PurrNet/compare/v1.23.0-beta.3...v1.23.0-beta.4) (2026-08-27)
+
+
+### Bug Fixes
+
+* purrnet package manager installation process ([a266046](https://github.com/PurrNet/PurrNet/commit/a266046d2d5a5e5bf27b41dae4bbf180508cd8a7))
+
+# [1.23.0-beta.3](https://github.com/PurrNet/PurrNet/compare/v1.23.0-beta.2...v1.23.0-beta.3) (2026-08-25)
+
+
+### Bug Fixes
+
+* unity 2022 bad api ([b716b9c](https://github.com/PurrNet/PurrNet/commit/b716b9ca1da75d43db079271222dacc40018bcee))
+
+# [1.23.0-beta.2](https://github.com/PurrNet/PurrNet/compare/v1.23.0-beta.1...v1.23.0-beta.2) (2026-08-21)
+
+
+### Bug Fixes
+
+* move OwnerOnly to be an override of NetworkModule ([58e4984](https://github.com/PurrNet/PurrNet/commit/58e4984dc61b8936701c608ecba3c7ac5174ef82))
+
+# [1.23.0-beta.1](https://github.com/PurrNet/PurrNet/compare/v1.22.1-beta.15...v1.23.0-beta.1) (2026-08-21)
+
+
+### Features
+
+* [OwnerOnly] for sync types, this is a common case to not dealing ([6e597de](https://github.com/PurrNet/PurrNet/commit/6e597de06e08b902a189dc1cfba566483a6f9023))
+
+## [1.22.1-beta.15](https://github.com/PurrNet/PurrNet/compare/v1.22.1-beta.14...v1.22.1-beta.15) (2026-08-21)
+
+
+### Bug Fixes
+
+* Awaitable ServerRpc returning an IPackedSimple struct returns ([9d61f33](https://github.com/PurrNet/PurrNet/commit/9d61f338a02a2467550eeff027e8f3d05e37fc44))
+
+## [1.22.1-beta.14](https://github.com/PurrNet/PurrNet/compare/v1.22.1-beta.13...v1.22.1-beta.14) (2026-08-21)
+
+
+### Bug Fixes
+
+* SyncEvent bitpacker bug ([5359f7b](https://github.com/PurrNet/PurrNet/commit/5359f7be26e7c7ae7dea566eed285fe3c19982c3))
+
+## [1.22.1-beta.13](https://github.com/PurrNet/PurrNet/compare/v1.22.1-beta.12...v1.22.1-beta.13) (2026-08-20)
+
+
+### Bug Fixes
+
+* camelCase consistency ([0bd00f1](https://github.com/PurrNet/PurrNet/commit/0bd00f1d09109149b7f36a4ae3cbeb5fccd3a325))
+
+## [1.22.1-beta.12](https://github.com/PurrNet/PurrNet/compare/v1.22.1-beta.11...v1.22.1-beta.12) (2026-08-20)
+
+
+### Bug Fixes
+
+* cleanup ([cee08b7](https://github.com/PurrNet/PurrNet/commit/cee08b74af42e6345014bc7bdb6c1b1d2d98bff4))
+* Performance boost for new PurrAction ([2a80252](https://github.com/PurrNet/PurrNet/commit/2a80252cc80b8567393a021053ad1c3150ac63a1))
+* PurrAction guard against null entries ([d489ca5](https://github.com/PurrNet/PurrNet/commit/d489ca56753785dce283289df76f2a9a6bb9d432))
+
+## [1.22.1-beta.11](https://github.com/PurrNet/PurrNet/compare/v1.22.1-beta.10...v1.22.1-beta.11) (2026-08-20)
+
+
+### Bug Fixes
+
+* SyncBigData resilience and bad config for non "unsafe" network ([dc5ba05](https://github.com/PurrNet/PurrNet/commit/dc5ba051d3dc4f7550048b0839d3e89793f6df70))
+
+## [1.22.1-beta.10](https://github.com/PurrNet/PurrNet/compare/v1.22.1-beta.9...v1.22.1-beta.10) (2026-08-19)
+
+
+### Bug Fixes
+
+* Timing of instance handler to subsystem registration ([3c0f676](https://github.com/PurrNet/PurrNet/commit/3c0f676b75f33c613576077ae544f1dcb19e7dfc))
+
+## [1.22.1-beta.9](https://github.com/PurrNet/PurrNet/compare/v1.22.1-beta.8...v1.22.1-beta.9) (2026-08-19)
+
+
+### Bug Fixes
+
+* network animator auto sync also syncs layer weights ([8c4b376](https://github.com/PurrNet/PurrNet/commit/8c4b37661de77246454abb0aa933b9f74760ab2e))
+
+## [1.22.1-beta.8](https://github.com/PurrNet/PurrNet/compare/v1.22.1-beta.7...v1.22.1-beta.8) (2026-08-19)
+
+
+### Bug Fixes
+
+* Statistics manager improved initial ping & reporting ([cbfabac](https://github.com/PurrNet/PurrNet/commit/cbfabacfb06c28ed82bfbe3b1e40f165d60262c8))
+
+## [1.22.1-beta.7](https://github.com/PurrNet/PurrNet/compare/v1.22.1-beta.6...v1.22.1-beta.7) (2026-08-18)
+
+
+### Bug Fixes
+
+* PurrNet new icons ([778eba1](https://github.com/PurrNet/PurrNet/commit/778eba12a87ba7d5f5d2d8d0677ffe1dc7268a84))
+
+## [1.22.1-beta.6](https://github.com/PurrNet/PurrNet/compare/v1.22.1-beta.5...v1.22.1-beta.6) (2026-08-18)
+
+
+### Bug Fixes
+
+* BitPacker duplicate bug ([9daf35f](https://github.com/PurrNet/PurrNet/commit/9daf35fbd7a6655e1d663da536ac67d0aba8cc3d))
+
+## [1.22.1-beta.5](https://github.com/PurrNet/PurrNet/compare/v1.22.1-beta.4...v1.22.1-beta.5) (2026-08-17)
+
+
+### Bug Fixes
+
+* improved delta packers for other primitive types ([5d1ca99](https://github.com/PurrNet/PurrNet/commit/5d1ca99b5890c7a6653454e7b065ff9290e64491))
+
+## [1.22.1-beta.4](https://github.com/PurrNet/PurrNet/compare/v1.22.1-beta.3...v1.22.1-beta.4) (2026-08-17)
+
+
+### Bug Fixes
+
+* better float delta packer ([ec0638b](https://github.com/PurrNet/PurrNet/commit/ec0638bd74f6f85a1f11b17b2df0e4bb8407c096))
+
+## [1.22.1-beta.3](https://github.com/PurrNet/PurrNet/compare/v1.22.1-beta.2...v1.22.1-beta.3) (2026-08-14)
+
+
+### Bug Fixes
+
+* NetworkTransform ownership transfers smoothly transitions instead of teleporting ([b8fafaf](https://github.com/PurrNet/PurrNet/commit/b8fafaf740d12b85690d275b3a625f0f8e053829))
+
+## [1.22.1-beta.2](https://github.com/PurrNet/PurrNet/compare/v1.22.1-beta.1...v1.22.1-beta.2) (2026-08-13)
+
+
+### Bug Fixes
+
+* scene reload cleanup issue ([762ee79](https://github.com/PurrNet/PurrNet/commit/762ee7987ccfebe7f5ffb5bc1b6efcfd17c43d2d))
+
+## [1.22.1-beta.1](https://github.com/PurrNet/PurrNet/compare/v1.22.0...v1.22.1-beta.1) (2026-08-13)
+
+
+### Bug Fixes
+
+* include `com.uniy.mathematics` dep ([375ce4b](https://github.com/PurrNet/PurrNet/commit/375ce4bc50ac8893e7a3cf312c3f2ce2e3f30c14))
+* not sure why my unity has something not on the website ([9df82f5](https://github.com/PurrNet/PurrNet/commit/9df82f5d66bc44b1f852787d70a90e82aec265e9))
+* typo ([96816eb](https://github.com/PurrNet/PurrNet/commit/96816ebe58c4fff3eaa757cab73778805d8131f9))
+
+## [1.22.1-beta.1](https://github.com/PurrNet/PurrNet/compare/v1.22.0...v1.22.1-beta.1) (2026-08-13)
+
+
+### Bug Fixes
+
+* include `com.uniy.mathematics` dep ([375ce4b](https://github.com/PurrNet/PurrNet/commit/375ce4bc50ac8893e7a3cf312c3f2ce2e3f30c14))
+* not sure why my unity has something not on the website ([9df82f5](https://github.com/PurrNet/PurrNet/commit/9df82f5d66bc44b1f852787d70a90e82aec265e9))
+
 # [1.22.0](https://github.com/PurrNet/PurrNet/compare/v1.21.1...v1.22.0) (2026-08-11)
 
 

@@ -1,12 +1,20 @@
+using System;
 using System.Collections;
 using System.Reflection;
 using NUnit.Framework;
+using PurrNet;
 using PurrNet.Modules;
 using PurrNet.Packing;
 
 public class DeltaPackedNumberTests
 {
     private BitPacker packer;
+
+    [OneTimeSetUp]
+    public void Init()
+    {
+        NetworkManager.LoadOrGenerateHashes();
+    }
 
     [SetUp]
     public void Setup()
@@ -47,83 +55,359 @@ public class DeltaPackedNumberTests
         }
     }
 
-    /*[Test]
-    public void TestDeltaFloatEdgeCases()
-    {
-        float[] values =
-        {
-            0f, float.Epsilon, float.MinValue, float.MaxValue, float.NaN, float.PositiveInfinity, float.NegativeInfinity
-        };
+}
 
-        foreach (float oldVal in values)
+public class DeltaFloatBitPerfectionTests
+{
+    private BitPacker packer;
+
+    [OneTimeSetUp]
+    public void Init()
+    {
+        NetworkManager.LoadOrGenerateHashes();
+    }
+
+    [SetUp]
+    public void Setup()
+    {
+        packer = BitPackerPool.Get();
+    }
+
+    [TearDown]
+    public void Teardown()
+    {
+        packer?.Dispose();
+    }
+
+    // +0, -0, min/max denormal, min normal, 1, 1+ulp, -1, min/max, ±inf,
+    // quiet NaN, quiet NaN with payload, signaling NaN, negative NaN, pi
+    static readonly uint[] floatPatterns =
+    {
+        0x00000000, 0x80000000, 0x00000001, 0x807FFFFF, 0x00800000,
+        0x3F800000, 0x3F800001, 0xBF800000, 0x7F7FFFFF, 0xFF7FFFFF,
+        0x7F800000, 0xFF800000, 0x7FC00000, 0x7FC12345, 0x7F800001,
+        0xFFC00000, 0x40490FDB,
+    };
+
+    static readonly ulong[] doublePatterns =
+    {
+        0x0000000000000000, 0x8000000000000000, 0x0000000000000001, 0x800FFFFFFFFFFFFF, 0x0010000000000000,
+        0x3FF0000000000000, 0x3FF0000000000001, 0xBFF0000000000000, 0x7FEFFFFFFFFFFFFF, 0xFFEFFFFFFFFFFFFF,
+        0x7FF0000000000000, 0xFFF0000000000000, 0x7FF8000000000000, 0x7FF8123456789ABC, 0x7FF0000000000001,
+        0xFFF8000000000000, 0x400921FB54442D18,
+    };
+
+    [Test]
+    public void FloatDelta_AllEdgePairs_AreBitExact()
+    {
+        foreach (uint oldPattern in floatPatterns)
         {
-            foreach (float newVal in values)
+            foreach (uint newPattern in floatPatterns)
             {
-                float readValue = oldVal;
+                float oldVal = BitConverter.Int32BitsToSingle((int)oldPattern);
+                float newVal = BitConverter.Int32BitsToSingle((int)newPattern);
+                float readValue = default;
+
+                uint oldBits = (uint)BitConverter.SingleToInt32Bits(oldVal);
+                uint newBits = (uint)BitConverter.SingleToInt32Bits(newVal);
+
                 packer.ResetPositionAndMode(false);
-                DeltaPacker<float>.Write(packer, oldVal, newVal);
+                bool wasChanged = DeltaPacker<float>.Write(packer, oldVal, newVal);
                 packer.ResetPositionAndMode(true);
                 DeltaPacker<float>.Read(packer, oldVal, ref readValue);
 
-                if (float.IsNaN(newVal))
-                    Assert.That(float.IsNaN(readValue), $"NaN failed with old:{oldVal} new:{newVal}");
-                else
-                    Assert.That(readValue, Is.EqualTo(newVal), $"Failed with old:{oldVal} new:{newVal}");
+                Assert.That(wasChanged, Is.EqualTo(oldBits != newBits),
+                    $"Change flag wrong for old:{oldBits:X8} new:{newBits:X8}");
+                Assert.That((uint)BitConverter.SingleToInt32Bits(readValue), Is.EqualTo(newBits),
+                    $"Not bit-exact for old:{oldBits:X8} new:{newBits:X8}");
             }
         }
     }
 
     [Test]
-    public void TestDeltaSmallChanges()
+    public void DoubleDelta_AllEdgePairs_AreBitExact()
     {
-        float baseValue = 1000f;
-        float[] deltas = { 0.001f, 0.01f, 0.1f, 1f, 10f };
-
-        foreach (float delta in deltas)
+        foreach (ulong oldBits in doublePatterns)
         {
-            float oldValue = baseValue;
-            float newValue = baseValue + delta;
-            float readValue = oldValue;
+            foreach (ulong newBits in doublePatterns)
+            {
+                double oldVal = BitConverter.Int64BitsToDouble((long)oldBits);
+                double newVal = BitConverter.Int64BitsToDouble((long)newBits);
+                double readValue = default;
 
-            packer.ResetPositionAndMode(false);
-            DeltaPacker<float>.Write(packer, oldValue, newValue);
-            packer.ResetPositionAndMode(true);
-            DeltaPacker<float>.Read(packer, oldValue, ref readValue);
+                packer.ResetPositionAndMode(false);
+                bool wasChanged = DeltaPacker<double>.Write(packer, oldVal, newVal);
+                packer.ResetPositionAndMode(true);
+                DeltaPacker<double>.Read(packer, oldVal, ref readValue);
 
-            Assert.That(readValue, Is.EqualTo(newValue),
-                $"Small delta failed with old:{oldValue} new:{newValue} delta:{delta}");
+                Assert.That(wasChanged, Is.EqualTo(oldBits != newBits),
+                    $"Change flag wrong for old:{oldBits:X16} new:{newBits:X16}");
+                Assert.That((ulong)BitConverter.DoubleToInt64Bits(readValue), Is.EqualTo(newBits),
+                    $"Not bit-exact for old:{oldBits:X16} new:{newBits:X16}");
+            }
         }
     }
 
     [Test]
-    public void TestDeltaSequentialChanges()
+    public void FloatDelta_UnchangedValue_WritesSingleBit()
     {
-        float value = 1.0f;
+        foreach (uint bits in floatPatterns)
+        {
+            float value = BitConverter.Int32BitsToSingle((int)bits);
+            packer.ResetPositionAndMode(false);
+            bool wasChanged = DeltaPacker<float>.Write(packer, value, value);
+
+            Assert.That(wasChanged, Is.False, $"Identical bits reported as changed: {bits:X8}");
+            Assert.That(packer.positionInBits, Is.EqualTo(1), $"Unchanged value not 1 bit: {bits:X8}");
+        }
+    }
+
+    [Test]
+    public void NetworkIDDelta_RoundTripsAndStaysCompact()
+    {
+        var pairs = new (NetworkID from, NetworkID to)[]
+        {
+            (new NetworkID(200), new NetworkID(201)),
+            (new NetworkID(200), new NetworkID(200)),
+            (new NetworkID(10, new PlayerID(2, false)), new NetworkID(9, new PlayerID(2, false))),
+            (new NetworkID(5, new PlayerID(3, false)), new NetworkID(900000, new PlayerID(7, true))),
+            (default, new NetworkID(ulong.MaxValue, new PlayerID(ulong.MaxValue, false))),
+        };
+
+        foreach (var (from, to) in pairs)
+        {
+            packer.ResetPositionAndMode(false);
+            bool changed = DeltaPacker<NetworkID>.Write(packer, from, to);
+            int written = packer.positionInBits;
+            Assert.That(changed, Is.EqualTo(!from.Equals(to)), $"{from} -> {to}");
+
+            packer.ResetPositionAndMode(true);
+            NetworkID read = default;
+            DeltaPacker<NetworkID>.Read(packer, from, ref read);
+            Assert.That(read, Is.EqualTo(to), $"{from} -> {to}");
+            Assert.That(read.scope.isBot, Is.EqualTo(to.scope.isBot), $"{from} -> {to}");
+            Assert.That(packer.positionInBits, Is.EqualTo(written), $"{from} -> {to} read a different length");
+        }
 
         packer.ResetPositionAndMode(false);
+        DeltaPacker<NetworkID>.Write(packer, new NetworkID(200), new NetworkID(201));
+        Assert.That(packer.positionInBits, Is.LessThanOrEqualTo(12), "the next id in a batch should cost about a byte");
+    }
 
-        // Write sequence of small changes
-        for (int i = 0; i < 10; i++)
+    [Test]
+    public void DoubleDelta_UnchangedValue_WritesSingleBit()
+    {
+        foreach (ulong bits in doublePatterns)
         {
-            float oldValue = value;
-            value *= 1.1f; // 10% increase each time
-            DeltaPacker<float>.Write(packer, oldValue, value);
+            double value = BitConverter.Int64BitsToDouble((long)bits);
+            packer.ResetPositionAndMode(false);
+            bool wasChanged = DeltaPacker<double>.Write(packer, value, value);
+
+            Assert.That(wasChanged, Is.False, $"Identical bits reported as changed: {bits:X16}");
+            Assert.That(packer.positionInBits, Is.EqualTo(1), $"Unchanged value not 1 bit: {bits:X16}");
+        }
+    }
+
+    [Test]
+    public void FloatDelta_RandomPatternChains_AreBitExact()
+    {
+        var rng = new Random(9001);
+
+        packer.ResetPositionAndMode(false);
+        var values = new float[10_000];
+        float previous = 0f;
+        for (int i = 0; i < values.Length; i++)
+        {
+            values[i] = BitConverter.Int32BitsToSingle(rng.Next(int.MinValue, int.MaxValue));
+            DeltaPacker<float>.Write(packer, previous, values[i]);
+            previous = values[i];
         }
 
         packer.ResetPositionAndMode(true);
-
-        // Read back sequence
-        value = 1.0f;
-        for (int i = 0; i < 10; i++)
+        previous = 0f;
+        for (int i = 0; i < values.Length; i++)
         {
-            float oldValue = value;
-            value *= 1.1f;
-            float readValue = oldValue;
-            DeltaPacker<float>.Read(packer, oldValue, ref readValue);
-            Assert.That(readValue, Is.EqualTo(value),
-                $"Sequential change failed at step {i}");
+            float readValue = default;
+            DeltaPacker<float>.Read(packer, previous, ref readValue);
+            Assert.That(BitConverter.SingleToInt32Bits(readValue),
+                Is.EqualTo(BitConverter.SingleToInt32Bits(values[i])), $"Chain diverged at {i}");
+            previous = readValue;
         }
-    }*/
+    }
+
+    [Test]
+    public void DoubleDelta_RandomPatternChains_AreBitExact()
+    {
+        var rng = new Random(9002);
+
+        packer.ResetPositionAndMode(false);
+        var values = new double[10_000];
+        double previous = 0d;
+        for (int i = 0; i < values.Length; i++)
+        {
+            long bits = ((long)rng.Next(int.MinValue, int.MaxValue) << 32) | (uint)rng.Next(int.MinValue, int.MaxValue);
+            values[i] = BitConverter.Int64BitsToDouble(bits);
+            DeltaPacker<double>.Write(packer, previous, values[i]);
+            previous = values[i];
+        }
+
+        packer.ResetPositionAndMode(true);
+        previous = 0d;
+        for (int i = 0; i < values.Length; i++)
+        {
+            double readValue = default;
+            DeltaPacker<double>.Read(packer, previous, ref readValue);
+            Assert.That(BitConverter.DoubleToInt64Bits(readValue),
+                Is.EqualTo(BitConverter.DoubleToInt64Bits(values[i])), $"Chain diverged at {i}");
+            previous = readValue;
+        }
+    }
+}
+
+public class IntDeltaBitPerfectionTests
+{
+    private BitPacker packer;
+
+    [OneTimeSetUp]
+    public void Init()
+    {
+        NetworkManager.LoadOrGenerateHashes();
+    }
+
+    [SetUp]
+    public void Setup()
+    {
+        packer = BitPackerPool.Get();
+    }
+
+    [TearDown]
+    public void Teardown()
+    {
+        packer?.Dispose();
+    }
+
+    void TestAllPairs<T>(T[] values)
+    {
+        var comparer = System.Collections.Generic.EqualityComparer<T>.Default;
+
+        foreach (T oldVal in values)
+        {
+            foreach (T newVal in values)
+            {
+                T readValue = default;
+                bool expectChanged = !comparer.Equals(oldVal, newVal);
+
+                packer.ResetPositionAndMode(false);
+                bool wasChanged = DeltaPacker<T>.Write(packer, oldVal, newVal);
+
+                Assert.That(wasChanged, Is.EqualTo(expectChanged),
+                    $"{typeof(T).Name} change flag wrong for old:{oldVal} new:{newVal}");
+                if (!expectChanged)
+                    Assert.That(packer.positionInBits, Is.EqualTo(1),
+                        $"{typeof(T).Name} unchanged value not 1 bit: {oldVal}");
+
+                packer.ResetPositionAndMode(true);
+                DeltaPacker<T>.Read(packer, oldVal, ref readValue);
+
+                Assert.That(readValue, Is.EqualTo(newVal),
+                    $"{typeof(T).Name} not exact for old:{oldVal} new:{newVal}");
+            }
+        }
+    }
+
+    [Test]
+    public void SByteDelta_AllEdgePairs() =>
+        TestAllPairs(new sbyte[] { sbyte.MinValue, -127, -1, 0, 1, 126, sbyte.MaxValue });
+
+    [Test]
+    public void ByteDelta_AllEdgePairs() =>
+        TestAllPairs(new byte[] { 0, 1, 2, 127, 128, 254, byte.MaxValue });
+
+    [Test]
+    public void ShortDelta_AllEdgePairs() =>
+        TestAllPairs(new short[] { short.MinValue, -256, -1, 0, 1, 256, short.MaxValue });
+
+    [Test]
+    public void UShortDelta_AllEdgePairs() =>
+        TestAllPairs(new ushort[] { 0, 1, 255, 256, 32768, 65534, ushort.MaxValue });
+
+    [Test]
+    public void IntDelta_AllEdgePairs() =>
+        TestAllPairs(new[] { int.MinValue, -65536, -1, 0, 1, 65536, int.MaxValue });
+
+    [Test]
+    public void UIntDelta_AllEdgePairs() =>
+        TestAllPairs(new uint[] { 0, 1, 12345, 1u << 31, uint.MaxValue - 1, uint.MaxValue });
+
+    [Test]
+    public void LongDelta_AllEdgePairs() =>
+        TestAllPairs(new[] { long.MinValue, -(1L << 40), -1, 0, 1, 1L << 40, long.MaxValue });
+
+    [Test]
+    public void ULongDelta_AllEdgePairs() =>
+        TestAllPairs(new ulong[] { 0, 1, 1UL << 63, ulong.MaxValue - 1, ulong.MaxValue });
+
+    [Test]
+    public void PackedTypesDelta_AllEdgePairs()
+    {
+        TestAllPairs(new PackedUInt[] { new(0), new(1), new(12345), new(uint.MaxValue) });
+        TestAllPairs(new PackedULong[] { new(0), new(1), new(1UL << 63), new(ulong.MaxValue) });
+        TestAllPairs(new PackedUShort[] { new(0), new(1), new(256), new(ushort.MaxValue) });
+        TestAllPairs(new PackedLong[] { new(long.MinValue), new(-1), new(0), new(1), new(long.MaxValue) });
+        TestAllPairs(new Size[] { new(0), new(1), new(12345), new(uint.MaxValue) });
+    }
+
+    [Test]
+    public void IntDelta_RandomChains_AreExact()
+    {
+        var rng = new Random(9003);
+
+        packer.ResetPositionAndMode(false);
+        var values = new int[10_000];
+        int previous = 0;
+        for (int i = 0; i < values.Length; i++)
+        {
+            values[i] = rng.Next(int.MinValue, int.MaxValue);
+            DeltaPacker<int>.Write(packer, previous, values[i]);
+            previous = values[i];
+        }
+
+        packer.ResetPositionAndMode(true);
+        previous = 0;
+        for (int i = 0; i < values.Length; i++)
+        {
+            int readValue = default;
+            DeltaPacker<int>.Read(packer, previous, ref readValue);
+            Assert.That(readValue, Is.EqualTo(values[i]), $"Chain diverged at {i}");
+            previous = readValue;
+        }
+    }
+
+    [Test]
+    public void ULongDelta_RandomChains_AreExact()
+    {
+        var rng = new Random(9004);
+
+        packer.ResetPositionAndMode(false);
+        var values = new ulong[10_000];
+        ulong previous = 0;
+        for (int i = 0; i < values.Length; i++)
+        {
+            values[i] = ((ulong)(uint)rng.Next(int.MinValue, int.MaxValue) << 32) | (uint)rng.Next(int.MinValue, int.MaxValue);
+            DeltaPacker<ulong>.Write(packer, previous, values[i]);
+            previous = values[i];
+        }
+
+        packer.ResetPositionAndMode(true);
+        previous = 0;
+        for (int i = 0; i < values.Length; i++)
+        {
+            ulong readValue = default;
+            DeltaPacker<ulong>.Read(packer, previous, ref readValue);
+            Assert.That(readValue, Is.EqualTo(values[i]), $"Chain diverged at {i}");
+            previous = readValue;
+        }
+    }
 }
 
 public class ClientDeltaTrackerTests

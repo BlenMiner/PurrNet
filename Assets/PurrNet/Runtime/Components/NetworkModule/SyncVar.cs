@@ -10,7 +10,7 @@ using PurrNet.Utils;
 namespace PurrNet
 {
     [Serializable]
-    public class SyncVar<T> : NetworkModule, ISerializationCallbackReceiver
+    public class SyncVar<T> : NetworkModule, ISerializationCallbackReceiver, ITickListener
     {
         private TickManager _tickManager;
 
@@ -21,9 +21,13 @@ namespace PurrNet
         [SerializeField, Space(-5), Header("Sync Settings"), PurrLock]
         private bool _ownerAuth;
 
+        [SerializeField, PurrLock] private bool _ownerOnly;
+
         [SerializeField, Min(0)] private float _sendIntervalInSeconds;
 
         public bool ownerAuth => _ownerAuth;
+
+        public override bool ownerOnly => _ownerOnly;
 
         public float sendIntervalInSeconds
         {
@@ -78,6 +82,7 @@ namespace PurrNet
             isControllingSyncVar = false;
             _isDirty = false;
             _wasLastDirty = false;
+            _sentLastTick = false;
             _id = 0;
             _ignoreServerUpdates = false;
             _value = _initialValue;
@@ -122,7 +127,7 @@ namespace PurrNet
 
             _isSubscribedToTickManager = true;
             _subscribedTicker = networkManager.tickModule;
-            _subscribedTicker.onTick += OnTick;
+            _subscribedTicker.AddTickListener(this);
         }
 
         private void UnsubscribeFromTickManager()
@@ -131,7 +136,7 @@ namespace PurrNet
                 return;
 
             _isSubscribedToTickManager = false;
-            _subscribedTicker.onTick -= OnTick;
+            _subscribedTicker.RemoveTickListener(this);
         }
 
         public override void OnInitializeModules()
@@ -192,6 +197,7 @@ namespace PurrNet
             finally
             {
                 _wasLastDirty = false;
+                _sentLastTick = false;
                 _isDirty = false;
                 UnsubscribeFromTickManager();
             }
@@ -227,6 +233,7 @@ namespace PurrNet
             ForceSendReliable();
             _lastSendTime = Time.time;
             _wasLastDirty = false;
+            _sentLastTick = false;
             _isDirty = false;
             UnsubscribeFromTickManager();
         }
@@ -247,38 +254,65 @@ namespace PurrNet
                 float time = Time.time;
 
                 if (time - _lastSendTime < _sendIntervalInSeconds)
+                {
+                    _sentLastTick = false;
                     return;
+                }
 
-                ForceSendUnreliable();
+                if (_sentLastTick)
+                {
+                    ForceSendUnreliable();
+                    _wasLastDirty = true;
+                }
+                else
+                {
+                    ForceSendReliable();
+                    _wasLastDirty = false;
+                }
+
                 _lastSendTime = time;
-                _wasLastDirty = true;
+                _sentLastTick = true;
                 _isDirty = false;
             }
-            else if (_wasLastDirty)
+            else
             {
-                ForceSendReliable();
+                _sentLastTick = false;
+
+                if (_wasLastDirty)
+                {
+                    ForceSendReliable();
+                    _wasLastDirty = false;
+                }
+
                 UnsubscribeFromTickManager();
-                _wasLastDirty = false;
             }
         }
 
         private ulong _id;
+
         private bool _wasLastDirty;
+
+        private bool _sentLastTick;
+
         [SerializeField, HideInInspector]
         private T _initialValue;
 
-        public SyncVar(T initialValue = default, float sendIntervalInSeconds = 0f, bool ownerAuth = false)
+        public SyncVar(T initialValue = default, float sendIntervalInSeconds = 0f, bool ownerAuth = false, bool ownerOnly = false)
         {
             _initialValue = initialValue;
             _value = initialValue;
             _sendIntervalInSeconds = sendIntervalInSeconds;
             _ownerAuth = ownerAuth;
+            _ownerOnly = ownerOnly;
         }
 
         [TargetRpc, UsedImplicitly]
         private void SendLatestState(PlayerID player, PackedULong packetId, T newValue)
         {
             if (isServer)
+                return;
+
+            if (packetId.value < _id)
                 return;
 
             if (_ignoreServerUpdates)

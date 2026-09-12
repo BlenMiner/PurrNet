@@ -1,4 +1,5 @@
 using System.Collections.Generic;
+using System.Text;
 using PurrNet;
 using PurrNet.Modules;
 using UnityEngine;
@@ -35,6 +36,8 @@ public sealed class AsyncInstantiateProbe : NetworkIdentity
     private static bool _hideBeforeAsyncReady;
     private static int _hideBeforeReadyRequestsSent;
     private static int _hideBeforeReadyRequestsHandled;
+    private static bool _captureHierarchyOnSpawn;
+    private static readonly List<string> _hierarchySnapshots = new();
 
     public static int aliveCount => _instances.Count;
     public static int serverRpcTokenCount => _serverRpcTokens.Count;
@@ -47,6 +50,7 @@ public sealed class AsyncInstantiateProbe : NetworkIdentity
     public static int lateReadyDespawnRequestsHandled => _lateReadyDespawnRequestsHandled;
     public static int hideBeforeReadyRequestsSent => _hideBeforeReadyRequestsSent;
     public static int hideBeforeReadyRequestsHandled => _hideBeforeReadyRequestsHandled;
+    public static IReadOnlyList<string> hierarchySnapshots => _hierarchySnapshots;
 
     public static bool stateMissingAtSpawn { get; private set; }
     public static bool sawPooledAsyncInstance { get; private set; }
@@ -80,6 +84,8 @@ public sealed class AsyncInstantiateProbe : NetworkIdentity
         _hideBeforeAsyncReady = false;
         _hideBeforeReadyRequestsSent = 0;
         _hideBeforeReadyRequestsHandled = 0;
+        _captureHierarchyOnSpawn = false;
+        _hierarchySnapshots.Clear();
     }
 
     public static void SetDespawnBeforeAsyncReady(bool enabled)
@@ -90,6 +96,47 @@ public sealed class AsyncInstantiateProbe : NetworkIdentity
     public static void SetHideBeforeAsyncReady(bool enabled)
     {
         _hideBeforeAsyncReady = enabled;
+    }
+
+    public static void SetCaptureHierarchyOnSpawn(bool enabled)
+    {
+        _captureHierarchyOnSpawn = enabled;
+    }
+
+    /// <summary>
+    /// Canonical depth-first description of a transform's children: name, activeSelf, and
+    /// sibling order all participate, so two hierarchies compare equal only when every child
+    /// sits at the same index with the same active state. The root itself is excluded because
+    /// clones differ from templates in name ("(Clone)") and root activation (OnEarlySpawn).
+    /// </summary>
+    public static string DescribeChildren(Transform root)
+    {
+        var builder = new StringBuilder();
+        AppendChildren(root, builder);
+        return builder.ToString();
+    }
+
+    private static void AppendChildren(Transform parent, StringBuilder builder)
+    {
+        for (int i = 0; i < parent.childCount; i++)
+        {
+            var child = parent.GetChild(i);
+            if (i > 0)
+                builder.Append(' ');
+            // PURRNET_DEBUG_POOLING builds rename pool-routed instances ("X" -> "X-Warmup");
+            // structural comparisons must ignore that instrumentation suffix.
+            var childName = child.name;
+            if (childName.EndsWith("-Warmup", System.StringComparison.Ordinal))
+                childName = childName.Substring(0, childName.Length - "-Warmup".Length);
+            builder.Append(childName);
+            builder.Append(child.gameObject.activeSelf ? "[on]" : "[off]");
+            if (child.childCount > 0)
+            {
+                builder.Append('(');
+                AppendChildren(child, builder);
+                builder.Append(')');
+            }
+        }
     }
 
     public static AsyncInstantiateProbe[] SnapshotInstances()
@@ -244,6 +291,9 @@ public sealed class AsyncInstantiateProbe : NetworkIdentity
 
     protected override void OnSpawned(bool asServer)
     {
+        if (_captureHierarchyOnSpawn)
+            _hierarchySnapshots.Add(DescribeChildren(transform));
+
         _stateSeenOnSpawn = _state.value;
         if (!_isLocalOperationResult &&
             (!_expectedState.TryGetValue(this, out var expected) || _stateSeenOnSpawn != expected))

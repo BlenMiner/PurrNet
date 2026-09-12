@@ -256,6 +256,8 @@ namespace PurrNet.Modules
         [UsedByIL]
         public static void SendStaticRPC(StaticRPCPacket packet, RPCSignature signature)
         {
+            NetworkAssetResolver.serializationSceneHint = null;
+
             var nm = NetworkManager.main;
 
             if (!nm)
@@ -319,6 +321,17 @@ namespace PurrNet.Modules
                                 Statistics.SentRPC(type, signature.type, signature.rpcName, packet.data, null);
 #endif
                             module.BatchToTarget(signature.targetPlayer.Value, packet, signature.channel, signature.mtuExceeded, signature.immediate);
+                        }
+                        else if (signature.targetPlayerList is IReadOnlyList<PlayerID> groupTargets)
+                        {
+#if UNITY_EDITOR || PURR_RUNTIME_PROFILING
+                            if (Statistics.shouldTrack && Hasher.TryGetType(packet.header.typeHash, out var type))
+                            {
+                                for (var i = groupTargets.Count - 1; i >= 0; --i)
+                                    Statistics.SentRPC(type, signature.type, signature.rpcName, packet.data, null);
+                            }
+#endif
+                            module.BatchToTargets(groupTargets, packet, signature.channel, default, signature.mtuExceeded, signature.immediate);
                         }
                         else
                         {
@@ -579,6 +592,12 @@ namespace PurrNet.Modules
                 if (data.sig.excludeOwner && _ownership.TryGetOwner(identity, out var owner) && owner == player)
                     continue;
 
+                if (identity.TryGetModule((int)data.header.childId.value, out var module) && module is { ownerOnly: true } &&
+                    (!_ownership.TryGetOwner(identity, out var moduleOwner) || moduleOwner != player))
+                {
+                    continue;
+                }
+
                 switch (data.sig.type)
                 {
                     case RPCType.ObserversRPC:
@@ -837,6 +856,8 @@ namespace PurrNet.Modules
         [UsedByIL]
         public static RPCPacket BuildRawRPC(NetworkID? networkId, SceneID id, int rpcId, BitPacker data)
         {
+            NetworkAssetResolver.serializationSceneHint = id;
+
             var rpc = new RPCPacket
             {
                 header = new NetworkIdentityRPCHeader
@@ -855,6 +876,8 @@ namespace PurrNet.Modules
         [UsedByIL]
         public static StaticRPCPacket BuildStaticRawRPC<T>(uint rpcId, BitPacker data)
         {
+            NetworkAssetResolver.serializationSceneHint = null;
+
             var hash = Hasher.GetStableHashU32<T>();
 
             var rpc = new StaticRPCPacket
@@ -1028,6 +1051,25 @@ namespace PurrNet.Modules
                 players.Add(player);
             }
             return players;
+        }
+
+        [UsedByIL]
+        public static void ModifyManyToGroup(ref RPCSignature signature, DeltaFanoutGrouper grouper, int group)
+        {
+            var members = grouper.GetMembers(group);
+
+            signature.targetPlayerEnumerable = null;
+
+            if (members.Count == 1)
+            {
+                signature.targetPlayer = members[0];
+                signature.targetPlayerList = null;
+            }
+            else
+            {
+                signature.targetPlayer = null;
+                signature.targetPlayerList = members;
+            }
         }
 
         [UsedByIL]

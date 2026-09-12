@@ -5,6 +5,7 @@ using System.Net;
 using System.Net.Sockets;
 using System.Text;
 using System.Threading;
+using System.Threading.Tasks;
 using JamesFrowen.SimpleWeb;
 using JetBrains.Annotations;
 using LiteNetLib;
@@ -15,7 +16,6 @@ using UnityEngine;
 namespace PurrNet.Transports
 {
     [AddComponentMenu("PurrNet/Transport/Purr Transport")]
-    // ReSharper disable once PartialTypeWithSinglePart
     public partial class PurrTransport : GenericTransport, ITransport
     {
         enum SERVER_PACKET_TYPE : byte
@@ -26,14 +26,16 @@ namespace PurrNet.Transports
             SERVER_AUTHENTICATED = 3,
             SERVER_AUTHENTICATION_FAILED = 4,
             SERVER_PIPE_AUTHENTICATED = 5,
-            SERVER_NAT_INTRODUCE = 6
+            SERVER_NAT_INTRODUCE = 6,
+            SERVER_WEBRTC_SIGNAL = 7
         }
 
         enum HOST_PACKET_TYPE : byte
         {
             SEND_KEEPALIVE = 0,
             SEND_ONE = 1,
-            KICK_PLAYER = 2
+            KICK_PLAYER = 2,
+            WEBRTC_SIGNAL = 3
         }
 
         [Serializable, UsedImplicitly]
@@ -42,6 +44,7 @@ namespace PurrNet.Transports
             public string roomName;
             public string clientSecret;
             public bool nat;
+            public bool webRtcP2P;
         }
 
         [Header("Remote Settings")]
@@ -54,9 +57,9 @@ namespace PurrNet.Transports
         [Tooltip("The amount of time in seconds before socket is disconnected due to no data being received.")]
         [SerializeField, HideInInspector] private float _timeoutInSeconds = 5f;
 
-        [Tooltip("Use NAT hole-punching to establish a direct P2P link when possible. " +
-                 "If a punch succeeds the session runs over P2P; if that link is later " +
-                 "lost the session is disconnected cleanly.")]
+        // Keep the serialized name so existing scenes and prefab overrides retain their setting.
+        [Tooltip("Connect players straight to the host when possible, so game traffic skips the relay. " +
+                 "If a direct connection cannot be made, use the relay automatically.")]
         [SerializeField, HideInInspector] private bool _useNat;
         [SerializeField, HideInInspector] private float _natResolveTimeout = 8f;
 
@@ -88,18 +91,26 @@ namespace PurrNet.Transports
             set => _roomName = value;
         }
 
-        public bool useNat
+        /// <summary>Attempt a direct connection when both players enable it. Configure before connecting.</summary>
+        public bool attemptDirectConnection
         {
             get => _useNat;
             set => _useNat = value;
         }
 
-        /// <summary>Which link a session is running over: the relay or a direct NAT-punched P2P link.</summary>
+        /// <summary>Compatibility alias for <see cref="attemptDirectConnection"/>.</summary>
+        public bool useNat
+        {
+            get => attemptDirectConnection;
+            set => attemptDirectConnection = value;
+        }
+
+        /// <summary>Whether a session uses the relay or a direct P2P connection.</summary>
         public enum SessionLink
         {
             /// <summary>No active session.</summary>
             None,
-            /// <summary>Connected, still waiting for the NAT punch to resolve P2P vs relay.</summary>
+            /// <summary>Waiting for direct connection setup to choose P2P or relay.</summary>
             Resolving,
             /// <summary>Session is running over the relay.</summary>
             Relay,
@@ -107,27 +118,56 @@ namespace PurrNet.Transports
             P2P
         }
 
+        public enum ConnectionProtocol
+        {
+            None,
+            UDP,
+            WebSocket,
+            WebRTC
+        }
+
+        /// <summary>Client protocol, or None unless connected.</summary>
+        public ConnectionProtocol clientConnectionProtocol => _clientState == ConnectionState.Connected
+            ? (clientUsesDirectWebRtc ? ConnectionProtocol.WebRTC
+                : GetConnectionProtocol(_clientP2pSession ? _p2pHostPeer : _relayClientPeer, _client))
+            : ConnectionProtocol.None;
+
+        /// <summary>Protocol of the local host-to-relay link, or None unless connected.</summary>
+        public ConnectionProtocol hostConnectionProtocol => _listenerState == ConnectionState.Connected
+            ? GetConnectionProtocol(_relayServerPeer, _server)
+            : ConnectionProtocol.None;
+
+        private ConnectionProtocol GetConnectionProtocol(NetPeer udpPeer, PurrWebClient webClient)
+        {
+            if (_isUsingUDP)
+                return udpPeer?.ConnectionState == LiteNetLib.ConnectionState.Connected
+                    ? ConnectionProtocol.UDP : ConnectionProtocol.None;
+            if (webClient?.ConnectionState != ClientState.Connected)
+                return ConnectionProtocol.None;
+            return webClient.isWebRtc ? ConnectionProtocol.WebRTC : ConnectionProtocol.WebSocket;
+        }
+
         /// <summary>Which link the local client's session is running over (relay vs direct P2P).</summary>
         public SessionLink clientSessionLink
         {
             get
             {
-                if (_clientConnPending)
+                if (_clientConnPending || (_webRtcHost != null && !_webRtcHost.decided))
                     return SessionLink.Resolving;
                 if (_clientState != ConnectionState.Connected)
                     return SessionLink.None;
-                return _clientP2pSession ? SessionLink.P2P : SessionLink.Relay;
+                return _clientP2pSession || clientUsesDirectWebRtc ? SessionLink.P2P : SessionLink.Relay;
             }
         }
 
         /// <summary>Number of host-side connections currently running over a direct P2P link.</summary>
-        public int p2pConnectionCount => _p2pSessionConns.Count;
+        public int p2pConnectionCount => _p2pSessionConns.Count + WebRtcP2pConnectionCount;
 
-        /// <summary>Remote endpoint of the direct P2P link to the host, or null when not on a P2P session.</summary>
+        /// <summary>Remote endpoint of a native UDP P2P link to the host, or null for other routes.</summary>
         public string p2pHostEndpoint =>
             _clientP2pSession && _p2pHostPeer != null ? _p2pHostPeer.ToString() : null;
 
-        /// <summary>Remote endpoint of a host-side connection's direct P2P link, or null if it runs over the relay.</summary>
+        /// <summary>Remote endpoint of a host-side native UDP P2P link, or null for other routes.</summary>
         public string GetP2pEndpoint(Connection conn)
         {
             return _p2pSessionConns.Contains(conn.connectionId) &&
@@ -235,6 +275,9 @@ namespace PurrNet.Transports
 
         public int GetMTU(Connection target, Channel channel, bool asServer)
         {
+            if (asServer ? hostUsesWebRtc : clientUsesWebRtc)
+                return channel == Channel.ReliableOrdered ? 8192 * 2 : 1024;
+
             if (_isUsingUDP)
             {
                 try
@@ -254,6 +297,140 @@ namespace PurrNet.Transports
             return 8192 * 2;
         }
 
+
+        public bool measuresRoundTripTime => _isUsingUDP && !clientUsesDirectWebRtc;
+
+        public int GetRoundTripTime(Connection conn, bool asServer)
+        {
+            if (asServer ? HostUsesDirectWebRtc(conn.connectionId) : clientUsesDirectWebRtc)
+                return -1;
+            if (asServer)
+                return _p2pPeersByConnId.TryGetValue(conn.connectionId, out var p2p) ? GetRoundTripTime(p2p) : -1;
+
+            var peer = _clientP2pSession && _p2pHostPeer != null ? _p2pHostPeer : _relayClientPeer;
+            return GetRoundTripTime(peer);
+        }
+
+        /// <summary>
+        /// Pinging a PurrTransport joins the room as a throwaway client when a host is running it, which measures
+        /// the real link (direct P2P or relay). Without a room it pings the relay of the configured region over HTTP.
+        /// </summary>
+        protected override async Task<PingResult> PingInternal(string address, ushort port, bool useAddress, float timeoutSeconds, CancellationToken token)
+        {
+            if (!string.IsNullOrEmpty(_roomName))
+            {
+                var (checkedRoom, roomExists) = await WithDeadline(PurrTransportUtils.RoomExistsAsync(_masterServer, _roomName), timeoutSeconds);
+
+                if (checkedRoom && roomExists)
+                    return await ProbeConnection(address, port, useAddress, timeoutSeconds, token);
+            }
+
+            return await PingRelay(timeoutSeconds);
+        }
+
+        private async Task<PingResult> PingRelay(float timeoutSeconds)
+        {
+            try
+            {
+                var (found, server) = await WithDeadline(FindRelayServer(), timeoutSeconds);
+
+                if (!found)
+                    return PingResult.Failed($"Timed out after {timeoutSeconds:0.#}s while looking up relay servers.");
+
+                if (string.IsNullOrEmpty(server.apiEndpoint))
+                    return PingResult.Failed("No relay server available.");
+
+                var (pinged, ms) = await WithDeadline(PurrTransportUtils.PingRelayAsync(server), timeoutSeconds);
+
+                if (!pinged)
+                    return PingResult.Failed($"Timed out after {timeoutSeconds:0.#}s while pinging relay {server.region}.");
+
+                int rtt = Mathf.RoundToInt(ms);
+                return new PingResult(rtt, rtt, $"Relay {server.region} (HTTP)");
+            }
+            catch (Exception e)
+            {
+                return PingResult.Failed(e.Message);
+            }
+        }
+
+        private async Task<RelayServer> FindRelayServer()
+        {
+            var relayers = await PurrTransportUtils.GetRelayServersAsync(_masterServer);
+            var servers = relayers.servers;
+
+            if (servers == null || servers.Length == 0)
+                return default;
+
+            if (!string.IsNullOrEmpty(_region))
+            {
+                for (int i = 0; i < servers.Length; i++)
+                {
+                    if (servers[i].region == _region)
+                        return servers[i];
+                }
+            }
+
+            return await PurrTransportUtils.ActualGetRelayServerAsync(_masterServer);
+        }
+
+        private static async Task<(bool completed, T result)> WithDeadline<T>(Task<T> task, float seconds)
+        {
+            var winner = await Task.WhenAny(task, Task.Delay(TimeSpan.FromSeconds(seconds)));
+
+            if (winner != task)
+                return (false, default);
+
+            return (true, await task);
+        }
+
+        /// <summary>Client route and protocol, Connecting while pending, or null when inactive.</summary>
+        public string clientLinkDescription
+        {
+            get
+            {
+                if (_clientState == ConnectionState.Connecting)
+                    return _webRtcHost != null ? "Resolving P2P (WebRTC)"
+                        : _clientConnPending ? "Resolving NAT punch (UDP)" : "Connecting";
+                var protocol = clientConnectionProtocol;
+                if (protocol == ConnectionProtocol.None)
+                    return null;
+                if (clientUsesDirectWebRtc)
+                    return "P2P (WebRTC)";
+                if (_clientP2pSession && _p2pHostPeer != null)
+                    return $"P2P {_p2pHostPeer} (UDP)";
+                if (_isPipeMode)
+                    return $"Pipe relay ({protocol})";
+                var relay = string.IsNullOrEmpty(_region) ? "Relay" : $"Relay {_region}";
+                return $"{relay} ({protocol})";
+            }
+        }
+
+        /// <summary>Local host-to-relay route and protocol, Connecting while pending, or null when inactive.</summary>
+        public string hostLinkDescription
+        {
+            get
+            {
+                if (_listenerState == ConnectionState.Connecting)
+                    return "Connecting";
+                var protocol = hostConnectionProtocol;
+                if (protocol == ConnectionProtocol.None)
+                    return null;
+                var relay = string.IsNullOrEmpty(_region) ? "Relay" : $"Relay {_region}";
+                return $"{relay} ({protocol})";
+            }
+        }
+
+        /// <summary>Round trip time in ms between the local host and the relay, or -1 when not hosting over UDP.</summary>
+        public int hostRelayRoundTripTime => GetRoundTripTime(_relayServerPeer);
+
+        /// <summary>Round trip time in ms between the local client and the relay, or -1 when not connected over UDP.</summary>
+        public int clientRelayRoundTripTime => GetRoundTripTime(_relayClientPeer);
+
+        private static int GetRoundTripTime(NetPeer peer)
+        {
+            return peer != null && peer.HasRoundTripTime ? peer.RoundTripTime : -1;
+        }
 
         public IReadOnlyList<Connection> connections => _connections;
         private readonly List<Connection> _connections = new List<Connection>();
@@ -340,7 +517,8 @@ namespace PurrNet.Transports
         private float P2PResolveTimeout => Mathf.Max(1f, _natResolveTimeout);
 
         /// <summary>NAT punching is only relevant on the (non-pipe) UDP transport.</summary>
-        private bool natEnabled => _useNat && _isUsingUDP && !_isPipeMode;
+        private bool clientNatEnabled => _isUsingUDP && !_isPipeMode && _udpClient?.NatPunchEnabled == true;
+        private bool serverNatEnabled => _isUsingUDP && !_isPipeMode && _udpServer?.NatPunchEnabled == true;
 
         /// <summary>Tracks an in-flight NAT introduce handshake keyed by the relay-issued token.</summary>
         private sealed class PunchSession
@@ -442,20 +620,15 @@ namespace PurrNet.Transports
             _serverListener.NetworkReceiveEvent += OnHostDataUDP;
             _serverListener.ConnectionRequestEvent += OnServerConnectionRequestUDP;
 
-            if (_useNat)
-            {
-                _clientNatListener = new EventBasedNatPunchListener();
-                _clientNatListener.NatIntroductionSuccess += OnClientNatPunchSuccess;
-                _udpClient.NatPunchEnabled = true;
-                _udpClient.NatPunchModule.UnsyncedEvents = false;
-                _udpClient.NatPunchModule.Init(_clientNatListener);
+            _clientNatListener = new EventBasedNatPunchListener();
+            _clientNatListener.NatIntroductionSuccess += OnClientNatPunchSuccess;
+            _udpClient.NatPunchModule.UnsyncedEvents = false;
+            _udpClient.NatPunchModule.Init(_clientNatListener);
 
-                _serverNatListener = new EventBasedNatPunchListener();
-                _serverNatListener.NatIntroductionSuccess += OnServerNatPunchSuccess;
-                _udpServer.NatPunchEnabled = true;
-                _udpServer.NatPunchModule.UnsyncedEvents = false;
-                _udpServer.NatPunchModule.Init(_serverNatListener);
-            }
+            _serverNatListener = new EventBasedNatPunchListener();
+            _serverNatListener.NatIntroductionSuccess += OnServerNatPunchSuccess;
+            _udpServer.NatPunchModule.UnsyncedEvents = false;
+            _udpServer.NatPunchModule.Init(_serverNatListener);
 
             ApplySimulationSettings();
         }
@@ -489,8 +662,15 @@ namespace PurrNet.Transports
             _udpServer?.Stop();
         }
 
-        private SimpleWebClient _server;
-        private SimpleWebClient _client;
+        private PurrWebClient _server;
+        private PurrWebClient _client;
+        private readonly WebRtcHostInbox _webRtcHostInbox = new();
+
+        /// <summary>Whether the local host's connection to the relay uses WebRTC.</summary>
+        public bool hostUsesWebRtc => _server?.isWebRtc == true;
+
+        /// <summary>Whether the local client's connection to the relay uses WebRTC.</summary>
+        public bool clientUsesWebRtc => _client?.isWebRtc == true;
         private HostJoinInfo _hostJoinInfo;
         readonly TcpConfig _tcpConfig = new(noDelay: true, sendTimeout: 0, receiveTimeout: 0);
 
@@ -507,7 +687,7 @@ namespace PurrNet.Transports
             // data; if it was already dropped (relay won the race, or the session ended)
             // ignore the stale packets — raw P2P bytes must never reach OnHostData, which
             // would misparse them as a relay control frame.
-            if (natEnabled && !ReferenceEquals(peer, _relayServerPeer))
+            if (serverNatEnabled && !ReferenceEquals(peer, _relayServerPeer))
             {
                 if (_connIdByP2pPeer.TryGetValue(peer, out var p2pConnId))
                 {
@@ -524,7 +704,8 @@ namespace PurrNet.Transports
 
         private void OnHostData(ArraySegment<byte> data)
         {
-            if (data.Array == null || data.Count == 0)
+            if (data.Array == null || data.Count == 0 || listenerState == ConnectionState.Disconnected ||
+                listenerState == ConnectionState.Disconnecting)
                 return;
 
             var type = (SERVER_PACKET_TYPE)data.Array[data.Offset];
@@ -550,8 +731,10 @@ namespace PurrNet.Transports
                     for (var i = 0; i < connectionCount; i++)
                     {
                         Packer<int>.Read(_packer, ref clientId);
+                        if (_rejectedWebRtcPeers.Contains(clientId))
+                            continue;
 
-                        if (natEnabled &&
+                        if (serverNatEnabled && !HostUsesDirectWebRtc(clientId) &&
                             (HasServerPunchFor(clientId) || _p2pPeersByConnId.ContainsKey(clientId)))
                         {
                             if (_p2pPeersByConnId.TryGetValue(clientId, out var p2p) &&
@@ -568,8 +751,18 @@ namespace PurrNet.Transports
                         else
                         {
                             var conn = new Connection(clientId);
+                            var pending = TakePendingHostWebRtcData(clientId);
                             _connections.Add(conn);
                             onConnected?.Invoke(conn, true);
+                            if (pending != null)
+                            {
+                                foreach (var packet in pending)
+                                {
+                                    if (!_connections.Contains(conn))
+                                        break;
+                                    RaiseDataReceived(conn, new ByteData(packet), true);
+                                }
+                            }
                         }
                     }
 
@@ -587,6 +780,11 @@ namespace PurrNet.Transports
                     Packer<int>.Read(_packer, ref clientId);
 
                     var conn = new Connection(clientId);
+
+                    if (hostUsesWebRtc || HostUsesDirectWebRtc(clientId))
+                        _webRtcHostInbox.MarkDisconnected(clientId);
+                    RemoveHostWebRtcPeer(clientId);
+                    _rejectedWebRtcPeers.Remove(clientId);
 
                     if (_connections.Remove(conn))
                         onDisconnected?.Invoke(conn, DisconnectReason.ClientRequest, true);
@@ -606,16 +804,34 @@ namespace PurrNet.Transports
                                  data.Array[data.Offset + 3] << 16 |
                                  data.Array[data.Offset + 4] << 24;
 
-                    if (natEnabled && _pendingHostConns.ContainsKey(connId))
+                    var conn = new Connection(connId);
+                    if (HostUsesDirectWebRtc(connId) || _rejectedWebRtcPeers.Contains(connId))
+                        return;
+                    var payload = new ArraySegment<byte>(data.Array, data.Offset + 5, data.Count - 5);
+                    if (hostUsesWebRtc && !_connections.Contains(conn))
+                    {
+                        // Data channels can overtake join notifications; buffer reliable data until onConnected.
+                        if (_webRtcHostInbox.TryQueue(connId, payload, _server.receivedDeliveryMethod) ==
+                            WebRtcHostInbox.QueueResult.Overflow)
+                        {
+                            PurrLogger.LogError("WebRTC received too much reliable data before client join notifications.");
+                            StopListening();
+                        }
+                        return;
+                    }
+
+                    if (serverNatEnabled && _pendingHostConns.ContainsKey(connId))
                         ResolveHostConnAsRelay(connId);
 
-                    RaiseDataReceived(new Connection(connId), new ByteData(data.Array, data.Offset + 5, data.Count - 5),
-                        true);
+                    RaiseDataReceived(conn, new ByteData(payload), true);
                     break;
                 }
+                case SERVER_PACKET_TYPE.SERVER_WEBRTC_SIGNAL:
+                    HandleWebRtcSignal(data, true);
+                    break;
                 case SERVER_PACKET_TYPE.SERVER_NAT_INTRODUCE:
                 {
-                    if (natEnabled && data.Count > 1)
+                    if (serverNatEnabled && data.Count > 1)
                     {
                         var token = Encoding.UTF8.GetString(data.Array, data.Offset + 1, data.Count - 1);
                         int underscore = token.LastIndexOf('_');
@@ -641,7 +857,7 @@ namespace PurrNet.Transports
                 return;
             }
 
-            if (natEnabled && ReferenceEquals(peer, _p2pHostPeer))
+            if (clientNatEnabled && ReferenceEquals(peer, _p2pHostPeer))
             {
                 _clientPunch = null;
 
@@ -670,7 +886,7 @@ namespace PurrNet.Transports
                 return;
             }
 
-            if (natEnabled && !ReferenceEquals(peer, _relayClientPeer))
+            if (clientNatEnabled && !ReferenceEquals(peer, _relayClientPeer))
             {
                 if (!ReferenceEquals(peer, _p2pHostPeer))
                     return;
@@ -704,7 +920,7 @@ namespace PurrNet.Transports
             // Any non-relay peer is the P2P link. Deliver while it is the live host
             // peer; ignore stale packets from a dropped P2P peer so they never reach
             // OnClientData and get misparsed as a relay control frame.
-            if (natEnabled && !ReferenceEquals(peer, _relayClientPeer))
+            if (clientNatEnabled && !ReferenceEquals(peer, _relayClientPeer))
             {
                 if (ReferenceEquals(peer, _p2pHostPeer))
                 {
@@ -725,7 +941,8 @@ namespace PurrNet.Transports
 
         private void OnClientData(ArraySegment<byte> data)
         {
-            if (data.Array == null || data.Count == 0)
+            if (data.Array == null || data.Count == 0 || clientState == ConnectionState.Disconnected ||
+                clientState == ConnectionState.Disconnecting)
                 return;
 
             if (_clientConnPending)
@@ -733,6 +950,8 @@ namespace PurrNet.Transports
 
             if (clientState == ConnectionState.Connected)
             {
+                if (clientUsesDirectWebRtc)
+                    return;
                 var bdata = new ByteData(data.Array, data.Offset, data.Count);
                 RaiseDataReceived(new Connection(0), bdata, false);
                 return;
@@ -743,7 +962,7 @@ namespace PurrNet.Transports
             switch (type)
             {
                 case SERVER_PACKET_TYPE.SERVER_AUTHENTICATED:
-                    if (natEnabled && _clientPunch != null)
+                    if (clientNatEnabled && !clientUsesDirectWebRtc && _clientPunch != null && !isPinging)
                     {
                         _clientConnPending = true;
                         _clientConnDeadline = Time.realtimeSinceStartup + P2PResolveTimeout;
@@ -752,13 +971,18 @@ namespace PurrNet.Transports
                     {
                         clientState = ConnectionState.Connected;
                         onConnected?.Invoke(new Connection(0), false);
+                        if (clientUsesDirectWebRtc)
+                            DeliverPendingWebRtcClientData();
                     }
                     break;
                 case SERVER_PACKET_TYPE.SERVER_AUTHENTICATION_FAILED:
                     Disconnect();
                     break;
+                case SERVER_PACKET_TYPE.SERVER_WEBRTC_SIGNAL:
+                    HandleWebRtcSignal(data, false);
+                    break;
                 case SERVER_PACKET_TYPE.SERVER_NAT_INTRODUCE:
-                    if (natEnabled && data.Count > 1)
+                    if (clientNatEnabled && data.Count > 1)
                     {
                         var token = Encoding.UTF8.GetString(data.Array, data.Offset + 1, data.Count - 1);
                         BeginPunch(token, false, 0);
@@ -775,7 +999,8 @@ namespace PurrNet.Transports
             var authenticate = new ClientAuthenticate()
             {
                 roomName = _roomName,
-                clientSecret = _hostJoinInfo.secret
+                clientSecret = _hostJoinInfo.secret,
+                webRtcP2P = webRtcP2PAvailable && hostUsesWebRtc
             };
 
             string json = JsonUtility.ToJson(authenticate);
@@ -786,7 +1011,7 @@ namespace PurrNet.Transports
 
         private void OnHostConnectedUDP(NetPeer peer)
         {
-            if (natEnabled && !ReferenceEquals(peer, _relayServerPeer))
+            if (serverNatEnabled && !ReferenceEquals(peer, _relayServerPeer))
             {
                 if (_connIdByP2pPeer.TryGetValue(peer, out var p2pConnId))
                 {
@@ -803,7 +1028,8 @@ namespace PurrNet.Transports
             {
                 roomName = _roomName,
                 clientSecret = _hostJoinInfo.secret,
-                nat = _useNat
+                nat = serverNatEnabled,
+                webRtcP2P = webRtcP2PAvailable
             };
 
             string json = JsonUtility.ToJson(authenticate);
@@ -817,7 +1043,8 @@ namespace PurrNet.Transports
             var authenticate = new ClientAuthenticate()
             {
                 roomName = _roomName,
-                clientSecret = _clientJoinInfo.secret
+                clientSecret = _clientJoinInfo.secret,
+                webRtcP2P = webRtcP2PAvailable && clientUsesWebRtc
             };
 
             string json = JsonUtility.ToJson(authenticate);
@@ -832,7 +1059,8 @@ namespace PurrNet.Transports
             {
                 roomName = _roomName,
                 clientSecret = _clientJoinInfo.secret,
-                nat = _useNat
+                nat = clientNatEnabled,
+                webRtcP2P = webRtcP2PAvailable
             };
 
             string json = JsonUtility.ToJson(authenticate);
@@ -843,7 +1071,7 @@ namespace PurrNet.Transports
 
         private void OnHostDisconnectedUDP(NetPeer peer, DisconnectInfo disconnectInfo)
         {
-            if (natEnabled && !ReferenceEquals(peer, _relayServerPeer))
+            if (serverNatEnabled && !ReferenceEquals(peer, _relayServerPeer))
             {
                 if (!_connIdByP2pPeer.Remove(peer, out var p2pConnId))
                     return;
@@ -891,7 +1119,7 @@ namespace PurrNet.Transports
 
                 listenerState = ConnectionState.Connecting;
 
-                _server = SimpleWebClient.Create(ushort.MaxValue, 5000, _tcpConfig);
+                _server = PurrWebClient.Create(ushort.MaxValue, 5000, _tcpConfig);
 
                 _server.onConnect += OnHostConnected;
                 _server.onData += OnHostData;
@@ -933,6 +1161,7 @@ namespace PurrNet.Transports
                     {
                         _isUsingUDP = true;
 
+                        _udpServer.NatPunchEnabled = attemptDirectConnection;
                         _udpServer.StartInManualMode(0);
                         var addresses = await Dns.GetHostAddressesAsync(_host);
                         var ipv4 = addresses.FirstOrDefault(ip => ip.AddressFamily == AddressFamily.InterNetwork)
@@ -952,7 +1181,7 @@ namespace PurrNet.Transports
                             Path = string.Empty
                         };
 
-                        _server.Connect(builder.Uri);
+                        _server.Connect(builder.Uri, _hostJoinInfo.webRtcUrl);
                     }
                 }
                 catch (OperationCanceledException)
@@ -978,7 +1207,9 @@ namespace PurrNet.Transports
 
         public void StopListening()
         {
+            ClearWebRtcPeers(true);
             _connections.Clear();
+            _webRtcHostInbox.Clear();
             CancelAll(true);
 
             if (_server != null)
@@ -1007,6 +1238,7 @@ namespace PurrNet.Transports
 
         public void Disconnect()
         {
+            ClearWebRtcPeers(false);
             if (clientState != ConnectionState.Disconnected)
                 onDisconnected?.Invoke(default, DisconnectReason.ClientRequest, false);
 
@@ -1055,7 +1287,7 @@ namespace PurrNet.Transports
                 if (token.IsCancellationRequested)
                     return;
 
-                _client = SimpleWebClient.Create(ushort.MaxValue, 5000, _tcpConfig);
+                _client = PurrWebClient.Create(ushort.MaxValue, 5000, _tcpConfig);
                 _client.onConnect += OnClientConnected;
                 _client.onData += OnClientData;
                 _client.onDisconnect += OnClientDisconnected;
@@ -1071,6 +1303,7 @@ namespace PurrNet.Transports
                 if (Application.platform != RuntimePlatform.WebGLPlayer)
                 {
                     _isUsingUDP = true;
+                    _udpClient.NatPunchEnabled = attemptDirectConnection;
                     _udpClient.StartInManualMode(0);
 
                     var addresses = await Dns.GetHostAddressesAsync(_clientJoinInfo.host);
@@ -1082,6 +1315,7 @@ namespace PurrNet.Transports
                 }
                 else
                 {
+                    _isUsingUDP = false;
                     var builder = new UriBuilder
                     {
                         Scheme = _clientJoinInfo.ssl ? "wss" : "ws",
@@ -1089,7 +1323,7 @@ namespace PurrNet.Transports
                         Port = _clientJoinInfo.port
                     };
 
-                    _client.Connect(builder.Uri);
+                    _client.Connect(builder.Uri, _clientJoinInfo.webRtcUrl);
                 }
             }
             catch (OperationCanceledException)
@@ -1134,7 +1368,20 @@ namespace PurrNet.Transports
             if (!target.isValid)
                 return;
 
-            if (natEnabled && _p2pSessionConns.Contains(target.connectionId))
+            if (HostUsesDirectWebRtc(target.connectionId))
+            {
+                var session = _webRtcPeers[target.connectionId];
+                if (!session.peer.isConnected)
+                {
+                    FailWebRtcSession(session);
+                    return;
+                }
+                session.peer.Send(odata.segment, (byte)UDPTransport.ToDeliveryMethod(method));
+                RaiseDataSent(target, odata, true);
+                return;
+            }
+
+            if (serverNatEnabled && _p2pSessionConns.Contains(target.connectionId))
             {
                 if (_p2pPeersByConnId.TryGetValue(target.connectionId, out var p2pPeer))
                     p2pPeer.Send(odata.data, odata.offset, odata.length, UDPTransport.ToDeliveryMethod(method));
@@ -1147,7 +1394,7 @@ namespace PurrNet.Transports
             Packer<byte>.Write(_packer, (byte)HOST_PACKET_TYPE.SEND_ONE);
             Packer<int>.Write(_packer, target.connectionId);
 
-            if (_isUsingUDP)
+            if (_isUsingUDP || hostUsesWebRtc)
                 Packer<byte>.Write(_packer, (byte)UDPTransport.ToDeliveryMethod(method));
 
             _packer.WriteBytes(odata);
@@ -1159,7 +1406,7 @@ namespace PurrNet.Transports
                 var deliveryMethod = UDPTransport.ToDeliveryMethod(method);
                 _relayServerPeer.Send(data.data, data.offset, data.length, deliveryMethod);
             }
-            else _server.Send(new ArraySegment<byte>(data.data, data.offset, data.length));
+            else _server.Send(data.segment, (byte)UDPTransport.ToDeliveryMethod(method));
             RaiseDataSent(target, data, true);
         }
 
@@ -1168,11 +1415,24 @@ namespace PurrNet.Transports
             if (clientState != ConnectionState.Connected)
                 return;
 
-            if (_isUsingUDP)
+            if (clientUsesDirectWebRtc)
+            {
+                var session = _webRtcHost;
+                if (!session.peer.isConnected)
+                {
+                    FailWebRtcSession(session);
+                    return;
+                }
+                session.peer.Send(data.segment, (byte)UDPTransport.ToDeliveryMethod(method));
+                RaiseDataSent(default, data, false);
+                return;
+            }
+
+            if (_isUsingUDP || clientUsesWebRtc)
             {
                 var deliveryMethod = UDPTransport.ToDeliveryMethod(method);
 
-                if (natEnabled && _clientP2pSession)
+                if (clientNatEnabled && _clientP2pSession)
                 {
                     if (_p2pHostPeer != null)
                         _p2pHostPeer.Send(data.data, data.offset, data.length, deliveryMethod);
@@ -1184,7 +1444,10 @@ namespace PurrNet.Transports
                 Packer<byte>.Write(_packer, (byte)deliveryMethod);
                 _packer.WriteBytes(data);
                 var byteData = _packer.ToByteData();
-                _relayClientPeer.Send(byteData.data, byteData.offset, byteData.length, deliveryMethod);
+                if (_isUsingUDP)
+                    _relayClientPeer.Send(byteData.data, byteData.offset, byteData.length, deliveryMethod);
+                else
+                    _client.Send(byteData.segment, (byte)deliveryMethod);
             }
             else
             {
@@ -1198,7 +1461,13 @@ namespace PurrNet.Transports
         /// Connect to a relay server in pipe mode. No rooms, no host — just
         /// connId-based forwarding. Use SendPipeData to send to specific peers.
         /// </summary>
-        public async void ConnectAsPipe(string relayHost, int udpPort, int wsPort)
+        public void ConnectAsPipe(string relayHost, int udpPort, int wsPort)
+        {
+            ConnectAsPipe(relayHost, udpPort, wsPort, null);
+        }
+
+        /// <summary>Connect in pipe mode with optional WebRTC and WebSocket fallback for browsers.</summary>
+        public async void ConnectAsPipe(string relayHost, int udpPort, int wsPort, string webRtcUrl)
         {
             try
             {
@@ -1211,7 +1480,7 @@ namespace PurrNet.Transports
                 var token = new CancellationTokenSource();
                 AddCancellation(token, false);
 
-                _client = SimpleWebClient.Create(ushort.MaxValue, 5000, _tcpConfig);
+                _client = PurrWebClient.Create(ushort.MaxValue, 5000, _tcpConfig);
                 _client.onConnect += OnPipeConnected;
                 _client.onData += OnPipeData;
                 _client.onDisconnect += OnPipeDisconnected;
@@ -1220,6 +1489,7 @@ namespace PurrNet.Transports
                 if (Application.platform != RuntimePlatform.WebGLPlayer)
                 {
                     _isUsingUDP = true;
+                    _udpClient.NatPunchEnabled = false;
                     _udpClient.StartInManualMode(0);
 
                     var addresses = await Dns.GetHostAddressesAsync(relayHost);
@@ -1237,11 +1507,12 @@ namespace PurrNet.Transports
                     _isUsingUDP = false;
                     var builder = new UriBuilder
                     {
-                        Scheme = "ws",
+                        Scheme = Uri.TryCreate(webRtcUrl, UriKind.Absolute, out var rtcUri) &&
+                                 rtcUri.Scheme == Uri.UriSchemeHttps ? "wss" : "ws",
                         Host = relayHost,
                         Port = wsPort
                     };
-                    _client.Connect(builder.Uri);
+                    _client.Connect(builder.Uri, webRtcUrl);
                 }
             }
             catch (Exception e)
@@ -1325,7 +1596,7 @@ namespace PurrNet.Transports
 
             _packer.ResetPositionAndMode(false);
 
-            if (_isUsingUDP)
+            if (_isUsingUDP || clientUsesWebRtc)
                 Packer<byte>.Write(_packer, (byte)UDPTransport.ToDeliveryMethod(channel));
 
             Packer<int>.Write(_packer, targetConnId);
@@ -1340,7 +1611,7 @@ namespace PurrNet.Transports
             }
             else
             {
-                _client.Send(new ArraySegment<byte>(byteData.data, byteData.offset, byteData.length));
+                _client.Send(byteData.segment, (byte)UDPTransport.ToDeliveryMethod(channel));
             }
         }
 
@@ -1373,7 +1644,10 @@ namespace PurrNet.Transports
 
         public void CloseConnection(Connection conn)
         {
-            if (natEnabled && _p2pPeersByConnId.Remove(conn.connectionId, out var kickP2pPeer))
+            if (_webRtcPeers.ContainsKey(conn.connectionId))
+                _rejectedWebRtcPeers.Add(conn.connectionId);
+            RemoveHostWebRtcPeer(conn.connectionId);
+            if (serverNatEnabled && _p2pPeersByConnId.Remove(conn.connectionId, out var kickP2pPeer))
             {
                 _connIdByP2pPeer.Remove(kickP2pPeer);
                 kickP2pPeer.Disconnect();
@@ -1388,7 +1662,7 @@ namespace PurrNet.Transports
 
             if (_isUsingUDP)
                 _relayServerPeer?.Send(data.data, data.offset, data.length, DeliveryMethod.ReliableSequenced);
-            else _server.Send(new ArraySegment<byte>(data.data, data.offset, data.length));
+            else _server?.Send(new ArraySegment<byte>(data.data, data.offset, data.length));
             RaiseDataSent(conn, data, true);
         }
 
@@ -1424,7 +1698,7 @@ namespace PurrNet.Transports
         /// </summary>
         private void BeginPunch(string token, bool isServer, int clientConnId)
         {
-            if (!natEnabled || string.IsNullOrEmpty(token))
+            if (!(isServer ? serverNatEnabled : clientNatEnabled) || string.IsNullOrEmpty(token))
                 return;
 
             var session = new PunchSession
@@ -1448,12 +1722,11 @@ namespace PurrNet.Transports
         /// <summary>Client side of a successful NAT introduction — connect directly to the host.</summary>
         private void OnClientNatPunchSuccess(IPEndPoint targetEndPoint, NatAddressType type, string token)
         {
-            if (_clientPunch != null && _clientPunch.token == token)
-                _clientPunch.done = true;
-
-            if (_p2pHostPeer != null)
+            if (!clientNatEnabled || _clientPunch == null || _clientPunch.token != token ||
+                Time.realtimeSinceStartup >= _clientPunch.deadline || _p2pHostPeer != null)
                 return;
 
+            _clientPunch.done = true;
             _p2pHostPeer = _udpClient.Connect(targetEndPoint, token);
         }
 
@@ -1472,11 +1745,11 @@ namespace PurrNet.Transports
         /// </summary>
         private void PollNatPunch()
         {
-            if (!natEnabled)
+            if (!clientNatEnabled && !serverNatEnabled)
                 return;
 
-            var clientNat = _udpClient is { IsRunning: true } ? _udpClient.NatPunchModule : null;
-            var serverNat = _udpServer is { IsRunning: true } ? _udpServer.NatPunchModule : null;
+            var clientNat = clientNatEnabled && _udpClient.IsRunning ? _udpClient.NatPunchModule : null;
+            var serverNat = serverNatEnabled && _udpServer.IsRunning ? _udpServer.NatPunchModule : null;
             clientNat?.PollEvents();
             serverNat?.PollEvents();
 
@@ -1553,6 +1826,7 @@ namespace PurrNet.Transports
                 _server?.ProcessMessageQueue();
                 _client?.ProcessMessageQueue();
             }
+            PollWebRtcPeers();
         }
 
         public void UnityUpdate(float delta)
@@ -1571,6 +1845,43 @@ namespace PurrNet.Transports
                 if (_udpServer.IsRunning)
                     _udpServer.ManualUpdate(dInMs);
             }
+        }
+
+        public bool FlushConnection(Connection conn, bool asServer)
+        {
+            if (asServer)
+            {
+                if (listenerState != ConnectionState.Connected)
+                    return false;
+
+                if (!_isUsingUDP)
+                    return true;
+
+                if (serverNatEnabled && _p2pSessionConns.Contains(conn.connectionId))
+                {
+                    if (_p2pPeersByConnId.TryGetValue(conn.connectionId, out var p2pPeer))
+                        p2pPeer.FlushSends();
+                    return true;
+                }
+
+                _relayServerPeer?.FlushSends();
+                return true;
+            }
+
+            if (clientState != ConnectionState.Connected)
+                return false;
+
+            if (!_isUsingUDP)
+                return true;
+
+            if (clientNatEnabled && _clientP2pSession && _p2pHostPeer != null)
+            {
+                _p2pHostPeer.FlushSends();
+                return true;
+            }
+
+            _relayClientPeer?.FlushSends();
+            return true;
         }
 
         private void OnDisable()

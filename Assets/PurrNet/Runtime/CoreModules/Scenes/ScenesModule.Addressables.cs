@@ -19,10 +19,14 @@ namespace PurrNet.Modules
             public AsyncOperationHandle<SceneInstance> handle;
             public SceneID idToAssign;
             public PurrSceneSettings settings;
+            public bool ownsHandle;
         }
 
         private readonly List<PendingAddressableSceneOperation> _pendingAddressableOperations =
             new List<PendingAddressableSceneOperation>();
+
+        private readonly List<AsyncOperationHandle<SceneInstance>> _pendingAddressableUnloads =
+            new List<AsyncOperationHandle<SceneInstance>>();
 
         private readonly Dictionary<SceneID, AsyncOperationHandle<SceneInstance>> _addressableSceneHandles =
             new Dictionary<SceneID, AsyncOperationHandle<SceneInstance>>();
@@ -58,6 +62,9 @@ namespace PurrNet.Modules
 
         partial void ProcessCompletedAddressableLoads()
         {
+            if (_isDisabled)
+                return;
+
             for (var i = _pendingAddressableOperations.Count - 1; i >= 0; i--)
             {
                 var op = _pendingAddressableOperations[i];
@@ -85,6 +92,16 @@ namespace PurrNet.Modules
 
         private void ProcessLoadAddressableAction(LoadAddressableSceneAction action)
         {
+            // A reconnect delivers the same load action twice: once in the
+            // first-join batch and once when the player is re-added to the
+            // public scene. Loading again would duplicate the addressable scene
+            // and clash with the already assigned SceneID.
+            if (_scenes.ContainsKey(action.sceneID) || IsScenePending(action.sceneID))
+            {
+                _sceneActionScenes.Add(action.sceneID);
+                return;
+            }
+
             var guid = action.guid.value;
             if (string.IsNullOrEmpty(guid))
             {
@@ -111,7 +128,8 @@ namespace PurrNet.Modules
                 guid = guid,
                 handle = handle,
                 idToAssign = action.sceneID,
-                settings = action.parameters
+                settings = action.parameters,
+                ownsHandle = true
             });
             _sceneActionScenes.Add(action.sceneID);
 
@@ -125,7 +143,8 @@ namespace PurrNet.Modules
                     guid = guid,
                     handle = handle,
                     idToAssign = action.sceneID,
-                    settings = action.parameters
+                    settings = action.parameters,
+                    ownsHandle = false
                 });
                 clientModule._sceneActionScenes.Add(action.sceneID);
                 clientModule.RegisterAddressableCompletionCallback(handle);
@@ -162,6 +181,74 @@ namespace PurrNet.Modules
         private bool TryUnloadAddressableScene(SceneID sceneId, UnloadSceneOptions options)
         {
             return TryRemoveAddressableScene(sceneId, options, false, false, out _);
+        }
+
+        private bool TryUnloadAddressableSceneOnCleanup(SceneID sceneId)
+        {
+            if (!_addressableSceneHandles.TryGetValue(sceneId, out var handle))
+                return false;
+
+            UnregisterAddressableScene(sceneId);
+
+            if (!handle.IsValid())
+                return false;
+
+            _pendingAddressableUnloads.Add(Addressables.UnloadSceneAsync(handle, UnloadSceneOptions.None, true));
+            return true;
+        }
+
+        private bool ArePendingAddressableUnloadsDone()
+        {
+            for (var i = 0; i < _pendingAddressableUnloads.Count; i++)
+            {
+                var handle = _pendingAddressableUnloads[i];
+
+                // The handle releases itself once it completes, which also invalidates it.
+                if (handle.IsValid() && !handle.IsDone)
+                    return false;
+            }
+
+            _pendingAddressableUnloads.Clear();
+            return true;
+        }
+
+        private void DiscardPendingAddressableOperations(bool unloadPendingScenes)
+        {
+            for (var i = 0; unloadPendingScenes && i < _pendingAddressableOperations.Count; i++)
+            {
+                var operation = _pendingAddressableOperations[i];
+
+                if (operation.ownsHandle)
+                    ReleaseAddressableSceneHandle(operation.handle);
+            }
+
+            _pendingAddressableOperations.Clear();
+            _pendingAddressableUnloads.Clear();
+        }
+
+        private static void ReleaseAddressableSceneHandle(AsyncOperationHandle<SceneInstance> handle)
+        {
+            if (!handle.IsValid())
+                return;
+
+            if (!handle.IsDone)
+            {
+                // Static callback on purpose: a closure here would keep the discarded module alive.
+                handle.Completed += ReleaseCompletedAddressableSceneHandle;
+                return;
+            }
+
+            ReleaseCompletedAddressableSceneHandle(handle);
+        }
+
+        private static void ReleaseCompletedAddressableSceneHandle(AsyncOperationHandle<SceneInstance> handle)
+        {
+            if (!handle.IsValid())
+                return;
+
+            if (handle.Status == AsyncOperationStatus.Succeeded)
+                Addressables.UnloadSceneAsync(handle, UnloadSceneOptions.None, true);
+            else Addressables.Release(handle);
         }
 
         /// <summary>
@@ -480,7 +567,8 @@ namespace PurrNet.Modules
                 guid = guid,
                 handle = handle,
                 idToAssign = idToAssign,
-                settings = settings
+                settings = settings,
+                ownsHandle = true
             });
 
             RegisterAddressableCompletionCallback(handle);
@@ -493,7 +581,8 @@ namespace PurrNet.Modules
                     guid = guid,
                     handle = handle,
                     idToAssign = idToAssign,
-                    settings = settings
+                    settings = settings,
+                    ownsHandle = false
                 });
                 clientModule._sceneActionScenes.Add(idToAssign);
                 clientModule.RegisterAddressableCompletionCallback(handle);
@@ -561,7 +650,8 @@ namespace PurrNet.Modules
                 guid = guid,
                 handle = handle,
                 idToAssign = idToAssign,
-                settings = settings
+                settings = settings,
+                ownsHandle = true
             });
 
             RegisterAddressableCompletionCallback(handle);
@@ -574,7 +664,8 @@ namespace PurrNet.Modules
                     guid = guid,
                     handle = handle,
                     idToAssign = idToAssign,
-                    settings = settings
+                    settings = settings,
+                    ownsHandle = false
                 });
                 clientModule._sceneActionScenes.Add(idToAssign);
                 clientModule.RegisterAddressableCompletionCallback(handle);

@@ -65,8 +65,10 @@ namespace PurrNet.Modules
     {
         public readonly PlayerID skipA;
         public readonly PlayerID skipB;
+        public readonly PlayerID only;
         public readonly bool hasSkipA;
         public readonly bool hasSkipB;
+        public readonly bool hasOnly;
 
         public ObserverFilter(PlayerID skipA, bool hasSkipA, PlayerID skipB, bool hasSkipB)
         {
@@ -74,11 +76,24 @@ namespace PurrNet.Modules
             this.hasSkipA = hasSkipA;
             this.skipB = skipB;
             this.hasSkipB = hasSkipB;
+            only = default;
+            hasOnly = false;
+        }
+
+        public ObserverFilter(PlayerID skipA, bool hasSkipA, PlayerID skipB, bool hasSkipB, PlayerID only, bool hasOnly)
+        {
+            this.skipA = skipA;
+            this.hasSkipA = hasSkipA;
+            this.skipB = skipB;
+            this.hasSkipB = hasSkipB;
+            this.only = only;
+            this.hasOnly = hasOnly;
         }
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         public bool ShouldSkip(PlayerID player)
         {
+            if (hasOnly && player != only) return true;
             if (hasSkipA && player == skipA) return true;
             if (hasSkipB && player == skipB) return true;
             return false;
@@ -592,7 +607,7 @@ namespace PurrNet.Modules
             ValidateChannel(channel);
             _queueMultiMarker.Begin();
 
-            bool hasFilter = filter.hasSkipA || filter.hasSkipB;
+            bool hasFilter = filter.hasSkipA || filter.hasSkipB || filter.hasOnly;
 
             if (ShouldQueueDirect(targets, filter, hasFilter))
             {

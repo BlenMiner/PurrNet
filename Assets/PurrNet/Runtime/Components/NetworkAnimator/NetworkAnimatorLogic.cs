@@ -171,6 +171,12 @@ namespace PurrNet
                             => a._trigger.nameHash == b._trigger.nameHash);
                         break;
                     }
+                    case NetAnimatorAction.SetLayerWeight:
+                    {
+                        i -= RemovePast(i, action, (a, b)
+                            => a._setLayerWeight.layerIndex.value == b._setLayerWeight.layerIndex.value);
+                        break;
+                    }
                     case NetAnimatorAction.SetSpeed:
                     {
                         i -= RemovePast(i, action, (_, _) => true);
@@ -312,8 +318,8 @@ namespace PurrNet
                 if (!ResolveParamRef(ref action))
                     continue;
 
-                bool hasCachedValue = CacheParameterValue(action);
-                if (!canApplyAnimatorParameters && IsParameterAction(action.type))
+                bool hasCachedValue = CacheActionState(action);
+                if (!canApplyAnimatorParameters && IsCachedStateAction(action.type))
                 {
                     if (hasCachedValue)
                         _hasPendingAnimatorParameterState = true;

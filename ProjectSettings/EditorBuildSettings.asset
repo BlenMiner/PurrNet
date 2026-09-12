@@ -20,9 +20,17 @@ EditorBuildSettings:
   - enabled: 1
     path: Assets/PlayModeTests/ServerConnectedSceneSpawnTarget.unity
     guid: f024ea30a2764d969ec8add3bd1c2b0e
+  - enabled: 1
+    path: Assets/PlayModeTestsScoped/SceneScopedTarget.unity
+    guid: 8e4d6b2f0a7c9d3e4f5a6b7c8d9eafb6
+  - enabled: 1
+    path: Assets/PlayModeTestsScoped/SceneScopedSharedA.unity
+    guid: d4e5f60718293a4b5c6d7e8f90a1b2c3
+  - enabled: 1
+    path: Assets/PlayModeTestsScoped/SceneScopedSharedB.unity
+    guid: e5f60718293a4b5c6d7e8f90a1b2c3d4
   m_configObjects:
     com.unity.addressableassets: {fileID: 11400000, guid: f321fa2f9211178448ea4925059f7af5, type: 2}
     com.unity.dt.app-ui: {fileID: 11400000, guid: 1b1c20d82303e4b5781c3ef50ac1449f, type: 2}
     com.unity.xr.arfoundation.simulation_settings: {fileID: 11400000, guid: 2c2e68bebf1c66f46aa9096fabba66a2, type: 2}
     com.unity.xr.management.loader_settings: {fileID: 11400000, guid: d869dcd489b98ec45adacf939d41cd74, type: 2}
-  m_UseUCBPForAssetBundles: 0

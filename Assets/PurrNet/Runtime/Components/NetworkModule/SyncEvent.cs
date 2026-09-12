@@ -10,35 +10,39 @@ namespace PurrNet
 {
     public struct SyncEventData : IDisposable
     {
-        public BitPacker _dataPacker;
+        public BitData data;
 
-        public SyncEventData AddData<T>(T data)
+        [DontPack] private bool _ownsPacker;
+
+        public SyncEventData AddData<T>(T value)
         {
-            _dataPacker ??= BitPackerPool.Get();
-            Packer<T>.Write(_dataPacker, data);
+            var packer = _ownsPacker ? data.packer : BitPackerPool.Get();
+            _ownsPacker = true;
+
+            Packer<T>.Write(packer, value);
+            data = new BitData(packer);
             return this;
         }
 
         public T ReadData<T>()
         {
-            if (_dataPacker == null)
+            if (data.packer == null)
                 return default;
 
-            return Packer<T>.Read(_dataPacker);
+            return Packer<T>.Read(data.packer);
         }
 
-        public void ResetPosition()
-        {
-            _dataPacker?.ResetPosition();
-        }
+        public BitDataScope BeginRead() => data.AutoScope();
 
         public void Dispose()
         {
-            if (_dataPacker != null)
+            if (_ownsPacker)
             {
-                _dataPacker.Dispose();
-                _dataPacker = null;
+                data.Dispose();
+                _ownsPacker = false;
             }
+
+            data = default;
         }
     }
 
@@ -47,14 +51,19 @@ namespace PurrNet
     {
         [SerializeField, PurrLock] protected bool _ownerAuth;
 
+        [SerializeField, PurrLock] protected bool _ownerOnly;
+
         /// <summary>
         /// Whether it is the owner or  the server that has the authority to invoke the event
         /// </summary>
         public bool ownerAuth => _ownerAuth;
 
-        protected SyncEventBase(bool ownerAuth = false)
+        public override bool ownerOnly => _ownerOnly;
+
+        protected SyncEventBase(bool ownerAuth = false, bool ownerOnly = false)
         {
             _ownerAuth = ownerAuth;
+            _ownerOnly = ownerOnly;
         }
 
         protected bool ValidateInvoke()
@@ -81,7 +90,7 @@ namespace PurrNet
     {
         protected SyncEventData _lastData;
 
-        protected SyncEventLogic(bool ownerAuth = false) : base(ownerAuth) { }
+        protected SyncEventLogic(bool ownerAuth = false, bool ownerOnly = false) : base(ownerAuth, ownerOnly) { }
 
         protected abstract void InvokeUnityEvent(T data);
         protected virtual void ClearUnityEvent() { }
@@ -167,7 +176,7 @@ namespace PurrNet
     {
         [SerializeField] private SerializableSyncUnityEvent unityEvent = new SerializableSyncUnityEvent();
 
-        public SyncEvent(bool ownerAuth = false) : base(ownerAuth) { }
+        public SyncEvent(bool ownerAuth = false, bool ownerOnly = false) : base(ownerAuth, ownerOnly) { }
 
         public void AddListener(UnityAction listener) => unityEvent.AddListener(listener);
         public void RemoveListener(UnityAction listener) => unityEvent.RemoveListener(listener);
@@ -205,7 +214,7 @@ namespace PurrNet
     {
         [SerializeField] private SerializableSyncUnityEvent<T> unityEvent = new SerializableSyncUnityEvent<T>();
 
-        public SyncEvent(bool ownerAuth = false) : base(ownerAuth) { }
+        public SyncEvent(bool ownerAuth = false, bool ownerOnly = false) : base(ownerAuth, ownerOnly) { }
 
         public void AddListener(UnityAction<T> listener) => unityEvent.AddListener(listener);
         public void RemoveListener(UnityAction<T> listener) => unityEvent.RemoveListener(listener);
@@ -214,7 +223,7 @@ namespace PurrNet
 
         protected override void InvokeLocal()
         {
-            _lastData.ResetPosition();
+            using var scope = _lastData.BeginRead();
             var value = _lastData.ReadData<T>();
             unityEvent.Invoke(value);
         }
@@ -245,7 +254,7 @@ namespace PurrNet
     {
         [SerializeField] private SerializableSyncUnityEvent<T1, T2> unityEvent = new SerializableSyncUnityEvent<T1, T2>();
 
-        public SyncEvent(bool ownerAuth = false) : base(ownerAuth) { }
+        public SyncEvent(bool ownerAuth = false, bool ownerOnly = false) : base(ownerAuth, ownerOnly) { }
 
         public void AddListener(UnityAction<T1, T2> listener) => unityEvent.AddListener(listener);
         public void RemoveListener(UnityAction<T1, T2> listener) => unityEvent.RemoveListener(listener);
@@ -254,7 +263,7 @@ namespace PurrNet
 
         protected override void InvokeLocal()
         {
-            _lastData.ResetPosition();
+            using var scope = _lastData.BeginRead();
             var value1 = _lastData.ReadData<T1>();
             var value2 = _lastData.ReadData<T2>();
             unityEvent.Invoke(value1, value2);
@@ -286,7 +295,7 @@ namespace PurrNet
     {
         [SerializeField] private SerializableSyncUnityEvent<T1, T2, T3> unityEvent = new SerializableSyncUnityEvent<T1, T2, T3>();
 
-        public SyncEvent(bool ownerAuth = false) : base(ownerAuth) { }
+        public SyncEvent(bool ownerAuth = false, bool ownerOnly = false) : base(ownerAuth, ownerOnly) { }
 
         public void AddListener(UnityAction<T1, T2, T3> listener) => unityEvent.AddListener(listener);
         public void RemoveListener(UnityAction<T1, T2, T3> listener) => unityEvent.RemoveListener(listener);
@@ -294,7 +303,7 @@ namespace PurrNet
         public void Invoke(T1 a, T2 b, T3 c) => InvokePacket(new SyncEventData().AddData<T1>(a).AddData<T2>(b).AddData<T3>(c));
         protected override void InvokeLocal()
         {
-            _lastData.ResetPosition();
+            using var scope = _lastData.BeginRead();
             var value1 = _lastData.ReadData<T1>();
             var value2 = _lastData.ReadData<T2>();
             var value3 = _lastData.ReadData<T3>();
@@ -327,7 +336,7 @@ namespace PurrNet
     {
         [SerializeField] private SerializableSyncUnityEvent<T1, T2, T3, T4> unityEvent = new SerializableSyncUnityEvent<T1, T2, T3, T4>();
 
-        public SyncEvent(bool ownerAuth = false) : base(ownerAuth) { }
+        public SyncEvent(bool ownerAuth = false, bool ownerOnly = false) : base(ownerAuth, ownerOnly) { }
 
         public void AddListener(UnityAction<T1, T2, T3, T4> listener) => unityEvent.AddListener(listener);
         public void RemoveListener(UnityAction<T1, T2, T3, T4> listener) => unityEvent.RemoveListener(listener);
@@ -335,7 +344,7 @@ namespace PurrNet
         public void Invoke(T1 a, T2 b, T3 c, T4 d) => InvokePacket(new SyncEventData().AddData<T1>(a).AddData<T2>(b).AddData<T3>(c).AddData<T4>(d));
         protected override void InvokeLocal()
         {
-            _lastData.ResetPosition();
+            using var scope = _lastData.BeginRead();
             var value1 = _lastData.ReadData<T1>();
             var value2 = _lastData.ReadData<T2>();
             var value3 = _lastData.ReadData<T3>();
@@ -366,7 +375,7 @@ namespace PurrNet
     {
         private event Action<T1, T2, T3, T4, T5> unityEvent;
 
-        public SyncEvent(bool ownerAuth = false) : base(ownerAuth) { }
+        public SyncEvent(bool ownerAuth = false, bool ownerOnly = false) : base(ownerAuth, ownerOnly) { }
 
         public void AddListener(Action<T1, T2, T3, T4, T5> listener) => unityEvent += listener;
         public void RemoveListener(Action<T1, T2, T3, T4, T5> listener) => unityEvent -= listener;
@@ -374,7 +383,7 @@ namespace PurrNet
         public void Invoke(T1 a, T2 b, T3 c, T4 d, T5 e) => InvokePacket(new SyncEventData().AddData<T1>(a).AddData<T2>(b).AddData<T3>(c).AddData<T4>(d).AddData<T5>(e));
         protected override void InvokeLocal()
         {
-            _lastData.ResetPosition();
+            using var scope = _lastData.BeginRead();
             var value1 = _lastData.ReadData<T1>();
             var value2 = _lastData.ReadData<T2>();
             var value3 = _lastData.ReadData<T3>();

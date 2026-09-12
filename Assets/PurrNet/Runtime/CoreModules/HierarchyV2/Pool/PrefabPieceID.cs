@@ -1,14 +1,14 @@
-﻿using System;
+using System;
 using PurrNet.Packing;
 
 namespace PurrNet.Modules
 {
     public readonly struct PrefabPieceID : IEquatable<PrefabPieceID>
     {
-        public readonly PackedInt prefabId;
+        public readonly PrefabID prefabId;
         public readonly Size componentIndex;
 
-        public PrefabPieceID(int prefabId, int componentIndex)
+        public PrefabPieceID(PrefabID prefabId, int componentIndex)
         {
             this.prefabId = prefabId;
             this.componentIndex = componentIndex;

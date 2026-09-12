@@ -39,6 +39,8 @@ namespace PurrNet.Transports
         public bool ssl;
         public string secret;
         public int port;
+        /// <summary>Optional WebRTC signaling endpoint. Older relays leave this empty.</summary>
+        public string webRtcUrl;
         [Obsolete]
         public int udpPort;
         public int udpPortV2;
@@ -52,6 +54,8 @@ namespace PurrNet.Transports
         public string secret;
         public string host;
         public int port;
+        /// <summary>Optional WebRTC signaling endpoint. Older relays leave this empty.</summary>
+        public string webRtcUrl;
         [Obsolete]
         public int udpPort;
         public int udpPortV2;
@@ -101,6 +105,19 @@ namespace PurrNet.Transports
         internal static async Task<ClientJoinInfo> Join(string server, string roomName, CancellationTokenSource cts)
         {
             return await Retry<ClientJoinInfo>(10, () => ActualClientJoinInfo(server, roomName), cts);
+        }
+
+        internal static async Task<bool> RoomExistsAsync(string server, string roomName)
+        {
+            try
+            {
+                await ActualClientJoinInfo(server, roomName);
+                return true;
+            }
+            catch
+            {
+                return false;
+            }
         }
 
         private static async Task<ClientJoinInfo> ActualClientJoinInfo(string server, string roomName)
@@ -160,6 +177,18 @@ namespace PurrNet.Transports
         static async Task<float> PingInMS([UsedImplicitly] string url)
         {
             return await Retry<float>(10, () => ActualPing(url));
+        }
+
+        /// <summary>
+        /// HTTP round trip to a relay's API endpoint in milliseconds.
+        /// Useful for comparing regions without allocating or joining a room.
+        /// The first request warms up the connection so the TLS handshake is not counted.
+        /// </summary>
+        public static async Task<float> PingRelayAsync(RelayServer server)
+        {
+            var url = $"{server.apiEndpoint}/ping";
+            await ActualPing(url);
+            return await ActualPing(url) * 1000f;
         }
 
         private static async Task<float> ActualPing(string url)

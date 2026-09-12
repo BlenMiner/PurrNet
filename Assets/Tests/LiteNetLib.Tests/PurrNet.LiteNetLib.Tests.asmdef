@@ -1,0 +1,25 @@
+{
+    "name": "PurrNet.LiteNetLib.Tests",
+    "rootNamespace": "PurrNet.Tests",
+    "references": [
+        "GUID:1beb10fd218482c4c919c79f867341a0"
+    ],
+    "includePlatforms": [
+        "Editor"
+    ],
+    "excludePlatforms": [],
+    "allowUnsafeCode": false,
+    "overrideReferences": true,
+    "precompiledReferences": [
+        "nunit.framework.dll"
+    ],
+    "optionalUnityReferences": [
+        "TestAssemblies"
+    ],
+    "autoReferenced": false,
+    "defineConstraints": [
+        "UNITY_INCLUDE_TESTS"
+    ],
+    "versionDefines": [],
+    "noEngineReferences": false
+}

@@ -18,8 +18,11 @@ namespace PurrNet.Packing
         {
             public bool Equals(D x, D y)
             {
-                if (x is null) return y is null;
-                if (y is null) return false;
+                if (!typeof(D).IsValueType)
+                {
+                    if (x is null) return y is null;
+                    if (y is null) return false;
+                }
                 return x.PurrEquals(y);
             }
 

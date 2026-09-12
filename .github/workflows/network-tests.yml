@@ -6,7 +6,7 @@ on:
       clientCount:
         description: "Number of client processes to spawn"
         required: true
-        default: "3"
+        default: "5"
       connectionDelaySeconds:
         description: "Seconds to wait after server starts before launching clients"
         required: true

@@ -27,9 +27,9 @@ namespace PurrNet.Packing
             if (old.isDisposed)
             {
                 using var tmp = DisposableList<T>.Create();
-                changes = MyersDiff.Diff(tmp, value);
+                changes = MyersDiff.Diff(tmp.rawList, value.rawList);
             }
-            else changes = MyersDiff.Diff(old, value);
+            else changes = MyersDiff.Diff(old.rawList, value.rawList);
 
             if (changes.Count > 0)
             {

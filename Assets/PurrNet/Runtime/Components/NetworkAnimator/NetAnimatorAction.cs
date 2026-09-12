@@ -605,7 +605,7 @@ namespace PurrNet
 
     internal struct SetLayerWeight : IPackedAuto
     {
-        public int layerIndex;
+        public PackedInt layerIndex;
         public float weight;
 
         public void Apply(Animator anim)

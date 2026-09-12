@@ -33,7 +33,7 @@ namespace PurrNet
         /// <summary>
         /// Clears every instance in the handler.
         /// </summary>
-        [RuntimeInitializeOnLoadMethod(RuntimeInitializeLoadType.BeforeSceneLoad)]
+        [RuntimeInitializeOnLoadMethod(RuntimeInitializeLoadType.SubsystemRegistration)]
         public static void ClearAll()
         {
             _instances.Clear();

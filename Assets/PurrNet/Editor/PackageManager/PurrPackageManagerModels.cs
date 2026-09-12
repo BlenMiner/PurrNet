@@ -1,3 +1,6 @@
+using System;
+using System.Collections.Generic;
+using System.Threading.Tasks;
 using Newtonsoft.Json;
 
 namespace PurrNet.Editor
@@ -226,5 +229,243 @@ namespace PurrNet.Editor
 
         [JsonProperty("message")]
         public string Message { get; private set; }
+    }
+
+    [Serializable]
+    internal enum PackageUpdateBatchPhase
+    {
+        Staging,
+        Resolving
+    }
+
+    [Serializable]
+    internal sealed class PackageUpdateBatchState
+    {
+        public List<PackageUpdateBatchItem> Items = new();
+        public int NextIndex;
+        public List<string> Errors = new();
+        public PackageUpdateBatchPhase Phase;
+        public bool ResolveRequired;
+        public bool ResolveStarted;
+    }
+
+    [Serializable]
+    internal sealed class PackageUpdateBatchItem
+    {
+        public string PackageId;
+        public string UpmName;
+        public string DisplayName;
+        public string VersionId;
+        public string Version;
+        public string GitUrl;
+        public string ExpectedCommit;
+        public string ExpectedLockVersion;
+        public string[] DependencyIds = Array.Empty<string>();
+        public bool InstallStarted;
+        public bool Succeeded;
+        public bool Failed;
+    }
+
+    /// <summary>
+    /// Runs the reload-sensitive part of Update All from a persisted cursor. The caller saves the
+    /// state before and after every item, so a domain reload can inspect/retry the in-flight item and
+    /// continue. All installs are staged without resolving; the durable journal remains until the
+    /// single final resolve completes or its result can be verified after a reload.
+    /// </summary>
+    internal static class PackageUpdateBatchRunner
+    {
+        public static async Task Run(
+            PackageUpdateBatchState state,
+            Func<PackageUpdateBatchItem, bool> isApplied,
+            Func<PackageUpdateBatchItem, bool> isResolved,
+            Func<PackageUpdateBatchItem, bool, Task<Result<bool>>> install,
+            Action<PackageUpdateBatchState> persist,
+            Action<int, int, PackageUpdateBatchItem> reportProgress,
+            Action clearProgress,
+            Action beforeResolve,
+            Func<Task<Result<bool>>> resolve)
+        {
+            if (state?.Items == null || state.Items.Count == 0)
+                return;
+
+            state.Errors ??= new List<string>();
+
+            if (state.Phase == PackageUpdateBatchPhase.Staging)
+            {
+                try
+                {
+                    while (state.NextIndex < state.Items.Count)
+                    {
+                        var item = state.Items[state.NextIndex];
+                        if (item == null)
+                        {
+                            state.Errors.Add("Package: the saved update entry is invalid.");
+                            state.NextIndex++;
+                            persist?.Invoke(state);
+                            continue;
+                        }
+
+                        var failedDependency = FindFailedDependency(state, item);
+                        if (failedDependency != null)
+                        {
+                            item.Failed = true;
+                            state.Errors.Add(
+                                $"{GetDisplayName(item)}: skipped because dependency " +
+                                $"'{GetDisplayName(failedDependency)}' failed to update.");
+                        }
+                        else
+                        {
+                            bool alreadyApplied = false;
+                            try
+                            {
+                                alreadyApplied = isApplied?.Invoke(item) == true;
+                            }
+                            catch (Exception e)
+                            {
+                                state.Errors.Add(
+                                    $"{GetDisplayName(item)}: could not verify the pending update: {e.Message}");
+                            }
+
+                            if (alreadyApplied)
+                            {
+                                item.Succeeded = true;
+                                if (item.InstallStarted)
+                                    state.ResolveRequired = true;
+                            }
+                            else
+                            {
+                                reportProgress?.Invoke(state.NextIndex, state.Items.Count, item);
+
+                                // Persist before the awaited installer. If package code reloads the
+                                // domain after committing, the next domain knows this item was in flight.
+                                item.InstallStarted = true;
+                                state.ResolveRequired = true;
+                                persist?.Invoke(state);
+
+                                try
+                                {
+                                    var result = install == null
+                                        ? Result<bool>.Fail("No batch installer is available.")
+                                        : await install(item, false);
+                                    if (result.Success)
+                                    {
+                                        item.Succeeded = true;
+                                    }
+                                    else
+                                    {
+                                        item.Failed = true;
+                                        state.Errors.Add($"{GetDisplayName(item)}: {result.Error}");
+                                    }
+                                }
+                                catch (Exception e)
+                                {
+                                    item.Failed = true;
+                                    state.Errors.Add($"{GetDisplayName(item)}: {e.Message}");
+                                }
+                            }
+                        }
+
+                        state.NextIndex++;
+                        persist?.Invoke(state);
+                    }
+                }
+                finally
+                {
+                    clearProgress?.Invoke();
+                }
+
+                state.Phase = PackageUpdateBatchPhase.Resolving;
+                persist?.Invoke(state);
+            }
+            else
+            {
+                // A native progress dialog can outlive the managed domain that opened it.
+                clearProgress?.Invoke();
+            }
+
+            if (!state.ResolveRequired)
+                return;
+
+            // A reload during Resolve abandons this continuation. If the new domain can see every
+            // successfully staged target, resolution already completed and must not be requested again.
+            if (state.ResolveStarted && AreSuccessfulItemsApplied(state, isResolved))
+                return;
+
+            state.ResolveStarted = true;
+            persist?.Invoke(state);
+            try
+            {
+                beforeResolve?.Invoke();
+                var result = resolve == null
+                    ? Result<bool>.Fail("No package resolver is available.")
+                    : await resolve();
+                if (!result.Success)
+                    state.Errors.Add($"Package resolution: {result.Error}");
+                else if (!AreSuccessfulItemsApplied(state, isResolved))
+                    state.Errors.Add(
+                        "Package resolution completed, but one or more staged updates are not visible. " +
+                        "Reopen Unity to let the Package Manager refresh them.");
+            }
+            catch (Exception e)
+            {
+                state.Errors.Add($"Package resolution: {e.Message}");
+            }
+
+            persist?.Invoke(state);
+        }
+
+        private static PackageUpdateBatchItem FindFailedDependency(PackageUpdateBatchState state,
+            PackageUpdateBatchItem item)
+        {
+            if (item.DependencyIds == null || item.DependencyIds.Length == 0)
+                return null;
+
+            foreach (var dependencyId in item.DependencyIds)
+            {
+                foreach (var candidate in state.Items)
+                {
+                    if (candidate?.Failed == true
+                        && !string.IsNullOrEmpty(candidate.PackageId)
+                        && string.Equals(candidate.PackageId, dependencyId,
+                            StringComparison.OrdinalIgnoreCase))
+                        return candidate;
+                }
+            }
+
+            return null;
+        }
+
+        private static bool AreSuccessfulItemsApplied(PackageUpdateBatchState state,
+            Func<PackageUpdateBatchItem, bool> isApplied)
+        {
+            bool hasSuccessfulItem = false;
+            foreach (var item in state.Items)
+            {
+                if (item?.Succeeded != true)
+                    continue;
+
+                hasSuccessfulItem = true;
+                try
+                {
+                    if (isApplied?.Invoke(item) != true)
+                        return false;
+                }
+                catch
+                {
+                    return false;
+                }
+            }
+
+            // With no successful root item there is no target to verify. A resumed resolving phase
+            // may still have staged a dependency before the root failed, so one accepted resolve is enough.
+            return hasSuccessfulItem || state.ResolveStarted;
+        }
+
+        private static string GetDisplayName(PackageUpdateBatchItem item)
+        {
+            return string.IsNullOrEmpty(item?.DisplayName)
+                ? item?.UpmName ?? "Package"
+                : item.DisplayName;
+        }
     }
 }

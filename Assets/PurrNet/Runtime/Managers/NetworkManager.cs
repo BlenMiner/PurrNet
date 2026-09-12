@@ -184,49 +184,43 @@ namespace PurrNet
         /// </summary>
         public IPrefabProvider prefabProvider { get; private set; }
 
-        public bool TryGetPrefabPersistentId(int prefabId, out string persistentId)
-        {
-            if (prefabProvider is IPersistentPrefabProvider persistentProvider)
-                return persistentProvider.TryGetPersistentId(prefabId, out persistentId);
+        private PrefabResolver _prefabResolver;
 
-            persistentId = null;
-            return false;
+        /// <summary>
+        /// Resolves prefab ids and prefab references to prefab data. All runtime lookups go through this.
+        /// </summary>
+        public PrefabResolver prefabResolver => _prefabResolver ??= new PrefabResolver(this);
+
+        public bool TryGetPrefabPersistentId(PrefabID prefabId, out string persistentId)
+        {
+            return prefabResolver.TryGetPersistentId(prefabId, out persistentId);
         }
 
         public bool TryGetPrefabPersistentId(GameObject prefab, out string persistentId)
         {
-            if (prefabProvider is IPersistentPrefabProvider persistentProvider)
-                return persistentProvider.TryGetPersistentId(prefab, out persistentId);
-
-            persistentId = null;
-            return false;
+            return prefabResolver.TryGetPersistentId(prefab, out persistentId);
         }
 
         public bool TryGetPrefabDataByPersistentId(string persistentId, out PrefabData prefabData)
         {
-            if (prefabProvider is IPersistentPrefabProvider persistentProvider)
-                return persistentProvider.TryGetPrefabDataByPersistentId(persistentId, out prefabData);
-
-            prefabData = default;
-            return false;
+            return prefabResolver.TryGetPrefabDataByPersistentId(persistentId, out prefabData);
         }
+
+        private NetworkAssetResolver _networkAssetResolver;
+
+        /// <summary>
+        /// Resolves network asset ids and asset references to registered assets. All runtime lookups go through this.
+        /// </summary>
+        public NetworkAssetResolver networkAssetResolver => _networkAssetResolver ??= new NetworkAssetResolver(this);
 
         public bool TryGetNetworkAssetPersistentId(UnityEngine.Object asset, out string persistentId)
         {
-            if (_networkAssets)
-                return _networkAssets.TryGetPersistentId(asset, out persistentId);
-
-            persistentId = null;
-            return false;
+            return networkAssetResolver.TryGetPersistentId(asset, out persistentId);
         }
 
         public bool TryGetNetworkAssetByPersistentId(string persistentId, out UnityEngine.Object asset)
         {
-            if (_networkAssets)
-                return _networkAssets.TryGetAssetByPersistentId(persistentId, out asset);
-
-            asset = null;
-            return false;
+            return networkAssetResolver.TryGetAssetByPersistentId(persistentId, out asset);
         }
 
 #if ADDRESSABLES_PURRNET_SUPPORT
@@ -374,7 +368,10 @@ namespace PurrNet
             _transportLayer.onDisconnected += OnLostConnection;
             _transportLayer.onConnectionState += OnConnectionState;
             _transportLayer.onDataReceived += OnDataReceived;
+            _transport.externalPump = IsTickingTransport;
         }
+
+        private bool IsTickingTransport() => _serverTickManager != null || _clientTickManager != null;
 
         private void TeardownTransportLayer()
         {
@@ -386,7 +383,12 @@ namespace PurrNet
             _transportLayer.onConnectionState -= OnConnectionState;
             _transportLayer.onDataReceived -= OnDataReceived;
             _transportLayer = null;
+
+            if (_transport)
+                _transport.externalPump = null;
         }
+
+        private bool IsProbeEvent(bool asServer) => !asServer && _transport && _transport.isPinging;
 
         /// <summary>
         /// Whether the server should automatically start.
@@ -534,6 +536,7 @@ namespace PurrNet
 
             prefabProvider = provider;
             prefabProvider.Refresh();
+            HierarchyPool.EvictGlobalPrototypes();
         }
 
         /// <summary>
@@ -543,7 +546,7 @@ namespace PurrNet
         /// <param name="instance"></param>
         /// <param name="pid">The prefab index in the network prefabs list.</param>
         /// <param name="shouldBePooled">Whether the object should be pooled.</param>
-        public static void SetupPrefabInfo(GameObject instance, int pid, bool shouldBePooled)
+        public static void SetupPrefabInfo(GameObject instance, PrefabID pid, bool shouldBePooled)
         {
             var children = ListPool<NetworkIdentity>.Instantiate();
 
@@ -562,7 +565,7 @@ namespace PurrNet
         /// <param name="pid">The prefab index in the network prefabs list.</param>
         /// <param name="shouldBePooled">Whether the object should be pooled.</param>
         /// <param name="children">The result of GetComponentsInChildren(true) on the instance.</param>
-        public static void SetupPrefabInfo(GameObject instance, int pid, bool shouldBePooled,
+        public static void SetupPrefabInfo(GameObject instance, PrefabID pid, bool shouldBePooled,
             List<NetworkIdentity> children)
         {
             if (!instance.GetComponent<NetworkIdentity>())
@@ -1704,10 +1707,21 @@ namespace PurrNet
         }
 
         private bool _sendFlushRequested;
+        private readonly List<(Connection conn, bool asServer)> _connectionFlushRequests = new();
 
-        internal void RequestSendFlushThisFrame()
+        public void RequestSendFlushThisFrame()
         {
             _sendFlushRequested = true;
+        }
+
+        public void RequestSendFlushThisFrame(Connection conn, bool asServer)
+        {
+            if (_sendFlushRequested)
+                return;
+
+            var request = (conn, asServer);
+            if (!_connectionFlushRequests.Contains(request))
+                _connectionFlushRequests.Add(request);
         }
 
         // Runs from UnityLatestUpdate's post phase (execution order 32000, after every
@@ -1726,6 +1740,25 @@ namespace PurrNet
                 flushedAny |= _clientModules.FlushImmediateRPCs();
 
             if (flushedAny)
+            {
+                _connectionFlushRequests.Clear();
+                SendMessagesNow();
+                return;
+            }
+
+            if (_connectionFlushRequests.Count == 0)
+                return;
+
+            bool flushedAll = _transportLayer != null;
+            for (int i = 0; flushedAll && i < _connectionFlushRequests.Count; i++)
+            {
+                var (conn, asServer) = _connectionFlushRequests[i];
+                flushedAll = _transportLayer.FlushConnection(conn, asServer);
+            }
+
+            _connectionFlushRequests.Clear();
+
+            if (!flushedAll)
                 SendMessagesNow();
         }
 
@@ -1762,7 +1795,8 @@ namespace PurrNet
             var now = Time.unscaledTimeAsDouble;
             var sendDelta = _lastSendTime > 0 ? (float)(now - _lastSendTime) : fallbackDelta;
             _lastSendTime = now;
-            _transportLayer.SendMessages(sendDelta);
+            using (_onSendMessagesMarker.Auto())
+                _transportLayer.SendMessages(sendDelta);
         }
 
         private void OnTick()
@@ -1825,10 +1859,7 @@ namespace PurrNet
                     _clientModules.TriggerOnPostBatch();
             }
 
-            using (_onSendMessagesMarker.Auto())
-            {
-                SendMessagesNow(delta);
-            }
+            SendMessagesNow(delta);
 
             if (_isCleaningClient)
             {
@@ -2302,6 +2333,9 @@ namespace PurrNet
 
         private void OnNewConnection(Connection conn, bool asServer)
         {
+            if (IsProbeEvent(asServer))
+                return;
+
             if (asServer)
                 _serverModules.OnNewConnection(conn, true);
             else
@@ -2313,6 +2347,9 @@ namespace PurrNet
 
         private void OnLostConnection(Connection conn, DisconnectReason reason, bool asServer)
         {
+            if (IsProbeEvent(asServer))
+                return;
+
             if (asServer)
             {
                 _serverBroadcast?.DrainDeferred(conn);
@@ -2332,6 +2369,9 @@ namespace PurrNet
 
         private void OnDataReceived(Connection conn, ByteData data, bool asServer)
         {
+            if (IsProbeEvent(asServer))
+                return;
+
             if (asServer)
                 _serverModules.OnDataReceived(conn, data, true);
             else _clientModules.OnDataReceived(conn, data, false);
@@ -2339,6 +2379,9 @@ namespace PurrNet
 
         private void OnConnectionState(ConnectionState state, bool asServer)
         {
+            if (IsProbeEvent(asServer))
+                return;
+
             if (asServer)
             {
                 isServer = state == ConnectionState.Connected;

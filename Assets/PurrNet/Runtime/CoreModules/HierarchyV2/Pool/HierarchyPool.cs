@@ -1,4 +1,5 @@
-﻿using System.Collections.Generic;
+﻿using System;
+using System.Collections.Generic;
 using JetBrains.Annotations;
 using PurrNet.Logging;
 using PurrNet.Pooling;
@@ -10,11 +11,24 @@ namespace PurrNet.Modules
     {
         public readonly HierarchyPool scenePool;
         public readonly HierarchyPool prefabPool;
+        public readonly HierarchyPool scopedPrefabPool;
 
-        public PoolPair(HierarchyPool scenePool, HierarchyPool prefabPool)
+        public PoolPair(HierarchyPool scenePool, HierarchyPool prefabPool, HierarchyPool scopedPrefabPool = null)
         {
             this.scenePool = scenePool;
             this.prefabPool = prefabPool;
+            this.scopedPrefabPool = scopedPrefabPool ?? scenePool;
+        }
+
+        /// <summary>
+        /// Scene objects and scene scoped prefabs live with their scene; global prefabs live in the shared pool.
+        /// </summary>
+        public HierarchyPool GetPool(PrefabID id)
+        {
+            if (!id.isValid)
+                return scenePool;
+
+            return id.isSceneScoped ? scopedPrefabPool : prefabPool;
         }
     }
 
@@ -27,14 +41,83 @@ namespace PurrNet.Modules
 
         private readonly Transform _parent;
 
-        [UsedImplicitly] private readonly IPrefabProvider _prefabs;
+        [UsedImplicitly] private readonly PrefabResolver _prefabs;
         private readonly bool _forceWarmupPieces;
 
-        private static readonly Dictionary<GameObject, GameObjectPrototype> _prefabPrototypes = new();
+        private static readonly Dictionary<PrefabID, GameObjectPrototype> _prefabPrototypes = new();
+
+        private const int MAX_INTERNED_PATHS_PER_LENGTH = 64;
+
+        private static readonly Dictionary<int, List<int[]>> _internedPaths = new();
+
+        /// <summary>
+        /// Drops cached prototypes of prefabs scoped to the given scene so nothing outlives it.
+        /// </summary>
+        public static void EvictPrototypes(SceneID scene)
+        {
+            EvictPrototypes(id => id.scope.HasValue && id.scope.Value == scene);
+        }
+
+        /// <summary>
+        /// Drops cached prototypes of global prefabs. Global ids are plain indices into the active provider,
+        /// so they must not survive a provider swap.
+        /// </summary>
+        public static void EvictGlobalPrototypes()
+        {
+            EvictPrototypes(id => !id.scope.HasValue);
+        }
+
+        private static void EvictPrototypes(Func<PrefabID, bool> isStale)
+        {
+            var stale = ListPool<PrefabID>.Instantiate();
+
+            foreach (var (id, _) in _prefabPrototypes)
+            {
+                if (isStale(id))
+                    stale.Add(id);
+            }
+
+            for (int i = 0; i < stale.Count; i++)
+            {
+                if (_prefabPrototypes.Remove(stale[i], out var prototype))
+                    prototype.Dispose();
+            }
+
+            ListPool<PrefabID>.Destroy(stale);
+        }
+
+        public static bool HasPrototype(PrefabID prefabId)
+        {
+            return _prefabPrototypes.ContainsKey(prefabId);
+        }
+
+        /// <summary>
+        /// Number of idle pooled pieces belonging to the given prefab, summed over all of its pieces.
+        /// </summary>
+        public int GetPooledCount(PrefabID prefabId)
+        {
+            int count = 0;
+
+            foreach (var (pid, queue) in _pool)
+            {
+                if (pid.prefabId == prefabId)
+                    count += queue.Count;
+            }
+
+            return count;
+        }
+
+        public static void ClearPrototypes()
+        {
+            foreach (var (_, prototype) in _prefabPrototypes)
+                prototype.Dispose();
+            _prefabPrototypes.Clear();
+            _internedPaths.Clear();
+        }
 
         readonly HashSet<GameObject> _alreadyWarmedUp = new HashSet<GameObject>();
 
-        public HierarchyPool(Transform parent, IPrefabProvider prefabs = null, bool forceWarmupPieces = false)
+        public HierarchyPool(Transform parent, PrefabResolver prefabs = null, bool forceWarmupPieces = false)
         {
             _parent = parent;
             _prefabs = prefabs;
@@ -50,7 +133,12 @@ namespace PurrNet.Modules
             if (_prefabs == null)
                 return;
 
-            foreach (var prefabData in _prefabs.allPrefabs)
+            Warmup(_prefabs.allPrefabs);
+        }
+
+        public void Warmup(IEnumerable<PrefabData> prefabs)
+        {
+            foreach (var prefabData in prefabs)
             {
                 if (prefabData.pooled && _alreadyWarmedUp.Add(prefabData.prefab))
                 {
@@ -65,10 +153,10 @@ namespace PurrNet.Modules
             var copy = UnityProxy.InstantiateDirectly(prefabData.prefab, _parent);
             NetworkManager.SetupPrefabInfo(copy, prefabData.prefabId, prefabData.pooled || _forceWarmupPieces);
 
-            if (!_prefabPrototypes.ContainsKey(prefabData.prefab))
+            if (!_prefabPrototypes.ContainsKey(prefabData.prefabId))
             {
                 var prototype = GetFullPrototype(copy.transform, null, true);
-                _prefabPrototypes.Add(prefabData.prefab, prototype);
+                _prefabPrototypes.Add(prefabData.prefabId, prototype);
             }
 
             PutBackInPool(copy, true);
@@ -147,7 +235,8 @@ namespace PurrNet.Modules
             QueueVirtualNodesFromLeafToRoot(root, virtualNodes);
             QueueRealNodesFromLeafToRoot(root, realNodes);
 
-            realNodes.ExceptWith(virtualNodes);
+            foreach (var virtualNode in virtualNodes)
+                realNodes.Remove(virtualNode);
 
             // save the objects that should not be despawned
             foreach (var real in realNodes)
@@ -158,8 +247,8 @@ namespace PurrNet.Modules
 
             foreach (var child in virtualNodes)
             {
-                var pid = new PrefabPieceID(child.prefabId, child.componentIndex);
-                var pair = pid.prefabId >= 0 ? pool.prefabPool : pool.scenePool;
+                var pid = new PrefabPieceID(child.scopedPrefabId, child.componentIndex);
+                var pair = pool.GetPool(pid.prefabId);
 
                 // check if we should pool this object or not
                 if (!child.shouldBePooled)
@@ -215,7 +304,7 @@ namespace PurrNet.Modules
                 if (!child || (respectSkipSceneAutoSpawning && child.skipSceneAutoSpawning))
                     continue;
 
-                var pid = new PrefabPieceID(child.prefabId, child.componentIndex);
+                var pid = new PrefabPieceID(child.scopedPrefabId, child.componentIndex);
 
                 if (!pidSet.Add(pid)) continue;
 
@@ -262,7 +351,7 @@ namespace PurrNet.Modules
             if (!_activeScenePieceSet.Add(target))
                 return;
 
-            var pid = new PrefabPieceID(pieceIdentity.prefabId, pieceIdentity.componentIndex);
+            var pid = new PrefabPieceID(pieceIdentity.scopedPrefabId, pieceIdentity.componentIndex);
             if (!_activeScenePieces.TryGetValue(pid, out var queue))
             {
                 queue = QueuePool<GameObject>.Instantiate();
@@ -346,7 +435,7 @@ namespace PurrNet.Modules
                 return;
             }
 
-            var pid = new PrefabPieceID(identity.prefabId, identity.componentIndex);
+            var pid = new PrefabPieceID(identity.scopedPrefabId, identity.componentIndex);
             if (!_pool.TryGetValue(pid, out var queue))
             {
                 queue = QueuePool<GameObject>.Instantiate();
@@ -415,9 +504,16 @@ namespace PurrNet.Modules
         {
             while (true)
             {
-                var pool = pid.prefabId >= 0 ? pair.prefabPool : pair.scenePool;
+                var pool = pair.GetPool(pid.prefabId);
 
-                if (pid.prefabId < 0 && pool.TryGetActiveScenePiece(pid, out instance))
+                if (pool == null)
+                {
+                    PurrLogger.LogError($"No pool available for piece '{pid}'; is the prefab registered on this peer?");
+                    instance = null;
+                    return false;
+                }
+
+                if (!pid.prefabId.isValid && pool.TryGetActiveScenePiece(pid, out instance))
                     return true;
 
                 if (!pool._pool.TryGetValue(pid, out var queue))
@@ -426,6 +522,7 @@ namespace PurrNet.Modules
 
                     if (!pool._pool.TryGetValue(pid, out queue))
                     {
+                        PurrLogger.LogError($"Piece '{pid}' is still missing from the pool after warmup");
                         instance = null;
                         return false;
                     }
@@ -437,6 +534,7 @@ namespace PurrNet.Modules
 
                     if (queue.Count == 0)
                     {
+                        PurrLogger.LogError($"Pool for piece '{pid}' is empty after warmup");
                         instance = null;
                         return false;
                     }
@@ -468,12 +566,68 @@ namespace PurrNet.Modules
 
         private void Warmup(PrefabPieceID pid)
         {
-            if (pid.prefabId >= 0 && _prefabs != null)
+            if (!pid.prefabId.isValid)
+                return;
+
+            if (_prefabs == null)
             {
-                if (_prefabs.TryGetPrefabData(pid.prefabId, out var prefabData))
-                    Warmup(prefabData);
-                else PurrLogger.LogError($"Prefab with piece id of '{pid}' was not found");
+                PurrLogger.LogError($"Cannot warm up piece '{pid}': this pool has no prefab resolver");
+                return;
             }
+
+            if (_prefabs.TryGetPrefabData(pid.prefabId, out var prefabData))
+                Warmup(prefabData);
+            else PurrLogger.LogError($"Prefab with piece id of '{pid}' was not found");
+        }
+
+        internal static bool TryInternPath(DisposableList<int> path, out int[] interned)
+        {
+            if (path.Count == 0)
+            {
+                interned = Array.Empty<int>();
+                return true;
+            }
+
+            if (!_internedPaths.TryGetValue(path.Count, out var candidates))
+            {
+                candidates = new List<int[]>();
+                _internedPaths.Add(path.Count, candidates);
+            }
+
+            for (var i = 0; i < candidates.Count; i++)
+            {
+                var candidate = candidates[i];
+                var matches = true;
+
+                for (var j = 0; j < candidate.Length; j++)
+                {
+                    if (candidate[j] == path[j])
+                        continue;
+
+                    matches = false;
+                    break;
+                }
+
+                if (matches)
+                {
+                    interned = candidate;
+                    return true;
+                }
+            }
+
+            if (candidates.Count >= MAX_INTERNED_PATHS_PER_LENGTH)
+            {
+                interned = null;
+                return false;
+            }
+
+            interned = new int[path.Count];
+
+            for (var i = 0; i < interned.Length; i++)
+                interned[i] = path[i];
+
+            candidates.Add(interned);
+            return true;
         }
 
         public static DisposableList<int> GetInvPath(Transform parent, Transform transform)
@@ -509,20 +663,20 @@ namespace PurrNet.Modules
             ListPool<NetworkIdentity>.Destroy(children);
         }
 
-        public static bool TryGetPrefabPrototype(GameObject prefab, out GameObjectPrototype prototype)
+        public static bool TryGetPrefabPrototype(PrefabID prefabId, out GameObjectPrototype prototype)
         {
-            return _prefabPrototypes.TryGetValue(prefab, out prototype);
+            return _prefabPrototypes.TryGetValue(prefabId, out prototype);
         }
 
         public static bool TryGetOrCreatePrefabPrototype(PrefabData prefabData, out GameObjectPrototype prototype)
         {
-            if (_prefabPrototypes.TryGetValue(prefabData.prefab, out prototype))
+            if (_prefabPrototypes.TryGetValue(prefabData.prefabId, out prototype))
                 return true;
 
             var copy = UnityProxy.InstantiateDirectly(prefabData.prefab);
             NetworkManager.SetupPrefabInfo(copy, prefabData.prefabId, prefabData.pooled);
             prototype = GetFullPrototype(copy.transform, null, true);
-            _prefabPrototypes.Add(prefabData.prefab, prototype);
+            _prefabPrototypes.Add(prefabData.prefabId, prototype);
             UnityProxy.DestroyDirectly(copy);
             return true;
         }
@@ -530,83 +684,251 @@ namespace PurrNet.Modules
         public static bool TryGetPrototype(Transform transform, PlayerID scope, List<NetworkIdentity> allChildren,
             out GameObjectPrototype prototype)
         {
+            return TryGetPrototype(transform, scope, allChildren, out prototype, null);
+        }
+
+        internal static bool TryGetPrototype(Transform transform, PlayerID scope, List<NetworkIdentity> allChildren,
+            out GameObjectPrototype prototype, List<NetworkIdentity> componentsOut, List<NetworkIdentity> prefetched = null)
+        {
             var framework = DisposableList<GameObjectFrameworkPiece>.Create(16);
-
-            if (!transform.TryGetComponent<NetworkIdentity>(out var rootId))
+            if (!transform.TryGetComponent<NetworkIdentity>(out var rootId) || !rootId.id.HasValue ||
+                !CapturePrototype(transform, rootId, scope, false, framework, allChildren, prefetched, componentsOut))
             {
                 prototype = default;
                 framework.Dispose();
                 return false;
             }
 
-            bool isDefaultParent = transform.parent == rootId.defaultParent;
+            prototype = FinishPrototype(transform, rootId, framework, transform.parent == rootId.defaultParent);
+            return true;
+        }
 
-            var rootPair = new TransformIdentityPair(transform, rootId);
-            if (!rootPair.HasObserver(scope) || !rootId.id.HasValue)
+        /// <summary>
+        /// True when two observers see exactly the same identities of a hierarchy, so a prototype
+        /// captured for one is valid for the other. Every other input of the capture is observer
+        /// independent.
+        /// </summary>
+        internal static bool SameObserverPattern(List<NetworkIdentity> components, PlayerID a, PlayerID b)
+        {
+            for (int i = 0; i < components.Count; i++)
             {
-                prototype = default;
-                framework.Dispose();
-                return false;
+                var identity = components[i];
+                if (!identity)
+                    continue;
+                if (identity.IsObserverOrPending(a) != identity.IsObserverOrPending(b))
+                    return false;
             }
 
-            var queue = QueuePool<GameObjectRuntimePair>.Instantiate();
-            var pieceIdentities = allChildren != null ? ListPool<NetworkIdentity>.Instantiate() : null;
-            var pair = GetRuntimePair(null, rootId);
+            return true;
+        }
 
-            queue.Enqueue(pair);
+        private struct PrototypeNode
+        {
+            public Transform transform;
+            public NetworkIdentity identity;
+            public int parent;
+            public int firstChild;
+            public int lastChild;
+            public int nextSibling;
+            public int childCount;
+        }
 
-            while (queue.Count > 0)
+        private static bool CapturePrototype(Transform root, NetworkIdentity rootId, PlayerID? observer,
+            bool includeUnspawnedChildren, DisposableList<GameObjectFrameworkPiece> framework,
+            List<NetworkIdentity> allChildren, List<NetworkIdentity> prefetched = null,
+            List<NetworkIdentity> componentsOut = null)
+        {
+            using var componentLease = DisposableList<NetworkIdentity>.Create();
+            var components = prefetched ?? componentLease.list;
+            if (prefetched == null)
+                root.GetComponentsInChildren(true, components);
+            if (componentsOut != null)
+                componentsOut.AddRange(components);
+
+            int rootEnd = GetComponentGroupEnd(components, 0, root);
+            if (observer.HasValue && !HasObserver(components, 0, rootEnd, observer.Value))
+                return false;
+
+            AppendComponents(components, 0, rootEnd, allChildren);
+            if (rootEnd == components.Count)
             {
-                using var current = queue.Dequeue();
-                var children = current.children;
-                int actualChildCount = 0;
-                var trs = current.identity.transform;
+                AddPrototypePiece(framework, root, rootId, null, 0);
+                return true;
+            }
 
-                for (var i = 0; i < children.Count; i++)
+            using var nodeLease = DisposableList<PrototypeNode>.Create();
+            using var traversalLease = DisposableList<int>.Create();
+            var nodes = nodeLease.list;
+            var traversal = traversalLease.list;
+            nodes.Add(new PrototypeNode { transform = root, identity = rootId, parent = -1 });
+            traversal.Add(0);
+            Transform excludedRoot = null;
+
+            // Unity returns components depth-first. Group siblings on the same GameObject and
+            // use live ancestry to recover network parents without scanning any subtree again.
+            for (int start = rootEnd; start < components.Count;)
+            {
+                var component = components[start];
+                if (!component)
                 {
-                    var child = children[i];
-
-                    if (child.HasObserver(scope) && child.identity.id.HasValue)
-                    {
-                        var childPair = GetRuntimePair(trs, child.identity);
-                        queue.Enqueue(childPair);
-                        ++actualChildCount;
-                    }
+                    start++;
+                    continue;
                 }
 
-                var pid = new PrefabPieceID(current.identity.prefabId, current.identity.componentIndex);
-                trs.GetLocalPositionAndRotation(out var localPos, out var localRot);
-                var localTrs = new LocalTransform(localPos, localRot, trs.localScale);
-                var piece = new GameObjectFrameworkPiece(
-                    localTrs,
-                    pid,
-                    current.identity.id ?? default,
-                    actualChildCount,
-                    current.identity.gameObject.activeSelf,
-                    current.identity.invertedPathToNearestParent
-                );
-                framework.Add(piece);
-                pieceIdentities?.Add(current.identity);
+                var current = component.transform;
+                int end = GetComponentGroupEnd(components, start, current);
+                if (excludedRoot && current.IsChildOf(excludedRoot))
+                {
+                    start = SkipExcludedSubtree(components, end, ref excludedRoot);
+                    continue;
+                }
+                excludedRoot = null;
+
+                while (traversal.Count > 1 && !current.IsChildOf(nodes[traversal[^1]].transform))
+                    traversal.RemoveAt(traversal.Count - 1);
+
+                int parentIndex = traversal[^1];
+                var parent = nodes[parentIndex];
+                // Match the existing canonical component selection; every sibling still participates
+                // in visibility and serialization through its range in the original component list.
+                if (!current.TryGetComponent<NetworkIdentity>(out var identity) ||
+                    (parent.identity.isSceneObject && identity.skipSceneAutoSpawning) ||
+                    (!includeUnspawnedChildren && !identity.id.HasValue) ||
+                    (observer.HasValue && !HasObserver(components, start, end, observer.Value)))
+                {
+                    excludedRoot = current;
+                    start = end;
+                    continue;
+                }
+
+                int index = nodes.Count;
+                if (parent.childCount == 0)
+                    parent.firstChild = index;
+                else
+                {
+                    var previous = nodes[parent.lastChild];
+                    previous.nextSibling = index;
+                    nodes[parent.lastChild] = previous;
+                }
+                parent.lastChild = index;
+                parent.childCount++;
+                nodes[parentIndex] = parent;
+                nodes.Add(new PrototypeNode { transform = current, identity = identity, parent = parentIndex });
+                traversal.Add(index);
+                AppendComponents(components, start, end, allChildren);
+                start = end;
             }
 
-            QueuePool<GameObjectRuntimePair>.Destroy(queue);
-
-            if (allChildren != null)
+            // The wire framework is breadth-first; custom serialization follows the depth-first
+            // component order appended above. Reuse the ancestry stack as the breadth-first queue.
+            traversal.Clear();
+            traversal.Add(0);
+            for (int i = 0; i < traversal.Count; i++)
             {
-                CollectInBuildOrder(framework, pieceIdentities, 0, allChildren);
-                ListPool<NetworkIdentity>.Destroy(pieceIdentities);
+                var node = nodes[traversal[i]];
+                var parent = node.parent < 0 ? null : nodes[node.parent].transform;
+                AddPrototypePiece(framework, node.transform, node.identity, parent, node.childCount);
+                int child = node.firstChild;
+                for (int c = 0; c < node.childCount; c++)
+                {
+                    traversal.Add(child);
+                    child = nodes[child].nextSibling;
+                }
+            }
+            return true;
+        }
+
+        private static int SkipExcludedSubtree(List<NetworkIdentity> components, int start, ref Transform root)
+        {
+            // A subtree occupies one contiguous range in Unity's depth-first result. Grow a
+            // search window before bisecting it so small excluded branches stay cheap.
+            int lower = start;
+            int upper = start;
+            for (long step = 1; upper < components.Count; step *= 2)
+            {
+                var component = components[upper];
+                if (!component)
+                    return lower;
+                if (!component.transform.IsChildOf(root))
+                    break;
+                lower = upper + 1;
+                upper += (int)Math.Min(step, components.Count - upper);
             }
 
+            while (lower < upper)
+            {
+                int middle = lower + (upper - lower) / 2;
+                var component = components[middle];
+                // A missing entry cannot establish a boundary. Keep the outer exclusion
+                // guard and resume from the last lower bound that was proven safe.
+                if (!component)
+                    return lower;
+                if (component.transform.IsChildOf(root))
+                    lower = middle + 1;
+                else
+                    upper = middle;
+            }
+            // The boundary is proven, so the caller need not check this root again.
+            root = null;
+            return lower;
+        }
+
+        private static int GetComponentGroupEnd(List<NetworkIdentity> components, int start, Transform transform)
+        {
+            int end = start + 1;
+            while (end < components.Count && (!components[end] || components[end].transform == transform))
+                end++;
+            return end;
+        }
+
+        private static bool HasObserver(List<NetworkIdentity> components, int start, int end, PlayerID observer)
+        {
+            for (int i = start; i < end; i++)
+            {
+                if (components[i] && components[i].IsObserverOrPending(observer))
+                    return true;
+            }
+            return false;
+        }
+
+        private static void AppendComponents(List<NetworkIdentity> components, int start, int end,
+            List<NetworkIdentity> allChildren)
+        {
+            if (allChildren == null)
+                return;
+            for (int i = start; i < end; i++)
+            {
+                if (components[i])
+                    allChildren.Add(components[i]);
+            }
+        }
+
+        private static void AddPrototypePiece(DisposableList<GameObjectFrameworkPiece> framework,
+            Transform transform, NetworkIdentity identity, Transform parent, int childCount)
+        {
+            transform.GetLocalPositionAndRotation(out var localPos, out var localRot);
+            framework.Add(new GameObjectFrameworkPiece(
+                new LocalTransform(localPos, localRot, transform.localScale),
+                new PrefabPieceID(identity.scopedPrefabId, identity.componentIndex),
+                identity.id ?? default, childCount, identity.gameObject.activeSelf,
+                GetLiveRelativePath(parent, identity)));
+        }
+
+        private static GameObjectPrototype FinishPrototype(Transform transform, NetworkIdentity rootId,
+            DisposableList<GameObjectFrameworkPiece> framework, bool isDefaultParent)
+        {
             var parentNid = rootId.parent ? rootId.parent : default;
             var parentID = parentNid?.id;
             int[] path = null;
 
             if (parentNid)
-                path = GetInvPath(parentNid.transform, transform).list.ToArray();
+            {
+                using var invPath = GetInvPath(parentNid.transform, transform);
+                path = invPath.list.ToArray();
+            }
 
-            prototype = new GameObjectPrototype(transform.localPosition, transform.localRotation, transform.localScale, parentID, path,
+            return new GameObjectPrototype(transform.localPosition, transform.localRotation, transform.localScale, parentID, path,
                 framework, isDefaultParent ? transform.GetSiblingIndex() : null);
-            return true;
         }
 
         public static GameObjectPrototype GetFullPrototype(Transform transform, List<NetworkIdentity> allChildren = null,
@@ -619,82 +941,8 @@ namespace PurrNet.Modules
                     null);
             }
 
-            bool isDefaultParent = transform.parent == rootId.defaultParent;
-            var queue = QueuePool<GameObjectRuntimePair>.Instantiate();
-            var pieceIdentities = allChildren != null ? ListPool<NetworkIdentity>.Instantiate() : null;
-            var pair = GetRuntimePair(null, rootId);
-
-            queue.Enqueue(pair);
-
-            while (queue.Count > 0)
-            {
-                using var current = queue.Dequeue();
-                var children = current.children;
-                var trs = current.identity.transform;
-
-                int actualChildCount = 0;
-                for (var i = 0; i < children.Count; i++)
-                {
-                    var child = children[i];
-                    if (!includeUnspawnedChildren && !child.identity.id.HasValue)
-                        continue;
-                    var childPair = GetRuntimePair(trs, child.identity);
-                    queue.Enqueue(childPair);
-                    ++actualChildCount;
-                }
-
-                var pid = new PrefabPieceID(current.identity.prefabId, current.identity.componentIndex);
-                trs.GetLocalPositionAndRotation(out var localPos, out var localRot);
-                var localTrs = new LocalTransform(localPos, localRot, trs.localScale);
-
-                var piece = new GameObjectFrameworkPiece(
-                    localTrs,
-                    pid,
-                    current.identity.id ?? default,
-                    actualChildCount,
-                    current.identity.gameObject.activeSelf,
-                    current.identity.invertedPathToNearestParent
-                );
-
-                framework.Add(piece);
-                pieceIdentities?.Add(current.identity);
-            }
-
-            QueuePool<GameObjectRuntimePair>.Destroy(queue);
-
-            if (allChildren != null)
-            {
-                CollectInBuildOrder(framework, pieceIdentities, 0, allChildren);
-                ListPool<NetworkIdentity>.Destroy(pieceIdentities);
-            }
-
-            var parentNid = rootId.parent ? rootId.parent : default;
-            var parentID = parentNid?.id;
-            int[] path = null;
-
-            if (parentNid)
-                path = GetInvPath(parentNid.transform, transform).list.ToArray();
-
-            return new GameObjectPrototype(transform.localPosition, transform.localRotation, transform.localScale, parentID, path, framework,
-                isDefaultParent ? transform.GetSiblingIndex() : null);
-        }
-
-        private static void CollectInBuildOrder(DisposableList<GameObjectFrameworkPiece> framework,
-            List<NetworkIdentity> pieceIdentities, int currentIdx, List<NetworkIdentity> allChildren)
-        {
-            var components = ListPool<NetworkIdentity>.Instantiate();
-            pieceIdentities[currentIdx].gameObject.GetComponents(components);
-            for (var c = 0; c < components.Count; c++)
-                allChildren.Add(components[c]);
-            ListPool<NetworkIdentity>.Destroy(components);
-
-            int childScopeStart = 1;
-            for (var i = 0; i < currentIdx; ++i)
-                childScopeStart += framework[i].childCount;
-
-            var childCount = framework[currentIdx].childCount;
-            for (var j = 0; j < childCount; j++)
-                CollectInBuildOrder(framework, pieceIdentities, childScopeStart + j, allChildren);
+            CapturePrototype(transform, rootId, null, includeUnspawnedChildren, framework, allChildren);
+            return FinishPrototype(transform, rootId, framework, transform.parent == rootId.defaultParent);
         }
 
         public static bool TryBuildPrototype(PoolPair pair, GameObjectPrototype prototype,
@@ -712,14 +960,9 @@ namespace PurrNet.Modules
                 return TryBuildPrototypeHelper(pair, prototype, createdNids, null, 0, out result,
                     out shouldBeActive);
             }
-            catch
-#if PURRNET_DEBUG_POOLING
-                (System.Exception e)
-#endif
+            catch (Exception e)
             {
-#if PURRNET_DEBUG_POOLING
                 PurrLogger.LogError($"Build prototype exception: {e.Message}\n{e.StackTrace}");
-#endif
                 result = null;
                 shouldBeActive = false;
                 return false;
@@ -762,7 +1005,7 @@ namespace PurrNet.Modules
                 foreach (var sib in siblings)
                 {
                     sib.parent = p;
-                    sib.invertedPathToNearestParent = current.inversedRelativePath;
+                    sib.invertedPathToNearestParentArray = current.inversedRelativePath;
                 }
             }
             else
@@ -773,7 +1016,7 @@ namespace PurrNet.Modules
                 foreach (var sib in siblings)
                 {
                     sib.parent = null;
-                    sib.invertedPathToNearestParent = current.inversedRelativePath;
+                    sib.invertedPathToNearestParentArray = current.inversedRelativePath;
                 }
             }
 
@@ -847,18 +1090,21 @@ namespace PurrNet.Modules
             instance.SetSiblingIndex(targetSiblingIndex);
         }
 
-        private static GameObjectRuntimePair GetRuntimePair(Transform parent, NetworkIdentity rootId)
+        /// <summary>
+        /// Live replacement for the cached invertedPathToNearestParent: the cache is refreshed on
+        /// reparents but not when siblings are destroyed or reordered, so captured prototypes must
+        /// re-read the sibling indices from the transform at capture time.
+        /// </summary>
+        private static int[] GetLiveRelativePath(Transform parent, NetworkIdentity identity)
         {
-            var children = DisposableList<TransformIdentityPair>.Create(rootId.directChildren.Count);
-            var pair = new GameObjectRuntimePair(parent, rootId, children);
+            var pathParent = parent;
+            if (!pathParent && identity.parent)
+                pathParent = identity.parent.transform;
+            if (!pathParent)
+                return Array.Empty<int>();
 
-            foreach (var c in rootId.directChildren)
-            {
-                if (!c)
-                    continue;
-                children.Add(new TransformIdentityPair(c.transform, c));
-            }
-            return pair;
+            using var invPath = GetInvPath(pathParent, identity.transform);
+            return invPath.list.ToArray();
         }
 
         public static void GetDirectChildren(Transform root, DisposableList<TransformIdentityPair> children)
@@ -905,6 +1151,7 @@ namespace PurrNet.Modules
                 QueuePool<GameObject>.Destroy(queue);
             _pool.Clear();
             _pooledObjects.Clear();
+            _alreadyWarmedUp.Clear();
             ClearActiveScenePieceQueues();
             _activeScenePieceSet.Clear();
 

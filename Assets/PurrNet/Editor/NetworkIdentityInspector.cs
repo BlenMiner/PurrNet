@@ -1,4 +1,4 @@
-using System.Collections.Generic;
+﻿using System.Collections.Generic;
 using System.Reflection;
 using PurrNet.Contributors;
 using PurrNet.Utils;
@@ -340,21 +340,20 @@ namespace PurrNet.Editor
 
             EditorGUILayout.BeginVertical("box", GUILayout.ExpandWidth(false));
 
-            EditorGUILayout.LabelField($"prefabId: {identity.prefabId}");
+            EditorGUILayout.LabelField($"prefabId: {identity.scopedPrefabId}");
             EditorGUILayout.LabelField($"componentIndex: {identity.componentIndex}");
             EditorGUILayout.LabelField($"shouldBePooled: {identity.shouldBePooled}");
             EditorGUILayout.ObjectField("parent", identity.parent, typeof(NetworkIdentity), true);
 
             string path = "";
 
-            if (identity.invertedPathToNearestParent != null)
+            var invertedPath = identity.invertedPathToNearestParent;
+
+            for (var index = 0; index < invertedPath.Length; index++)
             {
-                for (var index = 0; index < identity.invertedPathToNearestParent.Length; index++)
-                {
-                    var parent = identity.invertedPathToNearestParent[index];
-                    bool isLast = index == identity.invertedPathToNearestParent.Length - 1;
-                    path += parent + (isLast ? ";" : " -> ");
-                }
+                var parent = invertedPath[index];
+                bool isLast = index == invertedPath.Length - 1;
+                path += parent + (isLast ? ";" : " -> ");
             }
 
             EditorGUILayout.LabelField($"pathToNearestParent: {path}");

@@ -20,6 +20,7 @@ namespace LiteNetLib
         private static List<object> _mergedPacketUserDataList;
         private const int MergeHeaderSize = 2;
         private const int MergeSizeThreshold = 20;
+        private NetPacket _mergeTail;
 
         private struct PendingPacket
         {
@@ -114,43 +115,152 @@ namespace LiteNetLib
             _outgoingAcks = new NetPacket(PacketProperty.Ack, (_windowSize - 1) / BitsInByte + 2) {ChannelId = id};
         }
 
+        public override void AddToQueue(NetPacket packet)
+        {
+            lock (OutgoingQueue)
+            {
+                _mergeTail = null;
+                OutgoingQueue.Enqueue(packet);
+            }
+            AddToPeerChannelSendQueue();
+        }
+
+        internal void AddToQueue(ReadOnlySpan<byte> data, int mtu)
+        {
+            lock (OutgoingQueue)
+            {
+                if (!TryAppendToTail(data, mtu))
+                {
+                    var packet = Peer.NetManager.PoolGetPacket(mtu);
+                    packet.Property = PacketProperty.Channeled;
+                    packet.Size = NetConstants.ChanneledHeaderSize + data.Length;
+                    packet.UserData = null;
+                    data.CopyTo(new Span<byte>(packet.RawData, NetConstants.ChanneledHeaderSize, data.Length));
+                    OutgoingQueue.Enqueue(packet);
+                    _mergeTail = packet;
+                }
+            }
+            AddToPeerChannelSendQueue();
+        }
+
+        private bool TryAppendToTail(ReadOnlySpan<byte> data, int mtu)
+        {
+            var packet = _mergeTail;
+            if (packet == null || OutgoingQueue.Count == 0 || data.Overlaps(new ReadOnlySpan<byte>(packet.RawData)))
+                return false;
+
+            int headerSize = NetConstants.ChanneledHeaderSize;
+            bool merged = packet.Property == PacketProperty.ReliableMerged;
+            int firstSize = packet.Size - headerSize;
+            int size = packet.Size + data.Length + MergeHeaderSize + (merged ? 0 : MergeHeaderSize);
+            if (size + MergeSizeThreshold > mtu || size > packet.RawData.Length)
+                return false;
+
+            if (!merged)
+            {
+                Buffer.BlockCopy(packet.RawData, headerSize, packet.RawData, headerSize + MergeHeaderSize, firstSize);
+                FastBitConverter.GetBytes(packet.RawData, headerSize, (ushort)firstSize);
+                packet.Size += MergeHeaderSize;
+                packet.Property = PacketProperty.ReliableMerged;
+            }
+
+            FastBitConverter.GetBytes(packet.RawData, packet.Size, (ushort)data.Length);
+            data.CopyTo(new Span<byte>(packet.RawData, packet.Size + MergeHeaderSize, data.Length));
+            packet.Size = size;
+            return true;
+        }
+
+        private NetPacket DequeueOutgoingPacket()
+        {
+            var packet = OutgoingQueue.Dequeue();
+            if (ReferenceEquals(packet, _mergeTail))
+                _mergeTail = null;
+            return packet;
+        }
+
+        private NetPacket TakeMergedPacket(NetPacket packet)
+        {
+            int headerSize = NetConstants.ChanneledHeaderSize;
+            if (packet.Size + MergeSizeThreshold <= Peer.Mtu &&
+                headerSize + MergeHeaderSize + BitConverter.ToUInt16(packet.RawData, headerSize) < packet.Size)
+                return DequeueOutgoingPacket();
+
+            int position = headerSize;
+            int count = 0;
+            int maxSize = Peer.Mtu - MergeSizeThreshold;
+            while (position + MergeHeaderSize <= packet.Size)
+            {
+                int length = BitConverter.ToUInt16(packet.RawData, position);
+                int next = position + MergeHeaderSize + length;
+                if (count > 0 && next > maxSize)
+                    break;
+                position = next;
+                ++count;
+            }
+
+            if (position == packet.Size)
+            {
+                DequeueOutgoingPacket();
+                if (count == 1)
+                {
+                    int length = packet.Size - headerSize - MergeHeaderSize;
+                    Buffer.BlockCopy(packet.RawData, headerSize + MergeHeaderSize, packet.RawData, headerSize, length);
+                    packet.Size = headerSize + length;
+                    packet.Property = PacketProperty.Channeled;
+                }
+                return packet;
+            }
+
+            int payloadSize = position - headerSize;
+            var result = Peer.NetManager.PoolGetPacket(position - (count == 1 ? MergeHeaderSize : 0));
+            result.Property = count == 1 ? PacketProperty.Channeled : PacketProperty.ReliableMerged;
+            result.UserData = null;
+            int offset = count == 1 ? MergeHeaderSize : 0;
+            Buffer.BlockCopy(packet.RawData, headerSize + offset, result.RawData, headerSize, payloadSize - offset);
+            int remaining = packet.Size - position;
+            Buffer.BlockCopy(packet.RawData, position, packet.RawData, headerSize, remaining);
+            packet.Size = headerSize + remaining;
+            return result;
+        }
+
         private NetPacket GetNextOutgoingPacket()
         {
+            var packet = OutgoingQueue.Peek();
+            if (packet.Property == PacketProperty.ReliableMerged)
+                return TakeMergedPacket(packet);
+
+            packet = DequeueOutgoingPacket();
+            if (OutgoingQueue.Count == 0 || packet.IsFragmented)
+                return packet;
+
             int maxPayloadSize = Peer.Mtu - NetConstants.ChanneledHeaderSize;
-            NetPacket mergedPacket = null;
+
+            // The caller holds the queue lock. Only allocate a merge packet if
+            // the first two messages can actually be sent together.
+            var second = OutgoingQueue.Peek();
+            int firstTwoSize = packet.Size + second.Size - 2 * NetConstants.ChanneledHeaderSize + 2 * MergeHeaderSize;
+            if (second.IsFragmented || second.Property == PacketProperty.ReliableMerged ||
+                firstTwoSize + MergeSizeThreshold > maxPayloadSize)
+                return packet;
+
+            var mergedPacket = Peer.NetManager.PoolGetPacket(Peer.Mtu);
+            mergedPacket.Property = PacketProperty.ReliableMerged;
             int mergePos = 0;
 
-            List<object> userDataList = null;
-
-            while (OutgoingQueue.Count > 0)
+            var userDataList = _mergedPacketUserDataList;
+            if (userDataList == null)
             {
-                var packet = OutgoingQueue.Peek();
-                if (packet.IsFragmented)
-                    break;
+                userDataList = new List<object>();
+                _mergedPacketUserDataList = userDataList;
+            }
+            else
+            {
+                userDataList.Clear();
+            }
 
+            while (true)
+            {
                 int payloadSize = packet.Size - NetConstants.ChanneledHeaderSize;
-                int newSize = mergePos + MergeHeaderSize + payloadSize;
-                if (newSize + MergeSizeThreshold > maxPayloadSize && mergePos > 0)
-                    break;
-                if (newSize > maxPayloadSize)
-                    break;
-
-                if (mergedPacket == null)
-                {
-                    mergedPacket = Peer.NetManager.PoolGetPacket(Peer.Mtu);
-                    mergedPacket.Property = PacketProperty.ReliableMerged;
-                    userDataList = _mergedPacketUserDataList;
-                    if (userDataList == null)
-                    {
-                        userDataList = new List<object>();
-                        _mergedPacketUserDataList = userDataList;
-                    }
-                    else
-                    {
-                        userDataList.Clear();
-                    }
-                }
-
                 FastBitConverter.GetBytes(mergedPacket.RawData, NetConstants.ChanneledHeaderSize + mergePos, (ushort)payloadSize);
                 Buffer.BlockCopy(packet.RawData, NetConstants.ChanneledHeaderSize, mergedPacket.RawData, NetConstants.ChanneledHeaderSize + mergePos + MergeHeaderSize, payloadSize);
                 mergePos += payloadSize + MergeHeaderSize;
@@ -161,11 +271,18 @@ namespace LiteNetLib
                     packet.UserData = null;
                 }
 
-                Peer.NetManager.PoolRecycle(OutgoingQueue.Dequeue());
-            }
+                Peer.NetManager.PoolRecycle(packet);
+                if (OutgoingQueue.Count == 0)
+                    break;
 
-            if (mergedPacket == null)
-                return OutgoingQueue.Dequeue();
+                packet = OutgoingQueue.Peek();
+                int newSize = mergePos + MergeHeaderSize + packet.Size - NetConstants.ChanneledHeaderSize;
+                if (packet.IsFragmented || packet.Property == PacketProperty.ReliableMerged ||
+                    newSize + MergeSizeThreshold > maxPayloadSize)
+                    break;
+
+                DequeueOutgoingPacket();
+            }
 
             mergedPacket.Size = NetConstants.ChanneledHeaderSize + mergePos;
             if (userDataList.Count > 0)

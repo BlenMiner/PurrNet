@@ -228,7 +228,7 @@ namespace PurrNet.Modules
                     {
                         using var stream = RPCModule.AllocStream(false);
                         stream.WriteBytes(data.data);
-                        stream.ResetPosition();
+                        stream.ResetPositionAndMode(true);
 
                         request.completer.Respond(stream);
                     }

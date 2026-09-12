@@ -282,14 +282,15 @@ namespace PurrNet.Packing
 
         public static bool WriteAsNetworkAsset(BitPacker packer, Object unityObj)
         {
-            var nassets = NetworkManager.main.networkAssets;
-            int index = nassets && unityObj ? nassets.GetIndex(unityObj) : -1;
-            bool isNetworkAsset = index != -1;
+            var manager = NetworkManager.main;
+            var id = NetworkAssetID.invalid;
+            bool isNetworkAsset = manager && manager.networkAssetResolver.TryGetId(
+                unityObj, NetworkAssetResolver.serializationSceneHint, out id, true);
             packer.WriteBit(isNetworkAsset);
 
             if (isNetworkAsset)
             {
-                Packer<PackedInt>.Write(packer, index);
+                Packer<NetworkAssetID>.Write(packer, id);
                 return true;
             }
 
@@ -334,10 +335,11 @@ namespace PurrNet.Packing
         {
             bool isNetworkAsset = Packer<bool>.Read(packer);
 
-            if (isNetworkAsset && NetworkManager.main && NetworkManager.main.networkAssets)
+            var manager = NetworkManager.main;
+            if (isNetworkAsset && manager)
             {
-                int index = Packer<PackedInt>.Read(packer);
-                value = NetworkManager.main.networkAssets.GetAsset(index) is T cast ? cast : default;
+                var id = Packer<NetworkAssetID>.Read(packer);
+                value = manager.networkAssetResolver.TryGetAsset(id, out var asset) && asset is T cast ? cast : default;
                 return true;
             }
 
