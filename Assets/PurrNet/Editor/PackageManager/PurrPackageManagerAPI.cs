@@ -25,6 +25,11 @@ namespace PurrNet.Editor
             return await SendRequest<UserInfo>($"{BaseUrl}/me", apiKey);
         }
 
+        internal static async Task<Result<UserInfo>> GetMe(string apiKey, int timeoutSeconds)
+        {
+            return await SendRequest<UserInfo>($"{BaseUrl}/me", apiKey, timeoutSeconds);
+        }
+
         public static async Task<Result<PackageRegistrationResponse>> RegisterPackage(
             string apiKey, PackageRegistrationRequest registration)
         {
@@ -68,11 +73,12 @@ namespace PurrNet.Editor
             return tcs.Task;
         }
 
-        private static async Task<Result<T>> SendRequest<T>(string url, string apiKey)
+        private static async Task<Result<T>> SendRequest<T>(string url, string apiKey, int timeoutSeconds = 0)
         {
             try
             {
                 using var request = UnityWebRequest.Get(url);
+                request.timeout = timeoutSeconds;
 
                 if (!string.IsNullOrEmpty(apiKey))
                     request.SetRequestHeader("Authorization", "Bearer " + apiKey);

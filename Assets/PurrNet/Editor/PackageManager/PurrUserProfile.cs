@@ -93,7 +93,10 @@ namespace PurrNet.Editor
                 var loginRect = new Rect(anchor.xMax - 58, anchor.y, 58, anchor.height);
                 if (GUI.Button(loginRect, "Login"))
                     PurrPackageManagerAuth.Login();
-                return 58;
+                var keyRect = new Rect(loginRect.x - 108, anchor.y, 104, anchor.height);
+                if (GUI.Button(keyRect, new GUIContent("Paste API Key", "Open a field to enter your Unity API key")))
+                    PurrPackageManagerAuth.PasteApiKey();
+                return 166;
             }
 
             const float logoutW = 58;

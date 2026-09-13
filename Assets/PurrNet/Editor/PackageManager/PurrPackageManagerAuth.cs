@@ -12,7 +12,9 @@ namespace PurrNet.Editor
         private const string LoginBaseUrl = "https://purrnet.dev/auth/unity";
 
         private static HttpListener _listener;
-        private static Thread _listenerThread;
+        private static int _loginAttempt;
+
+        internal static int LoginAttempt => _loginAttempt;
 
         public static event Action onAuthChanged;
 
@@ -23,12 +25,14 @@ namespace PurrNet.Editor
 
         public static void SetApiKey(string key)
         {
+            CancelLogin();
             EditorPrefs.SetString(PrefKey, key);
             onAuthChanged?.Invoke();
         }
 
         public static void ClearApiKey()
         {
+            CancelLogin();
             EditorPrefs.DeleteKey(PrefKey);
             onAuthChanged?.Invoke();
         }
@@ -48,35 +52,40 @@ namespace PurrNet.Editor
 
         public static void Login()
         {
-            if (_listener != null)
-            {
-                StopListener();
-            }
+            CancelLogin();
+            int attempt = _loginAttempt;
 
             int port = GetAvailablePort();
-            _listener = new HttpListener();
-            _listener.Prefixes.Add($"http://localhost:{port}/");
+            var listener = new HttpListener();
+            listener.Prefixes.Add($"http://localhost:{port}/");
 
             try
             {
-                _listener.Start();
+                listener.Start();
             }
             catch (Exception e)
             {
                 Debug.LogError($"[PurrNet] Failed to start auth listener: {e.Message}");
-                _listener = null;
+                listener.Close();
                 return;
             }
 
-            _listenerThread = new Thread(() => ListenForCallback(port))
+            _listener = listener;
+            var listenerThread = new Thread(() => ListenForCallback(listener, attempt))
             {
                 IsBackground = true,
                 Name = "PurrNet Auth Listener"
             };
-            _listenerThread.Start();
+            listenerThread.Start();
 
             var url = $"{LoginBaseUrl}?port={port}";
             Application.OpenURL(url);
+        }
+
+        [MenuItem("Tools/PurrNet/Paste API Key", false, -100)]
+        public static void PasteApiKey()
+        {
+            PurrPackageManagerLoginWindow.Open();
         }
 
         public static void Logout()
@@ -86,16 +95,7 @@ namespace PurrNet.Editor
 
         public static void DrawLoginButton()
         {
-            if (HasApiKey())
-            {
-                if (GUILayout.Button("Logout", GUILayout.Height(20), GUILayout.Width(60)))
-                    Logout();
-            }
-            else
-            {
-                if (GUILayout.Button("Login", GUILayout.Height(20), GUILayout.Width(60)))
-                    Login();
-            }
+            DrawLoginButton(60, 20);
         }
 
         public static void DrawLoginButton(float width, float height)
@@ -109,16 +109,19 @@ namespace PurrNet.Editor
             {
                 if (GUILayout.Button("Login", GUILayout.Height(height), GUILayout.Width(width)))
                     Login();
+                if (GUILayout.Button(new GUIContent("Paste API Key", "Open a field to enter your Unity API key"),
+                        GUILayout.Height(height), GUILayout.Width(Math.Max(width, 104))))
+                    PasteApiKey();
             }
         }
 
-        private static void ListenForCallback(int port)
+        private static void ListenForCallback(HttpListener listener, int attempt)
         {
             try
             {
-                while (_listener is { IsListening: true })
+                while (listener.IsListening)
                 {
-                    var context = _listener.GetContext();
+                    var context = listener.GetContext();
                     var request = context.Request;
 
                     // Add CORS headers for the website fetch
@@ -136,14 +139,6 @@ namespace PurrNet.Editor
                     var key = request.QueryString["key"];
                     bool success = !string.IsNullOrEmpty(key);
 
-                    if (success)
-                    {
-                        EditorApplication.delayCall += () =>
-                        {
-                            SetApiKey(key);
-                        };
-                    }
-
                     var body = success ? "ok" : "missing key";
                     var buffer = System.Text.Encoding.UTF8.GetBytes(body);
                     context.Response.ContentType = "text/plain";
@@ -153,7 +148,15 @@ namespace PurrNet.Editor
                     context.Response.OutputStream.Close();
 
                     if (success)
+                    {
+                        // Finish the HTTP response before SetApiKey can close the listener.
+                        EditorApplication.delayCall += () =>
+                        {
+                            if (attempt == _loginAttempt)
+                                SetApiKey(key);
+                        };
                         break;
+                    }
                 }
             }
             catch (HttpListenerException)
@@ -170,23 +173,31 @@ namespace PurrNet.Editor
             }
             finally
             {
-                StopListener();
+                StopListener(listener);
             }
         }
 
-        private static void StopListener()
+        internal static void CancelLogin()
         {
+            Interlocked.Increment(ref _loginAttempt);
+            var listener = Interlocked.Exchange(ref _listener, null);
+            if (listener != null)
+                StopListener(listener);
+        }
+
+        private static void StopListener(HttpListener listener)
+        {
+            // An older listener must never close a newer login's listener.
+            Interlocked.CompareExchange(ref _listener, null, listener);
             try
             {
-                _listener?.Stop();
-                _listener?.Close();
+                listener.Stop();
+                listener.Close();
             }
             catch
             {
                 // ignore cleanup errors
             }
-            _listener = null;
-            _listenerThread = null;
         }
 
         private static int GetAvailablePort()
