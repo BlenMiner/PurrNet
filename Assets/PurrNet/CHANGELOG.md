@@ -1,3 +1,10 @@
+## [1.23.1-beta.2](https://github.com/PurrNet/PurrNet/compare/v1.23.1-beta.1...v1.23.1-beta.2) (2026-09-13)
+
+
+### Bug Fixes
+
+* allow users to manually input api key to login ([ed43ed3](https://github.com/PurrNet/PurrNet/commit/ed43ed3207cca1b3ff2e4de6a9b7fb93df6d2a7b))
+
 ## [1.23.1-beta.1](https://github.com/PurrNet/PurrNet/compare/v1.23.0...v1.23.1-beta.1) (2026-09-13)
 
 
