@@ -731,7 +731,7 @@ public class BitPackerEdgeCaseTests
     }
 
     [Test]
-    public void FragmentationLayer_PerSenderBudget_RejectionReportedOncePerMessage()
+    public void FragmentationLayer_PerSenderBudget_SequencedRejectionReportedOncePerMessage()
     {
         using var sender = new FragmentationLayer();
         using var receiver = new FragmentationLayer();
@@ -743,7 +743,7 @@ public class BitPackerEdgeCaseTests
         {
             var fragments = new List<byte[]>();
             sender.Send(new ByteData(payload, 0, payload.Length), 24, fragment => Capture(fragment, fragments));
-            Assert.IsFalse(receiver.Receive(3, 0, false,
+            Assert.IsFalse(receiver.Receive(3, (byte)message, true,
                 new ByteData(fragments[0], 0, fragments[0].Length), out _));
         }
 
@@ -756,7 +756,7 @@ public class BitPackerEdgeCaseTests
 
         for (int i = 0; i < rejectedFragments.Count; i++)
         {
-            Assert.IsFalse(receiver.Receive(3, 0, false,
+            Assert.IsFalse(receiver.Receive(3, 99, true,
                 new ByteData(rejectedFragments[i], 0, rejectedFragments[i].Length), out _));
         }
 

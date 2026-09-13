@@ -21,7 +21,7 @@ namespace PurrNet.Transports
         /// <summary>The message did not complete within the reassembly timeout.</summary>
         Expired = 0,
 
-        /// <summary>The message was evicted to make room for a newer one under global memory pressure.</summary>
+        /// <summary>The message was evicted to make room under sender or global reassembly pressure.</summary>
         Evicted = 1,
 
         /// <summary>The sender exceeded its reassembly budget; the message was rejected on arrival.</summary>
@@ -79,6 +79,9 @@ namespace PurrNet.Transports
         const int MAX_PENDING_BYTES = 8 * 1024 * 1024;
         const int MAX_PENDING_BYTES_PER_SENDER = 2 * 1024 * 1024;
 
+        const int MAX_PRESSURE_EVICTIONS_PER_SENDER = 512;
+        const int MAX_PRESSURE_EVICTIONS = 8192;
+
         const byte FLAG_UNFRAGMENTED = 0;
         const byte FLAG_FRAGMENTED = 1;
         const byte FLAG_SEQUENCED = 2;
@@ -96,6 +99,8 @@ namespace PurrNet.Transports
         readonly Dictionary<ReassemblyKey, ReassemblyEntry> _pending = new(MAX_PENDING_MESSAGES);
         readonly Dictionary<int, SenderBudget> _senderBudgets = new(MAX_PENDING_MESSAGES);
         readonly Dictionary<StreamKey, uint> _latestSequencedMessages = new(MAX_PENDING_MESSAGES);
+        readonly Dictionary<ReassemblyKey, int> _unreliableEvictions = new(MAX_PENDING_MESSAGES);
+        readonly Dictionary<int, int> _senderEvictionCounts = new(MAX_PENDING_MESSAGES);
         readonly List<ReassemblyKey> _removeBuffer = new(MAX_PENDING_MESSAGES);
         readonly List<StreamKey> _streamRemoveBuffer = new(MAX_PENDING_MESSAGES);
 
@@ -168,6 +173,7 @@ namespace PurrNet.Transports
             public ushort fragmentStride;
             public int totalLength;
             public int createdAtTick;
+            public bool sequenced;
             public DisposableArray<byte> buffer;
 
             // 255 flags without allocating a second array for every pending message.
@@ -394,12 +400,15 @@ namespace PurrNet.Transports
             var key = new ReassemblyKey(senderId, streamId, messageId);
             bool hasEntry = _pending.TryGetValue(key, out var entry);
 
+            if (!sequenced && !hasEntry && _unreliableEvictions.ContainsKey(key))
+                return false;
+
             if (sequenced && !AcceptSequenced(key, hasEntry))
                 return false;
 
             if (!hasEntry)
             {
-                if (!TryReserve(senderId, totalLength))
+                if (!TryReserve(senderId, totalLength, sequenced))
                 {
                     ReportRejected(key, totalLength, fragmentIndex, payloadLength, data, header);
                     return false;
@@ -411,6 +420,7 @@ namespace PurrNet.Transports
                     fragmentStride = fragmentStride,
                     totalLength = totalLength,
                     createdAtTick = Environment.TickCount,
+                    sequenced = sequenced,
                     // Every range is validated and copied exactly once before completion.
                     buffer = DisposableArray<byte>.CreateUninitialized(totalLength)
                 };
@@ -453,7 +463,8 @@ namespace PurrNet.Transports
         /// </summary>
         public void CleanupStaleIfDue(int maxAgeMs, int intervalMs)
         {
-            if (_pending.Count == 0 && _sendBuffer.isDisposed && _completedBuffer.isDisposed)
+            if (_pending.Count == 0 && _unreliableEvictions.Count == 0 &&
+                _sendBuffer.isDisposed && _completedBuffer.isDisposed)
                 return;
 
             int now = Environment.TickCount;
@@ -463,7 +474,7 @@ namespace PurrNet.Transports
             _nextCleanupAt = unchecked(now + Math.Max(1, intervalMs));
             _cleanupScheduled = true;
 
-            if (_pending.Count > 0)
+            if (_pending.Count > 0 || _unreliableEvictions.Count > 0)
                 CleanupStale(maxAgeMs, now);
 
             if (_buffersTouched)
@@ -505,6 +516,16 @@ namespace PurrNet.Transports
 
             for (int i = 0; i < _streamRemoveBuffer.Count; i++)
                 _latestSequencedMessages.Remove(_streamRemoveBuffer[i]);
+
+            _removeBuffer.Clear();
+            foreach (var pair in _unreliableEvictions)
+            {
+                if (pair.Key.senderId == senderId)
+                    _removeBuffer.Add(pair.Key);
+            }
+            for (int i = 0; i < _removeBuffer.Count; i++)
+                _unreliableEvictions.Remove(_removeBuffer[i]);
+            _senderEvictionCounts.Remove(senderId);
         }
 
         public void Reset()
@@ -518,6 +539,8 @@ namespace PurrNet.Transports
             _pending.Clear();
             _senderBudgets.Clear();
             _latestSequencedMessages.Clear();
+            _unreliableEvictions.Clear();
+            _senderEvictionCounts.Clear();
             _removeBuffer.Clear();
             _streamRemoveBuffer.Clear();
             _pendingBytes = 0;
@@ -594,19 +617,80 @@ namespace PurrNet.Transports
             RemoveBufferedEntries(FragmentDropReason.SequencedStale);
         }
 
-        bool TryReserve(int senderId, int byteCount)
+        void RememberPressureEviction(ReassemblyKey key)
         {
-            _senderBudgets.TryGetValue(senderId, out var budget);
-            if (budget.messageCount >= MAX_PENDING_MESSAGES_PER_SENDER ||
-                byteCount > MAX_PENDING_BYTES_PER_SENDER - budget.byteCount)
+            _unreliableEvictions.Add(key, Environment.TickCount);
+            _senderEvictionCounts.TryGetValue(key.senderId, out int count);
+            _senderEvictionCounts[key.senderId] = count + 1;
+        }
+
+        void ForgetPressureEviction(ReassemblyKey key)
+        {
+            _unreliableEvictions.Remove(key);
+            int count = _senderEvictionCounts[key.senderId] - 1;
+            if (count == 0)
+                _senderEvictionCounts.Remove(key.senderId);
+            else
+                _senderEvictionCounts[key.senderId] = count;
+        }
+
+        bool TryMakeSenderRoom(int senderId, int byteCount, SenderBudget budget)
+        {
+            Span<ReassemblyKey> evictions = stackalloc ReassemblyKey[MAX_PENDING_MESSAGES_PER_SENDER];
+            int victimCount = 0;
+            _senderEvictionCounts.TryGetValue(senderId, out int evictionCount);
+
+            while (budget.messageCount >= MAX_PENDING_MESSAGES_PER_SENDER ||
+                   byteCount > MAX_PENDING_BYTES_PER_SENDER - budget.byteCount)
+            {
+                if (evictionCount + victimCount >= MAX_PRESSURE_EVICTIONS_PER_SENDER ||
+                    _unreliableEvictions.Count + victimCount >= MAX_PRESSURE_EVICTIONS ||
+                    !TryFindOldest(senderId, out var key, evictions.Slice(0, victimCount)))
+                    return false;
+
+                evictions[victimCount++] = key;
+                budget.messageCount--;
+                budget.byteCount -= _pending[key].totalLength;
+            }
+
+            // Reserve history before callbacks can trigger nested admissions.
+            for (int i = 0; i < victimCount; i++)
+                RememberPressureEviction(evictions[i]);
+
+            int evictedCount = 0;
+            try
+            {
+                for (; evictedCount < victimCount; evictedCount++)
+                    Evict(evictions[evictedCount]);
+            }
+            finally
+            {
+                for (int i = evictedCount; i < victimCount; i++)
+                    ForgetPressureEviction(evictions[i]);
+            }
+            return true;
+        }
+
+        bool TryReserve(int senderId, int byteCount, bool sequenced)
+        {
+            if (byteCount > MAX_PENDING_BYTES_PER_SENDER)
                 return false;
+            _senderBudgets.TryGetValue(senderId, out var budget);
+            while (budget.messageCount >= MAX_PENDING_MESSAGES_PER_SENDER ||
+                byteCount > MAX_PENDING_BYTES_PER_SENDER - budget.byteCount)
+            {
+                if (sequenced || !TryMakeSenderRoom(senderId, byteCount, budget))
+                    return false;
+                _senderBudgets.TryGetValue(senderId, out budget);
+            }
 
             // Global pressure evicts the oldest pending message instead of rejecting the new
             // one, so senders within their own budget can't be starved by everyone else.
             while (_pending.Count >= MAX_PENDING_MESSAGES || byteCount > MAX_PENDING_BYTES - _pendingBytes)
             {
-                if (!EvictOldest())
+                if (!TryFindOldest(null, out var key))
                     return false;
+                Evict(key);
             }
 
             _senderBudgets.TryGetValue(senderId, out budget);
@@ -617,18 +701,26 @@ namespace PurrNet.Transports
             return true;
         }
 
-        bool EvictOldest()
+        bool TryFindOldest(int? pressuredSender, out ReassemblyKey oldestKey,
+            ReadOnlySpan<ReassemblyKey> skipped = default)
         {
+            oldestKey = default;
             if (_pending.Count == 0)
                 return false;
 
             int now = Environment.TickCount;
-            ReassemblyKey oldestKey = default;
             int oldestAge = int.MinValue;
             bool found = false;
 
             foreach (var pair in _pending)
             {
+                // A pending entry with a record is reserved by an outer admission.
+                if (_unreliableEvictions.ContainsKey(pair.Key))
+                    continue;
+                if (pressuredSender.HasValue &&
+                    (pair.Key.senderId != pressuredSender.Value || pair.Value.sequenced ||
+                     ContainsKey(skipped, pair.Key)))
+                    continue;
                 int age = unchecked(now - pair.Value.createdAtTick);
                 if (!found || age > oldestAge)
                 {
@@ -638,14 +730,24 @@ namespace PurrNet.Transports
                 }
             }
 
-            if (!found || !_pending.TryGetValue(oldestKey, out var entry))
-                return false;
+            return found;
+        }
 
-            ReportDrop(oldestKey.senderId, FragmentDropReason.Evicted, in entry);
+        static bool ContainsKey(ReadOnlySpan<ReassemblyKey> keys, ReassemblyKey key)
+        {
+            for (int i = 0; i < keys.Length; i++)
+                if (keys[i].Equals(key))
+                    return true;
+            return false;
+        }
+
+        void Evict(ReassemblyKey key)
+        {
+            var entry = _pending[key];
+            ReportDrop(key.senderId, FragmentDropReason.Evicted, in entry);
             entry.buffer.Dispose();
-            _pending.Remove(oldestKey);
-            Release(oldestKey.senderId, entry.totalLength);
-            return true;
+            _pending.Remove(key);
+            Release(key.senderId, entry.totalLength);
         }
 
         void ReportDrop(int senderId, FragmentDropReason reason, in ReassemblyEntry entry)
@@ -705,6 +807,16 @@ namespace PurrNet.Transports
             }
 
             RemoveBufferedEntries(FragmentDropReason.Expired);
+
+            _removeBuffer.Clear();
+            foreach (var pair in _unreliableEvictions)
+            {
+                int elapsed = unchecked(now - pair.Value);
+                if (elapsed < 0 || elapsed >= maxAgeMs)
+                    _removeBuffer.Add(pair.Key);
+            }
+            for (int i = 0; i < _removeBuffer.Count; i++)
+                ForgetPressureEviction(_removeBuffer[i]);
         }
 
         void RemoveBufferedEntries(FragmentDropReason? reason)
