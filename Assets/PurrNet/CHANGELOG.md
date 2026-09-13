@@ -1,3 +1,10 @@
+## [1.23.1-beta.1](https://github.com/PurrNet/PurrNet/compare/v1.23.0...v1.23.1-beta.1) (2026-09-13)
+
+
+### Bug Fixes
+
+* fragmentation layer, resist incomplete-fragment spam and ordinary ([99d3d3d](https://github.com/PurrNet/PurrNet/commit/99d3d3d6c411946d0c27f7a532452385f455efb7))
+
 # [1.23.0](https://github.com/PurrNet/PurrNet/compare/v1.22.0...v1.23.0) (2026-09-12)
 
 
